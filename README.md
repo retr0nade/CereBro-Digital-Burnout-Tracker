@@ -22,11 +22,6 @@ A privacy-first Chrome extension that analyzes your browsing, focus, and behavio
 - **Animated, ultra-modern popup UI with real-time stats and visualizations**
 - **Local-only privacy:** All metrics are processed and retained on your device; nothing leaves your PC unless explicitly sent to your own backend or desktop app.
 
----
-
-## 🖥️ Preview
-
-![Burnout Tracker UI Screenshot](assets/demo-ui.png)
 
 ---
 
