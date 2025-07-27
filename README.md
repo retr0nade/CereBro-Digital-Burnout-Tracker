@@ -45,7 +45,7 @@ cd burnout-tracker-extension
 
 ## 🔧 Project Structure
 
-'''bash
+```bash
 burnout-tracker-extension/
 ├── manifest.json
 ├── background.js
@@ -58,7 +58,7 @@ burnout-tracker-extension/
 │ ├── icon48.png
 │ └── icon128.png
 └── README.md
-'''
+```
 
 
 ---
