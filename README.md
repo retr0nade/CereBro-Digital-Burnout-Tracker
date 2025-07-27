@@ -1,4 +1,4 @@
-# 🧠 Burnout Tracker – Advanced Chrome Extension
+# 🧠 CereBro – Advanced Digital Burnout Tracker
 
 **Digital wellness, redefined.**  
 A privacy-first Chrome extension that analyzes your browsing, focus, and behavioral patterns to surface actionable insights—and prevent digital burnout.
