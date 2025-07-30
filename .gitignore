@@ -61,3 +61,40 @@ Thumbs.db
 *.env
 .env.local
 .env.*.local
+
+
+# Python - more tools
+*.egg-info/
+.mypy_cache/
+.pytest_cache/
+.coverage
+coverage.xml
+
+# Jupyter notebook checkpoints
+.ipynb_checkpoints/
+
+# Node/Yarn/NPM debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-lock.yaml
+
+# Editor/IDE
+.spyproject/
+.ropeproject/
+
+# Mac/Windows
+.AppleDouble
+.LSOverride
+ehthumbs.db
+Desktop.ini
+
+# Rust lockfile (optional)
+src-tauri/Cargo.lock
+
+# Docker
+docker-compose.override.yml
+.envrc
+
+# Hot-update and misc build artifacts
+*.hot-update.*
