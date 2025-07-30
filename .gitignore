@@ -1,0 +1,63 @@
+# ==============================
+# Python
+# ==============================
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+venv/
+env/
+*.sqlite3
+*.db
+*.db-journal
+*.log
+
+# SQLite database files & other user data files generated locally:
+data/metrics.db
+backend/settings.json
+
+# ==============================
+# Node / React / Frontend
+# ==============================
+node_modules/
+dist/
+build/
+*.log
+
+# TailwindCSS generated output (if any):
+*.css.map
+
+# Lock files (optional: include or exclude)
+package-lock.json
+yarn.lock
+
+# ==============================
+# Tauri & Rust
+# ==============================
+/src-tauri/target/
+/src-tauri/.cargo/
+/src-tauri/icons/
+/src-tauri/build/
+
+# ==============================
+# VSCode / Editor
+# ==============================
+.vscode/
+.idea/
+*.code-workspace
+
+# ==============================
+# Others
+# ==============================
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# ==============================
+# Sensitive or local config files
+# ==============================
+*.env
+.env.local
+.env.*.local
