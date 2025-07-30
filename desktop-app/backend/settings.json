@@ -1,0 +1,7 @@
+{
+  "track_apps": true,
+  "track_idle": true,
+  "idle_threshold": 180,
+  "track_screenshots": false,
+  "track_audio": false
+}
