@@ -1,89 +1,146 @@
-# 🧠 CereBro – Advanced Digital Burnout Tracker
 
-**Digital wellness, redefined.**  
-A privacy-first Chrome extension that analyzes your browsing, focus, and behavioral patterns to surface actionable insights—and prevent digital burnout.
+# 🧠 CereBro – Mental Burnout Tracker
 
----
+**CereBro** is a two-part digital wellness tool that helps detect early signs of burnout by tracking user activity, both in the browser and on the desktop.
 
-## 🚀 Features
+It consists of:
 
-- **Session-long tracking** – Stats persist until browser/extension is restarted.
-- **All major digital wellness metrics:**
-  - ⏱️ Time spent per tab
-  - 🔄 Tab switch frequency
-  - ⚡ Erratic/rapid clicking (“stress signals”)
-  - 🔁 YouTube repeat/binge detection
-  - 💨 Scroll bursts & inactivity tracking
-  - ⌨️ Typing bursts and idle detection
-  - 📱 New tabs/min
-  - 🔄 Rapid URL navigation within the same tab
-  - 🔁 Repeated visits to same site
-  - 🟢 Focus vs distraction site time rolls up with live “focus bar”
-- **Animated, ultra-modern popup UI with real-time stats and visualizations**
-- **Local-only privacy:** All metrics are processed and retained on your device; nothing leaves your PC unless explicitly sent to your own backend or desktop app.
-
+- A **Chrome Extension** for real-time browser behavior monitoring.
+- A **Desktop App** for logging, analytics, and deeper insights.
 
 ---
 
-## ⚡ Installation
+## ✅ Current Features
 
-1. **Clone/Download this Repository**
+### 🌐 Chrome Extension
 
-git clone https://github.com/yourusername/burnout-tracker-extension.git
-cd burnout-tracker-extension
+Tracks browser-based behavioral patterns in real time:
 
+- **Time spent per tab** with cumulative totals
+- **Tab switches** and tab-switch frequency counter
+- **YouTube activity monitoring** (detects loops and binge sessions)
+- **Click behavior analysis** (erratic or rapid clicking detection)
+- **Inactivity detection** (based on scroll, clicks, and typing)
+- **Focus meter** that visualizes active focus vs distraction
+- **Live dashboard** in the popup UI with:
+  - Real-time metrics
+  - Focus time animation
+  - Stats breakdown by tab and category
 
-2. **Load Unpacked in Chrome**
+All data is stored locally in the browser and never leaves the user’s device.
+
+---
+
+### 💻 Desktop App
+
+Runs a local Python Flask server to receive and store metrics:
+
+- Accepts POST requests from the extension
+- Saves browser activity logs into a local SQLite database
+- Provides endpoints for querying historical usage
+- Base Flask + SQLite stack (no external dependencies)
+
+This allows long-term storage and future analytics that go beyond the browser session.
+
+---
+
+## 🔧 Ongoing Developments
+
+The following features are actively being worked on:
+
+### 🧠 Desktop Analytics & Insights
+- **Daily/weekly usage summaries**
+- **Trend visualizations** for focus, distraction, and stress signals
+- **Idle time vs active time analytics**
+- **Multi-app tracking support** (combine browser + PC data)
+
+### 🤖 AI-Powered Features
+- AI model to provide **personalized mental wellness insights**
+- Detection of **burnout risk** based on patterns
+- **Adaptive interventions** like:
+  - Focus reminders
+  - Break suggestions
+  - Customizable nudges based on behavior
+
+### 🌐 Cross-App Awareness
+- Tracking of **desktop application usage** alongside browser behavior
+- Unified analytics across all digital activities
+- Plans for full integration with PC activity monitor (e.g., active window logging, app usage time)
+
+### 🛠️ Other Planned Improvements
+- Toggle between **light/dark themes** in the popup UI
+- Export usage reports as CSV/PDF
+- Configurable thresholds for alerting user
+- Backend plugin system for custom AI modules
+
+---
+
+## 🚀 Getting Started
+
+### 1. Chrome Extension
+
 - Go to `chrome://extensions`
-- Enable “Developer mode”
-- Click **Load unpacked** and select this project folder.
+- Enable “Developer Mode”
+- Click **Load unpacked** and select the `burnout-tracker-extension` folder
 
-3. **[Optional] Run Your Local Server**
-- If using the desktop Python app/server: Start your Flask/API backend (see below).
-
----
-
-## 🔧 Project Structure
+### 2. Desktop App (Optional but Recommended)
 
 ```bash
-burnout-tracker-extension/
+cd desktop-app
+pip install -r requirements.txt
+python app_service.py
+```
+
+Runs locally at: `http://localhost:5005`
+
+The extension will start sending browser metrics to this endpoint automatically.
+
+---
+
+## 📂 Folder Structure
+
+```
+desktop-app/
+├── backend/
+│   ├── app_service.py      # Main Python daemon/server
+│   ├── metrics/
+│   │   ├── apps.py         # Active app/window monitor (cross-plat)
+│   │   ├── idle.py         # Idle time tracking
+│   │   ├── input.py        # Keyboard/mouse event hooks
+│   │   ├── screen.py       # Screen time, brightness, screenshot
+│   │   ├── audio.py        # Audio level (microphone)
+│   │   └── util.py         # Utility functions
+│   ├── data/
+│   │   └── models.py       # SQLite DB schemas for all time series and events
+│   ├── api/
+│   │   └── routes.py       # Flask/FastAPI with all endpoints
+│   ├── settings.json       # Default/active user preferences
+│   └── requirements.txt
+├── src-tauri/
+│   └── (Tauri config and rust backend bridge)
+├── frontend/
+│   ├── src/
+│   │   ├── App.tsx
+│   │   ├── Preferences.tsx
+│   │   ├── Dashboard.tsx
+│   │   ├── ScreenTime.tsx
+│   │   ├── MetricsCard.tsx
+│   │   ├── FocusBar.tsx
+│   │   └── ... (other components)
+│   ├── tailwind.config.js
+│   └── ...
+├── README.md
+└── (other auxiliary files)
+extension/
 ├── manifest.json
 ├── background.js
 ├── content.js
 ├── popup.html
 ├── popup.js
-├── popup.css
-├── icons/
-│ ├── icon16.png
-│ ├── icon48.png
-│ └── icon128.png
-└── README.md
+└── icons/
+
+
 ```
-
-
----
-
-## 📝 Usage
-
-- Open the extension popup from the Chrome toolbar to view your real-time wellness dashboard.
-- All statistics are persistently tracked.
-- Connect to your desktop “wellness server” (e.g., Python/Flask on `localhost:5005`) for advanced analytics/reports.
-- **No stats are reset mid-session**—metrics accumulate until Chrome or the extension is restarted.
-
----
-
-## 🛡️ Permissions & Privacy
-
-- **Tab, storage, and navigation permissions** are used _only_ for on-device analytics.
-- _No browsing content is ever uploaded unless you connect your own desktop analytics server._
-- **Reset**: Stats clear only on browser/extension reload. Manual data export/delete can be added as needed.
-
----
-
-## 🛠️ Backend/Desktop Integration (Optional)
-
-If you want persistent, historical stats beyond your Chrome session, use the [provided Flask+SQLite desktop app](docs/desktop-integration.md) or build your own.  
-The extension POSTs all data to `http://localhost:5005/api/track` every 5 seconds by default.
 
 ---
 
@@ -112,15 +169,25 @@ Ex: track site types, form fill behaviors, social media reactions, or page “ra
 - **No data sent to desktop app?**  
   Make sure your local server is running and accessible at `http://localhost:5005`.
 
----
-
-## 🌱 Credits
-
-- UI inspired by modern productivity apps and burnout-aware design
-- All code MIT licensed—use, fork, contribute, or remix as you wish!
 
 ---
 
-## ☎️ Questions?
+## 🛡 Privacy First
 
-Open an issue or discussion on this repo—or just [contact me](mailto:your.email@example.com) if you have suggestions or want to help improve burnout tracking for everyone.
+CereBro is **fully local** by design.
+
+- No data is ever uploaded or synced externally
+- All analytics run on-device
+- Extension uses only browser storage and local HTTP
+
+---
+
+## 💬 Contact & Contributions
+
+This is an evolving project. Contributions, feedback, and forks are welcome.
+
+Feel free to open an issue
+
+---
+
+MIT License • Built with focus, for your focus.
