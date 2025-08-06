@@ -140,22 +140,29 @@ class WindowTracker:
     def _get_active_window_windows(self) -> Optional[Tuple[str, str, int]]:
         """Get active window info on Windows"""
         try:
-            # Get foreground window handle
             hwnd = win32gui.GetForegroundWindow()
-            if hwnd == 0:
+            if not hwnd:
                 return None
             
-            # Get window title
             window_title = win32gui.GetWindowText(hwnd)
             
             # Get process ID
             _, pid = win32process.GetWindowThreadProcessId(hwnd)
             
+            # Validate process ID
+            if pid is None or pid <= 0:
+                self.logger.warning(f"Invalid process ID: {pid}")
+                return "unknown", window_title, 0
+            
             # Get process name
             try:
                 process = psutil.Process(pid)
                 app_name = process.name()
-            except (psutil.NoSuchProcess, psutil.AccessDenied):
+            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess) as e:
+                self.logger.warning(f"Error accessing process {pid}: {e}")
+                app_name = f"Unknown_{pid}"
+            except ValueError as e:
+                self.logger.warning(f"Invalid process ID {pid}: {e}")
                 app_name = f"Unknown_{pid}"
             
             return app_name, window_title, pid
@@ -224,11 +231,20 @@ class WindowTracker:
             
             pid = pid_prop.value[0] if pid_prop else 0
             
+            # Validate process ID
+            if pid <= 0:
+                self.logger.warning(f"Invalid process ID: {pid}")
+                return "unknown", window_title, 0
+            
             # Get process name
             try:
                 process = psutil.Process(pid)
                 app_name = process.name()
-            except (psutil.NoSuchProcess, psutil.AccessDenied):
+            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess) as e:
+                self.logger.warning(f"Error accessing process {pid}: {e}")
+                app_name = f"Unknown_{pid}"
+            except ValueError as e:
+                self.logger.warning(f"Invalid process ID {pid}: {e}")
                 app_name = f"Unknown_{pid}"
             
             return app_name, window_title, pid
