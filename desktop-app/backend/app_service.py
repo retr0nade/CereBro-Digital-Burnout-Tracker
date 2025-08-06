@@ -4,6 +4,12 @@ from metrics.apps import get_foreground_app
 from metrics.idle import get_idle_seconds
 from data.models import init_db, store_app_event, store_idle_event, store_metric, list_usage, list_idle, list_switches, store_pref, get_pref
 from api.routes import api
+from window_tracker import WindowTracker
+from idle_monitor import IdleMonitor
+from input_logger import InputLogger
+from screen_time_tracker import ScreenTimeTracker
+from focus_timer import FocusTimer
+from break_monitor import BreakMonitor
 
 SETTINGS_PATH = "settings.json"
 
@@ -14,7 +20,13 @@ def load_settings():
             "track_idle": True,
             "idle_threshold": 180,
             "track_screenshots": False,
-            "track_audio": False
+            "track_audio": False,
+            "track_windows": True,  # New setting for window tracking
+            "track_idle_detailed": True,  # New setting for detailed idle monitoring
+            "track_input": True,  # New setting for input monitoring
+            "track_screen_time": True,  # New setting for screen time tracking
+            "track_focus_sessions": True,  # New setting for focus session tracking
+            "track_breaks": True  # New setting for break monitoring
         })
     return get_pref()
 
@@ -25,6 +37,85 @@ settings = load_settings()
 app = Flask(__name__)
 app.register_blueprint(api, url_prefix='/api')
 init_db()
+
+# Initialize window tracker
+window_tracker = None
+if settings.get("track_windows", True):
+    try:
+        window_tracker = WindowTracker(db_path="window_activity.db", log_interval=1.0)
+        window_tracker.start()
+        print("Window tracker started successfully")
+    except Exception as e:
+        print(f"Failed to start window tracker: {e}")
+
+# Initialize idle monitor
+idle_monitor = None
+if settings.get("track_idle_detailed", True):
+    try:
+        idle_timeout = settings.get("idle_threshold", 180)
+        idle_monitor = IdleMonitor(db_path="idle_activity.db", timeout_seconds=idle_timeout, check_interval=1.0)
+        idle_monitor.start()
+        print("Idle monitor started successfully")
+    except Exception as e:
+        print(f"Failed to start idle monitor: {e}")
+
+# Initialize input logger
+input_logger = None
+if settings.get("track_input", True):
+    try:
+        input_logger = InputLogger(
+            db_path="input_activity.db", 
+            log_interval=60,  # Log every minute
+            enable_keyboard=True,
+            enable_mouse=True
+        )
+        input_logger.start()
+        print("Input logger started successfully")
+    except Exception as e:
+        print(f"Failed to start input logger: {e}")
+
+# Initialize screen time tracker
+screen_time_tracker = None
+if settings.get("track_screen_time", True):
+    try:
+        screen_time_tracker = ScreenTimeTracker(
+            db_path="screen_time.db",
+            idle_threshold=60,  # 60 seconds of inactivity
+            check_interval=1.0,  # Check every second
+            daily_reset_hour=0  # Reset at midnight
+        )
+        screen_time_tracker.start()
+        print("Screen time tracker started successfully")
+    except Exception as e:
+        print(f"Failed to start screen time tracker: {e}")
+
+# Initialize focus timer
+focus_timer = None
+if settings.get("track_focus_sessions", True):
+    try:
+        focus_timer = FocusTimer(
+            db_path="focus_sessions.db",
+            idle_threshold=60  # 60 seconds of inactivity
+        )
+        print("Focus timer initialized successfully")
+    except Exception as e:
+        print(f"Failed to initialize focus timer: {e}")
+
+# Initialize break monitor
+break_monitor = None
+if settings.get("track_breaks", True):
+    try:
+        break_monitor = BreakMonitor(
+            db_path="break_activity.db",
+            min_break_duration=120,  # 2 minutes minimum
+            max_break_duration=900,  # 15 minutes maximum
+            check_interval=1.0,  # Check every second
+            detect_lock_events=True  # Detect system lock/unlock
+        )
+        break_monitor.start()
+        print("Break monitor started successfully")
+    except Exception as e:
+        print(f"Failed to start break monitor: {e}")
 
 def collect_app_usage():
     last_app = None
@@ -77,6 +168,389 @@ def api_extension():
     data = request.get_json()
     store_metric("browser_ext", json.dumps(data), int(time.time()))
     return {"ok": True}
+
+@app.route('/api/window_activity', methods=["GET"])
+def api_window_activity():
+    """Get window activity data"""
+    try:
+        if window_tracker is None:
+            return jsonify({"error": "Window tracker not available"}), 500
+        
+        hours = request.args.get('hours', 24, type=int)
+        activity = window_tracker.get_recent_activity(hours=hours)
+        
+        return jsonify({
+            "activity": activity,
+            "total_entries": len(activity)
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/window_summary', methods=["GET"])
+def api_window_summary():
+    """Get window activity summary"""
+    try:
+        if window_tracker is None:
+            return jsonify({"error": "Window tracker not available"}), 500
+        
+        hours = request.args.get('hours', 24, type=int)
+        summary = window_tracker.get_app_summary(hours=hours)
+        
+        return jsonify(summary)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/idle_activity', methods=["GET"])
+def api_idle_activity():
+    """Get idle activity data"""
+    try:
+        if idle_monitor is None:
+            return jsonify({"error": "Idle monitor not available"}), 500
+        
+        hours = request.args.get('hours', 24, type=int)
+        idle_periods = idle_monitor.get_recent_idle_periods(hours=hours)
+        
+        return jsonify({
+            "idle_periods": idle_periods,
+            "total_entries": len(idle_periods)
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/idle_summary', methods=["GET"])
+def api_idle_summary():
+    """Get idle activity summary"""
+    try:
+        if idle_monitor is None:
+            return jsonify({"error": "Idle monitor not available"}), 500
+        
+        hours = request.args.get('hours', 24, type=int)
+        summary = idle_monitor.get_idle_summary(hours=hours)
+        
+        return jsonify(summary)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/export_idle_csv', methods=["GET"])
+def api_export_idle_csv():
+    """Export idle data to CSV"""
+    try:
+        if idle_monitor is None:
+            return jsonify({"error": "Idle monitor not available"}), 500
+        
+        hours = request.args.get('hours', 24, type=int)
+        csv_path = f"idle_export_{int(time.time())}.csv"
+        
+        idle_monitor.export_to_csv(csv_path, hours=hours)
+        
+        return jsonify({
+            "success": True,
+            "file_path": csv_path,
+            "message": f"Exported {hours} hours of idle data to {csv_path}"
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/input_activity', methods=["GET"])
+def api_input_activity():
+    """Get input activity data"""
+    try:
+        if input_logger is None:
+            return jsonify({"error": "Input logger not available"}), 500
+        
+        hours = request.args.get('hours', 24, type=int)
+        input_activity = input_logger.get_recent_activity(hours=hours)
+        
+        return jsonify({
+            "input_activity": input_activity,
+            "total_entries": len(input_activity)
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/input_summary', methods=["GET"])
+def api_input_summary():
+    """Get input activity summary"""
+    try:
+        if input_logger is None:
+            return jsonify({"error": "Input logger not available"}), 500
+        
+        hours = request.args.get('hours', 24, type=int)
+        summary = input_logger.get_input_summary(hours=hours)
+        
+        return jsonify(summary)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/export_input_csv', methods=["GET"])
+def api_export_input_csv():
+    """Export input data to CSV"""
+    try:
+        if input_logger is None:
+            return jsonify({"error": "Input logger not available"}), 500
+        
+        hours = request.args.get('hours', 24, type=int)
+        csv_path = f"input_export_{int(time.time())}.csv"
+        
+        input_logger.export_to_csv(csv_path, hours=hours)
+        
+        return jsonify({
+            "success": True,
+            "file_path": csv_path,
+            "message": f"Exported {hours} hours of input data to {csv_path}"
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/screen_time_summary', methods=["GET"])
+def api_screen_time_summary():
+    """Get screen time summary"""
+    try:
+        if screen_time_tracker is None:
+            return jsonify({"error": "Screen time tracker not available"}), 500
+        
+        summary = screen_time_tracker.get_today_summary()
+        
+        return jsonify(summary)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/screen_time_weekly', methods=["GET"])
+def api_screen_time_weekly():
+    """Get weekly screen time summary"""
+    try:
+        if screen_time_tracker is None:
+            return jsonify({"error": "Screen time tracker not available"}), 500
+        
+        summary = screen_time_tracker.get_weekly_summary()
+        
+        return jsonify(summary)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/screen_time_sessions', methods=["GET"])
+def api_screen_time_sessions():
+    """Get recent screen time sessions"""
+    try:
+        if screen_time_tracker is None:
+            return jsonify({"error": "Screen time tracker not available"}), 500
+        
+        hours = request.args.get('hours', 24, type=int)
+        sessions = screen_time_tracker.get_recent_sessions(hours=hours)
+        
+        return jsonify({
+            "sessions": sessions,
+            "total_entries": len(sessions)
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/export_screen_time_csv', methods=["GET"])
+def api_export_screen_time_csv():
+    """Export screen time data to CSV"""
+    try:
+        if screen_time_tracker is None:
+            return jsonify({"error": "Screen time tracker not available"}), 500
+        
+        days = request.args.get('days', 7, type=int)
+        csv_path = f"screen_time_export_{int(time.time())}.csv"
+        
+        screen_time_tracker.export_to_csv(csv_path, days=days)
+        
+        return jsonify({
+            "success": True,
+            "file_path": csv_path,
+            "message": f"Exported {days} days of screen time data to {csv_path}"
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/focus_session_start', methods=["POST"])
+def api_focus_session_start():
+    """Start a new focus session"""
+    try:
+        if focus_timer is None:
+            return jsonify({"error": "Focus timer not available"}), 500
+        
+        data = request.get_json() or {}
+        duration_minutes = data.get('duration_minutes', 25)
+        notes = data.get('notes', '')
+        
+        session_id = focus_timer.start_session(duration_minutes, notes)
+        
+        return jsonify({
+            "success": True,
+            "session_id": session_id,
+            "duration_minutes": duration_minutes,
+            "message": f"Started {duration_minutes}-minute focus session"
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/focus_session_stop', methods=["POST"])
+def api_focus_session_stop():
+    """Stop the current focus session"""
+    try:
+        if focus_timer is None:
+            return jsonify({"error": "Focus timer not available"}), 500
+        
+        data = request.get_json() or {}
+        notes = data.get('notes', '')
+        
+        result = focus_timer.stop_session(notes)
+        
+        return jsonify({
+            "success": True,
+            "result": result,
+            "message": "Focus session stopped"
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/focus_session_status', methods=["GET"])
+def api_focus_session_status():
+    """Get current focus session status"""
+    try:
+        if focus_timer is None:
+            return jsonify({"error": "Focus timer not available"}), 500
+        
+        status = focus_timer.get_session_status()
+        
+        return jsonify(status)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/focus_session_history', methods=["GET"])
+def api_focus_session_history():
+    """Get focus session history"""
+    try:
+        if focus_timer is None:
+            return jsonify({"error": "Focus timer not available"}), 500
+        
+        days = request.args.get('days', 7, type=int)
+        sessions = focus_timer.get_session_history(days=days)
+        
+        return jsonify({
+            "sessions": sessions,
+            "total_entries": len(sessions)
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/focus_session_stats', methods=["GET"])
+def api_focus_session_stats():
+    """Get focus session statistics"""
+    try:
+        if focus_timer is None:
+            return jsonify({"error": "Focus timer not available"}), 500
+        
+        days = request.args.get('days', 7, type=int)
+        stats = focus_timer.get_session_statistics(days=days)
+        
+        return jsonify(stats)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/export_focus_csv', methods=["GET"])
+def api_export_focus_csv():
+    """Export focus session data to CSV"""
+    try:
+        if focus_timer is None:
+            return jsonify({"error": "Focus timer not available"}), 500
+        
+        days = request.args.get('days', 7, type=int)
+        csv_path = f"focus_sessions_export_{int(time.time())}.csv"
+        
+        focus_timer.export_to_csv(csv_path, days=days)
+        
+        return jsonify({
+            "success": True,
+            "file_path": csv_path,
+            "message": f"Exported {days} days of focus session data to {csv_path}"
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/break_status', methods=["GET"])
+def api_break_status():
+    """Get current break monitoring status"""
+    try:
+        if break_monitor is None:
+            return jsonify({"error": "Break monitor not available"}), 500
+        
+        status = break_monitor.get_current_status()
+        
+        return jsonify(status)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/break_history', methods=["GET"])
+def api_break_history():
+    """Get break history"""
+    try:
+        if break_monitor is None:
+            return jsonify({"error": "Break monitor not available"}), 500
+        
+        hours = request.args.get('hours', 24, type=int)
+        breaks = break_monitor.get_recent_breaks(hours=hours)
+        
+        return jsonify({
+            "breaks": breaks,
+            "total_entries": len(breaks)
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/break_stats', methods=["GET"])
+def api_break_stats():
+    """Get break statistics"""
+    try:
+        if break_monitor is None:
+            return jsonify({"error": "Break monitor not available"}), 500
+        
+        hours = request.args.get('hours', 24, type=int)
+        stats = break_monitor.get_break_statistics(hours=hours)
+        
+        return jsonify(stats)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/lock_events', methods=["GET"])
+def api_lock_events():
+    """Get lock event history"""
+    try:
+        if break_monitor is None:
+            return jsonify({"error": "Break monitor not available"}), 500
+        
+        hours = request.args.get('hours', 24, type=int)
+        events = break_monitor.get_recent_lock_events(hours=hours)
+        
+        return jsonify({
+            "events": events,
+            "total_entries": len(events)
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/export_break_csv', methods=["GET"])
+def api_export_break_csv():
+    """Export break data to CSV"""
+    try:
+        if break_monitor is None:
+            return jsonify({"error": "Break monitor not available"}), 500
+        
+        hours = request.args.get('hours', 24, type=int)
+        csv_path = f"break_activity_export_{int(time.time())}.csv"
+        
+        break_monitor.export_to_csv(csv_path, hours=hours)
+        
+        return jsonify({
+            "success": True,
+            "file_path": csv_path,
+            "message": f"Exported {hours} hours of break data to {csv_path}"
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
     threading.Thread(target=collect_app_usage, daemon=True).start()
