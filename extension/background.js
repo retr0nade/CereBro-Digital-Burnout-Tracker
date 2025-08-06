@@ -193,11 +193,13 @@ setInterval(() => {
       ts: t
     };
 
-    fetch("http://localhost:5005/api/track", {
+    fetch("http://localhost:5005/api/extension_data", {
       method: "POST",
       headers: {"Content-Type": "application/json"},
       body: JSON.stringify(payload)
-    }).catch(() => {});
+    }).catch((error) => {
+      console.log("Desktop app not running or connection failed:", error.message);
+    });
   });
 }, 5000);
 

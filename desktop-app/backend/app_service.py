@@ -3,6 +3,7 @@ from flask import Flask, request, jsonify
 from metrics.apps import get_foreground_app
 from metrics.idle import get_idle_seconds
 from data.models import init_db, store_app_event, store_idle_event, store_metric, list_usage, list_idle, list_switches, store_pref, get_pref
+from api.routes import api
 
 SETTINGS_PATH = "settings.json"
 
@@ -22,6 +23,7 @@ def update_pref(new_settings):
 
 settings = load_settings()
 app = Flask(__name__)
+app.register_blueprint(api, url_prefix='/api')
 init_db()
 
 def collect_app_usage():

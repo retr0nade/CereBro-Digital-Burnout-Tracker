@@ -1,8 +1,8 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "frontend",
-  "version": "0.1.0",
-  "identifier": "com.tauri.dev",
+  "productName": "CereBro",
+  "version": "2.0.0",
+  "identifier": "com.cerebro.burnout-tracker",
   "build": {
     "frontendDist": "../build",
     "devUrl": "http://localhost:3000",
@@ -13,10 +13,16 @@
     "windows": [
       {
         "title": "CereBro - Mental Burnout Tracker",
-        "width": 800,
-        "height": 600,
+        "width": 1200,
+        "height": 800,
         "resizable": true,
-        "fullscreen": false
+        "fullscreen": false,
+        "minWidth": 800,
+        "minHeight": 600,
+        "center": true,
+        "decorations": true,
+        "transparent": false,
+        "visible": true
       }
     ],
     "security": {
@@ -33,5 +39,10 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "log": {
+      "level": "info"
+    }
   }
 }
