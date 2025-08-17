@@ -3,14 +3,15 @@ import os
 import time
 from datetime import datetime
 from typing import Optional, List, Dict, Any
+from config_manager import config
 
 class CerebroDB:
     """
     Unified SQLite database for CereBro mental burnout tracker
     """
     
-    def __init__(self, db_path: str = "cerebro.db"):
-        self.db_path = db_path
+    def __init__(self, db_path: str = None):
+        self.db_path = db_path or config.get_database_path()
         self._init_database()
     
     def _init_database(self):

@@ -1,0 +1,82 @@
+{
+  "database": {
+    "path": "./cerebro.db",
+    "backup_path": "./backups/",
+    "max_backups": 10
+  },
+  "logging": {
+    "level": "INFO",
+    "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    "main_log": "./logs/cerebro.log",
+    "service_manager_log": "./logs/service_manager.log",
+    "window_tracker_log": "./logs/window_tracker.log",
+    "idle_monitor_log": "./logs/idle_monitor.log",
+    "input_logger_log": "./logs/input_logger.log",
+    "screen_time_tracker_log": "./logs/screen_time_tracker.log",
+    "break_monitor_log": "./logs/break_monitor.log",
+    "focus_timer_log": "./logs/focus_timer.log"
+  },
+  "services": {
+    "window_tracker": {
+      "enabled": true,
+      "log_interval": 2.0,
+      "max_restarts": 3,
+      "restart_delay": 5
+    },
+    "idle_monitor": {
+      "enabled": true,
+      "timeout_seconds": 300,
+      "check_interval": 1.0,
+      "max_restarts": 3,
+      "restart_delay": 5
+    },
+    "input_logger": {
+      "enabled": true,
+      "log_interval": 60,
+      "enable_keyboard": true,
+      "enable_mouse": true,
+      "max_restarts": 3,
+      "restart_delay": 5
+    },
+    "screen_time_tracker": {
+      "enabled": true,
+      "idle_threshold": 60,
+      "check_interval": 1.0,
+      "daily_reset_hour": 0,
+      "max_restarts": 3,
+      "restart_delay": 5
+    },
+    "break_monitor": {
+      "enabled": true,
+      "min_break_duration": 120,
+      "max_break_duration": 900,
+      "check_interval": 1.0,
+      "detect_lock_events": true,
+      "max_restarts": 3,
+      "restart_delay": 5
+    },
+    "focus_timer": {
+      "enabled": true,
+      "default_session_length": 1500,
+      "idle_threshold": 60,
+      "max_restarts": 3,
+      "restart_delay": 5
+    }
+  },
+  "monitoring": {
+    "check_interval": 10,
+    "manager_check_interval": 30,
+    "thread_timeout": 5
+  },
+  "api": {
+    "host": "localhost",
+    "port": 5006,
+    "debug": false
+  },
+  "paths": {
+    "logs_dir": "./logs",
+    "backups_dir": "./backups",
+    "data_dir": "./data",
+    "extension_data_dir": "./extension_data"
+  }
+}

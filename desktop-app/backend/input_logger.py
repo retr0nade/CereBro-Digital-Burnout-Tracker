@@ -15,6 +15,7 @@ import platform
 import os
 import json
 from cerebro_db import CerebroDB
+from config_manager import config
 
 # Import pynput for input monitoring
 try:
@@ -61,13 +62,16 @@ class InputLogger:
         self.mouse_listener = None
         
         # Setup logging
+        log_config = config.get_log_config('input_logger')
+        handlers = [logging.StreamHandler()]
+        
+        if 'file' in log_config:
+            handlers.append(logging.FileHandler(log_config['file']))
+        
         logging.basicConfig(
-            level=logging.INFO,
-            format='%(asctime)s - %(levelname)s - %(message)s',
-            handlers=[
-                logging.FileHandler('input_logger.log'),
-                logging.StreamHandler()
-            ]
+            level=getattr(logging, log_config.get('level', 'INFO')),
+            format=log_config.get('format', '%(asctime)s - %(levelname)s - %(message)s'),
+            handlers=handlers
         )
         self.logger = logging.getLogger(__name__)
         

@@ -125,9 +125,16 @@ The extension will start sending browser metrics to this endpoint automatically.
 desktop-app/
 ├── backend/
 │   ├── app_service.py      # Main Python daemon/server
+│   ├── service_manager.py  # Service manager for all trackers
+│   ├── config_manager.py   # Configuration management system
+│   ├── config.json         # Centralized configuration file
 │   ├── cerebro.db          # Unified SQLite database for all metrics
 │   ├── cerebro_db.py       # Database interface and schema
 │   ├── migrate_old_data.py # Migration script for legacy data
+│   ├── logs/               # Application log files
+│   ├── backups/            # Database backup directory
+│   ├── data/               # Data storage directory
+│   ├── extension_data/     # Browser extension data
 │   ├── metrics/
 │   │   ├── apps.py         # Active app/window monitor (cross-plat)
 │   │   ├── idle.py         # Idle time tracking
@@ -196,6 +203,92 @@ The application now uses a single unified SQLite database (`cerebro.db`) that co
 ### Migration
 
 The `migrate_old_data.py` script automatically imports data from legacy database files into the unified structure. All trackers have been updated to use the new unified database interface.
+
+### Configuration Management
+
+The `config_manager.py` and `config.json` provide centralized configuration management:
+
+- **Centralized settings** - All hardcoded paths and settings moved to `config.json`
+- **Service configuration** - Individual settings for each tracking service
+- **Logging configuration** - Centralized log file paths and levels
+- **Database configuration** - Database path and backup settings
+- **API configuration** - Server host, port, and debug settings
+- **Monitoring configuration** - Service monitoring intervals and timeouts
+- **Directory management** - Automatic creation of required directories
+- **Configuration validation** - Ensures all required settings are present
+- **Runtime updates** - Ability to update configuration at runtime
+
+### Service Management
+
+The `service_manager.py` provides centralized management of all tracking services:
+
+- **Automatic startup** - Starts all enabled trackers in separate threads
+- **Crash monitoring** - Detects when trackers crash and automatically restarts them
+- **Graceful shutdown** - Cleanly stops all services on shutdown
+- **Status monitoring** - Provides real-time status of all services
+- **Configuration integration** - Uses centralized configuration for all settings
+- **Logging** - Comprehensive logging of all service events
+
+#### Configuration Usage
+
+```python
+from config_manager import config
+
+# Get database path
+db_path = config.get_database_path()
+
+# Get service configuration
+service_config = config.get_service_config('window_tracker')
+
+# Get logging configuration
+log_config = config.get_log_config('input_logger')
+
+# Get API configuration
+api_config = config.get_api_config()
+
+# Update configuration
+config.update_config({
+    "api": {"port": 5006},
+    "services": {"window_tracker": {"log_interval": 2.0}}
+})
+```
+
+#### Service Manager Usage
+
+```python
+from service_manager import ServiceManager
+
+# Create service manager with default configuration
+manager = ServiceManager()
+
+# Start all services
+manager.start_all()
+
+# Get service status
+status = manager.get_service_status()
+
+# Manually restart a service
+manager.restart_service('window_tracker')
+
+# Stop all services
+manager.stop_all()
+```
+
+#### Command Line Usage
+
+```bash
+# Start service manager for 5 minutes
+python service_manager.py --duration 300
+
+# Show current service status
+python service_manager.py --status
+
+# Use custom configuration
+python service_manager.py --config config.json
+
+# Start main application with configuration
+python app_service.py
+```
 
 ---
 

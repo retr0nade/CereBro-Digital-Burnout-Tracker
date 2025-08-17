@@ -14,6 +14,7 @@ from typing import Optional, Dict, Any
 import platform
 import os
 from cerebro_db import CerebroDB
+from config_manager import config
 
 # Platform-specific imports
 if platform.system() == "Windows":
@@ -59,13 +60,16 @@ class IdleMonitor:
         self.is_idle = False
         
         # Setup logging
+        log_config = config.get_log_config('idle_monitor')
+        handlers = [logging.StreamHandler()]
+        
+        if 'file' in log_config:
+            handlers.append(logging.FileHandler(log_config['file']))
+        
         logging.basicConfig(
-            level=logging.INFO,
-            format='%(asctime)s - %(levelname)s - %(message)s',
-            handlers=[
-                logging.FileHandler('idle_monitor.log'),
-                logging.StreamHandler()
-            ]
+            level=getattr(logging, log_config.get('level', 'INFO')),
+            format=log_config.get('format', '%(asctime)s - %(levelname)s - %(message)s'),
+            handlers=handlers
         )
         self.logger = logging.getLogger(__name__)
         

@@ -16,6 +16,7 @@ import os
 import signal
 import sys
 from cerebro_db import CerebroDB
+from config_manager import config
 
 # Platform-specific imports for idle detection
 if platform.system() == "Windows":
@@ -58,13 +59,16 @@ class FocusTimer:
         self.state_lock = threading.Lock()
         
         # Setup logging
+        log_config = config.get_log_config('focus_timer')
+        handlers = [logging.StreamHandler()]
+        
+        if 'file' in log_config:
+            handlers.append(logging.FileHandler(log_config['file']))
+        
         logging.basicConfig(
-            level=logging.INFO,
-            format='%(asctime)s - %(levelname)s - %(message)s',
-            handlers=[
-                logging.FileHandler('focus_timer.log'),
-                logging.StreamHandler()
-            ]
+            level=getattr(logging, log_config.get('level', 'INFO')),
+            format=log_config.get('format', '%(asctime)s - %(levelname)s - %(message)s'),
+            handlers=handlers
         )
         self.logger = logging.getLogger(__name__)
         

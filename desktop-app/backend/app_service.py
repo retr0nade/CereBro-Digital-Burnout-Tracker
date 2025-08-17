@@ -11,6 +11,7 @@ from input_logger import InputLogger
 from screen_time_tracker import ScreenTimeTracker
 from focus_timer import FocusTimer
 from break_monitor import BreakMonitor
+from config_manager import config
 
 SETTINGS_PATH = "settings.json"
 
@@ -39,14 +40,18 @@ app = Flask(__name__)
 app.register_blueprint(api, url_prefix='/api')
 
 # Initialize unified database
-unified_db = BurnoutTrackerDB("data/burnout_tracker.db")
+unified_db = BurnoutTrackerDB(config.get_database_path())
 print("Unified database initialized successfully")
 
 # Initialize window tracker
 window_tracker = None
 if settings.get("track_windows", True):
     try:
-        window_tracker = WindowTracker(db_path="window_activity.db", log_interval=1.0, unified_db=unified_db)
+        service_config = config.get_service_config('window_tracker')
+        window_tracker = WindowTracker(
+            log_interval=service_config.get('log_interval', 1.0),
+            cerebro_db=unified_db
+        )
         window_tracker.start()
         print("Window tracker started successfully")
     except Exception as e:
@@ -56,8 +61,12 @@ if settings.get("track_windows", True):
 idle_monitor = None
 if settings.get("track_idle_detailed", True):
     try:
-        idle_timeout = settings.get("idle_threshold", 180)
-        idle_monitor = IdleMonitor(db_path="idle_activity.db", timeout_seconds=idle_timeout, check_interval=1.0)
+        service_config = config.get_service_config('idle_monitor')
+        idle_monitor = IdleMonitor(
+            timeout_seconds=service_config.get('timeout_seconds', 300),
+            check_interval=service_config.get('check_interval', 1.0),
+            cerebro_db=unified_db
+        )
         idle_monitor.start()
         print("Idle monitor started successfully")
     except Exception as e:
@@ -67,12 +76,12 @@ if settings.get("track_idle_detailed", True):
 input_logger = None
 if settings.get("track_input", True):
     try:
+        service_config = config.get_service_config('input_logger')
         input_logger = InputLogger(
-            db_path="input_activity.db", 
-            log_interval=60,  # Log every minute
-            enable_keyboard=True,
-            enable_mouse=True,
-            unified_db=unified_db
+            log_interval=service_config.get('log_interval', 60),
+            enable_keyboard=service_config.get('enable_keyboard', True),
+            enable_mouse=service_config.get('enable_mouse', True),
+            cerebro_db=unified_db
         )
         input_logger.start()
         print("Input logger started successfully")
@@ -83,11 +92,11 @@ if settings.get("track_input", True):
 screen_time_tracker = None
 if settings.get("track_screen_time", True):
     try:
+        service_config = config.get_service_config('screen_time_tracker')
         screen_time_tracker = ScreenTimeTracker(
-            db_path="screen_time.db",
-            idle_threshold=60,  # 60 seconds of inactivity
-            check_interval=1.0,  # Check every second
-            daily_reset_hour=0  # Reset at midnight
+            idle_threshold=service_config.get('idle_threshold', 60),
+            check_interval=service_config.get('check_interval', 1.0),
+            daily_reset_hour=service_config.get('daily_reset_hour', 0)
         )
         screen_time_tracker.start()
         print("Screen time tracker started successfully")
@@ -98,9 +107,10 @@ if settings.get("track_screen_time", True):
 focus_timer = None
 if settings.get("track_focus_sessions", True):
     try:
+        service_config = config.get_service_config('focus_timer')
         focus_timer = FocusTimer(
-            db_path="focus_sessions.db",
-            idle_threshold=60  # 60 seconds of inactivity
+            idle_threshold=service_config.get('idle_threshold', 60),
+            cerebro_db=unified_db
         )
         print("Focus timer initialized successfully")
     except Exception as e:
@@ -110,12 +120,12 @@ if settings.get("track_focus_sessions", True):
 break_monitor = None
 if settings.get("track_breaks", True):
     try:
+        service_config = config.get_service_config('break_monitor')
         break_monitor = BreakMonitor(
-            db_path="break_activity.db",
-            min_break_duration=120,  # 2 minutes minimum
-            max_break_duration=900,  # 15 minutes maximum
-            check_interval=1.0,  # Check every second
-            detect_lock_events=True  # Detect system lock/unlock
+            min_break_duration=service_config.get('min_break_duration', 120),
+            max_break_duration=service_config.get('max_break_duration', 900),
+            check_interval=service_config.get('check_interval', 1.0),
+            detect_lock_events=service_config.get('detect_lock_events', True)
         )
         break_monitor.start()
         print("Break monitor started successfully")
@@ -561,4 +571,11 @@ if __name__ == "__main__":
     threading.Thread(target=collect_app_usage, daemon=True).start()
     threading.Thread(target=collect_idle, daemon=True).start()
     # Additional metric collectors go here as threads (audio, screenshot...)
-    app.run(port=5005)
+    
+    # Get API configuration
+    api_config = config.get_api_config()
+    app.run(
+        host=api_config.get('host', 'localhost'),
+        port=api_config.get('port', 5005),
+        debug=api_config.get('debug', False)
+    )
