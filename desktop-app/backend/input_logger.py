@@ -14,7 +14,7 @@ from typing import Dict, Any, Optional
 import platform
 import os
 import json
-from data.unified_schema import BurnoutTrackerDB, InputActivity
+from cerebro_db import CerebroDB
 
 # Import pynput for input monitoring
 try:
@@ -29,23 +29,21 @@ except ImportError:
 class InputLogger:
     """Cross-platform input activity logger"""
     
-    def __init__(self, db_path: str = "input_activity.db", log_interval: int = 60, 
-                 enable_keyboard: bool = True, enable_mouse: bool = True, unified_db: BurnoutTrackerDB = None):
+    def __init__(self, log_interval: int = 60, 
+                 enable_keyboard: bool = True, enable_mouse: bool = True, cerebro_db: CerebroDB = None):
         """
         Initialize the input logger
         
         Args:
-            db_path: Path to SQLite database file (legacy support)
             log_interval: How often to log data in seconds (default: 60)
             enable_keyboard: Whether to monitor keyboard input
             enable_mouse: Whether to monitor mouse input
-            unified_db: Unified database instance for logging
+            cerebro_db: Unified CerebroDB instance for logging
         """
-        self.db_path = db_path
         self.log_interval = log_interval
         self.enable_keyboard = enable_keyboard
         self.enable_mouse = enable_mouse
-        self.unified_db = unified_db or BurnoutTrackerDB("data/burnout_tracker.db")
+        self.cerebro_db = cerebro_db or CerebroDB("cerebro.db")
         self.is_running = False
         self.logger_thread = None
         
@@ -73,8 +71,7 @@ class InputLogger:
         )
         self.logger = logging.getLogger(__name__)
         
-        # Initialize legacy database (for backward compatibility)
-        self._init_database()
+
         
         # Setup input monitoring
         if PYNPUT_AVAILABLE:
@@ -82,45 +79,7 @@ class InputLogger:
         else:
             self.logger.warning("pynput not available - input monitoring disabled")
     
-    def _init_database(self):
-        """Initialize SQLite database with input activity table"""
-        try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            
-            # Create input activity table
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS input_activity (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    timestamp TIMESTAMP NOT NULL,
-                    keypress_count INTEGER DEFAULT 0,
-                    mouse_click_count INTEGER DEFAULT 0,
-                    mouse_scroll_count INTEGER DEFAULT 0,
-                    mouse_move_count INTEGER DEFAULT 0,
-                    total_inputs INTEGER DEFAULT 0,
-                    interval_seconds INTEGER DEFAULT 60,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            ''')
-            
-            # Create index for faster queries
-            cursor.execute('''
-                CREATE INDEX IF NOT EXISTS idx_timestamp 
-                ON input_activity(timestamp)
-            ''')
-            
-            cursor.execute('''
-                CREATE INDEX IF NOT EXISTS idx_total_inputs 
-                ON input_activity(total_inputs)
-            ''')
-            
-            conn.commit()
-            conn.close()
-            self.logger.info(f"Database initialized: {self.db_path}")
-            
-        except Exception as e:
-            self.logger.error(f"Failed to initialize database: {e}")
-            raise
+
     
     def _setup_input_monitoring(self):
         """Setup keyboard and mouse listeners"""
@@ -208,30 +167,12 @@ class InputLogger:
                 self.mouse_scroll_count = 0
                 self.mouse_move_count = 0
             
-            # Log to unified database
-            input_activity = InputActivity(
+            # Log to unified cerebro database
+            self.cerebro_db.insert_input_activity(
                 timestamp=int(time.time()),
                 keypress_count=keypresses,
-                mouse_click_count=mouse_clicks,
-                scroll_events=mouse_scrolls,
-                mouse_movement=mouse_moves
+                mouse_click_count=mouse_clicks
             )
-            self.unified_db.insert_input_activity(input_activity)
-            
-            # Also log to legacy database for backward compatibility
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            
-            cursor.execute('''
-                INSERT INTO input_activity 
-                (timestamp, keypress_count, mouse_click_count, mouse_scroll_count, 
-                 mouse_move_count, total_inputs, interval_seconds)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            ''', (datetime.now(), keypresses, mouse_clicks, mouse_scrolls, 
-                  mouse_moves, total_inputs, self.log_interval))
-            
-            conn.commit()
-            conn.close()
             
             self.logger.info(f"Logged input activity: {keypresses} keys, {mouse_clicks} clicks, "
                            f"{mouse_scrolls} scrolls, {mouse_moves} moves, {total_inputs} total")

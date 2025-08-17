@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 from typing import Optional, Tuple, Dict, Any
 import platform
 import os
-from data.unified_schema import BurnoutTrackerDB, AppUsage
+from cerebro_db import CerebroDB
 
 # Platform-specific imports
 if platform.system() == "Windows":
@@ -38,18 +38,16 @@ elif platform.system() == "Linux":
 class WindowTracker:
     """Cross-platform window activity tracker"""
     
-    def __init__(self, db_path: str = "window_activity.db", log_interval: float = 1.0, unified_db: BurnoutTrackerDB = None):
+    def __init__(self, log_interval: float = 1.0, cerebro_db: CerebroDB = None):
         """
         Initialize the window tracker
         
         Args:
-            db_path: Path to SQLite database file (legacy support)
             log_interval: How often to check for window changes (seconds)
-            unified_db: Unified database instance for logging
+            cerebro_db: Unified CerebroDB instance for logging
         """
-        self.db_path = db_path
         self.log_interval = log_interval
-        self.unified_db = unified_db or BurnoutTrackerDB("data/burnout_tracker.db")
+        self.cerebro_db = cerebro_db or CerebroDB("cerebro.db")
         self.current_window = None
         self.current_start_time = None
         self.is_running = False
@@ -66,8 +64,7 @@ class WindowTracker:
         )
         self.logger = logging.getLogger(__name__)
         
-        # Initialize legacy database (for backward compatibility)
-        self._init_database()
+
         
         # Platform-specific setup
         self._setup_platform()
@@ -101,44 +98,7 @@ class WindowTracker:
             self.logger.error(f"Failed to initialize X11 display: {e}")
             raise
     
-    def _init_database(self):
-        """Initialize SQLite database with window activity table"""
-        try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            
-            # Create window activity table
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS window_activity (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    app_name TEXT NOT NULL,
-                    window_title TEXT,
-                    start_time TIMESTAMP NOT NULL,
-                    end_time TIMESTAMP,
-                    duration_seconds REAL,
-                    process_id INTEGER,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            ''')
-            
-            # Create index for faster queries
-            cursor.execute('''
-                CREATE INDEX IF NOT EXISTS idx_start_time 
-                ON window_activity(start_time)
-            ''')
-            
-            cursor.execute('''
-                CREATE INDEX IF NOT EXISTS idx_app_name 
-                ON window_activity(app_name)
-            ''')
-            
-            conn.commit()
-            conn.close()
-            self.logger.info(f"Database initialized: {self.db_path}")
-            
-        except Exception as e:
-            self.logger.error(f"Failed to initialize database: {e}")
-            raise
+
     
     def _get_active_window_windows(self) -> Optional[Tuple[str, str, int]]:
         """Get active window info on Windows"""
@@ -271,29 +231,13 @@ class WindowTracker:
                            end_time: datetime, duration: float, pid: int):
         """Log window activity to database"""
         try:
-            # Log to unified database
-            app_usage = AppUsage(
+            # Log to unified cerebro database
+            self.cerebro_db.insert_app_usage(
                 app_name=app_name,
                 start_time=int(start_time.timestamp()),
                 end_time=int(end_time.timestamp()),
-                duration=int(duration),
-                window_title=window_title,
-                category=self._categorize_app(app_name)
+                duration=int(duration)
             )
-            self.unified_db.insert_app_usage(app_usage)
-            
-            # Also log to legacy database for backward compatibility
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            
-            cursor.execute('''
-                INSERT INTO window_activity 
-                (app_name, window_title, start_time, end_time, duration_seconds, process_id)
-                VALUES (?, ?, ?, ?, ?, ?)
-            ''', (app_name, window_title, start_time, end_time, duration, pid))
-            
-            conn.commit()
-            conn.close()
             
             self.logger.debug(f"Logged: {app_name} - {duration:.1f}s")
             

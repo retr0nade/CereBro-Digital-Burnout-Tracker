@@ -36,7 +36,7 @@ All data is stored locally in the browser and never leaves the user’s device.
 Runs a local Python Flask server to receive and store metrics:
 
 - Accepts POST requests from the extension
-- Saves browser activity logs into a local SQLite database
+- Saves all activity data into a unified SQLite database (`cerebro.db`)
 - Provides endpoints for querying historical usage
 - Base Flask + SQLite stack (no external dependencies)
 
@@ -125,6 +125,9 @@ The extension will start sending browser metrics to this endpoint automatically.
 desktop-app/
 ├── backend/
 │   ├── app_service.py      # Main Python daemon/server
+│   ├── cerebro.db          # Unified SQLite database for all metrics
+│   ├── cerebro_db.py       # Database interface and schema
+│   ├── migrate_old_data.py # Migration script for legacy data
 │   ├── metrics/
 │   │   ├── apps.py         # Active app/window monitor (cross-plat)
 │   │   ├── idle.py         # Idle time tracking
@@ -133,7 +136,7 @@ desktop-app/
 │   │   ├── audio.py        # Audio level (microphone)
 │   │   └── util.py         # Utility functions
 │   ├── data/
-│   │   └── models.py       # SQLite DB schemas for all time series and events
+│   │   └── models.py       # Legacy SQLite DB schemas (deprecated)
 │   ├── api/
 │   │   └── routes.py       # Flask/FastAPI with all endpoints
 │   ├── settings.json       # Default/active user preferences
@@ -163,6 +166,36 @@ extension/
 
 
 ```
+
+---
+
+## 🗄️ Unified Database Structure
+
+The application now uses a single unified SQLite database (`cerebro.db`) that contains all tracking data:
+
+### Database Tables
+
+1. **app_usage** - Application and window usage tracking
+   - `id`, `app_name`, `start_time`, `end_time`, `duration`
+
+2. **idle_periods** - User inactivity periods
+   - `id`, `start_time`, `end_time`, `duration`
+
+3. **input_activity** - Keyboard and mouse activity
+   - `id`, `timestamp`, `keypress_count`, `mouse_click_count`
+
+4. **focus_sessions** - Focus timer sessions
+   - `id`, `start_time`, `end_time`, `was_interrupted`, `duration`
+
+5. **breaks** - Break periods and types
+   - `id`, `start_time`, `end_time`, `type`
+
+6. **browser_activity** - Browser tab and domain activity
+   - `id`, `domain`, `url`, `start_time`, `end_time`, `duration`
+
+### Migration
+
+The `migrate_old_data.py` script automatically imports data from legacy database files into the unified structure. All trackers have been updated to use the new unified database interface.
 
 ---
 

@@ -13,6 +13,7 @@ from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 import platform
 import os
+from cerebro_db import CerebroDB
 
 # Platform-specific imports
 if platform.system() == "Windows":
@@ -38,19 +39,19 @@ elif platform.system() == "Linux":
 class IdleMonitor:
     """Cross-platform user idle monitoring"""
     
-    def __init__(self, db_path: str = "idle_activity.db", timeout_seconds: int = 300, 
-                 check_interval: float = 1.0):
+    def __init__(self, timeout_seconds: int = 300, 
+                 check_interval: float = 1.0, cerebro_db: CerebroDB = None):
         """
         Initialize the idle monitor
         
         Args:
-            db_path: Path to SQLite database file
             timeout_seconds: Seconds of inactivity before logging idle period
             check_interval: How often to check for activity (seconds)
+            cerebro_db: Unified CerebroDB instance for logging
         """
-        self.db_path = db_path
         self.timeout_seconds = timeout_seconds
         self.check_interval = check_interval
+        self.cerebro_db = cerebro_db or CerebroDB("cerebro.db")
         self.is_running = False
         self.monitor_thread = None
         self.last_activity_time = time.time()
@@ -68,8 +69,7 @@ class IdleMonitor:
         )
         self.logger = logging.getLogger(__name__)
         
-        # Initialize database
-        self._init_database()
+
         
         # Platform-specific setup
         self._setup_platform()
@@ -126,42 +126,7 @@ class IdleMonitor:
             self.logger.error(f"Failed to initialize X11 display: {e}")
             raise
     
-    def _init_database(self):
-        """Initialize SQLite database with idle activity table"""
-        try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            
-            # Create idle activity table
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS idle_activity (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    idle_start TIMESTAMP NOT NULL,
-                    idle_end TIMESTAMP,
-                    duration_seconds REAL,
-                    timeout_seconds INTEGER,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            ''')
-            
-            # Create index for faster queries
-            cursor.execute('''
-                CREATE INDEX IF NOT EXISTS idx_idle_start 
-                ON idle_activity(idle_start)
-            ''')
-            
-            cursor.execute('''
-                CREATE INDEX IF NOT EXISTS idx_duration 
-                ON idle_activity(duration_seconds)
-            ''')
-            
-            conn.commit()
-            conn.close()
-            self.logger.info(f"Database initialized: {self.db_path}")
-            
-        except Exception as e:
-            self.logger.error(f"Failed to initialize database: {e}")
-            raise
+
     
     def _get_last_input_time_windows(self) -> Optional[float]:
         """Get last input time on Windows"""
@@ -230,17 +195,12 @@ class IdleMonitor:
     def _log_idle_period(self, idle_start: datetime, idle_end: datetime, duration: float):
         """Log idle period to database"""
         try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            
-            cursor.execute('''
-                INSERT INTO idle_activity 
-                (idle_start, idle_end, duration_seconds, timeout_seconds)
-                VALUES (?, ?, ?, ?)
-            ''', (idle_start, idle_end, duration, self.timeout_seconds))
-            
-            conn.commit()
-            conn.close()
+            # Log to unified cerebro database
+            self.cerebro_db.insert_idle_period(
+                start_time=int(idle_start.timestamp()),
+                end_time=int(idle_end.timestamp()),
+                duration=int(duration)
+            )
             
             self.logger.info(f"Logged idle period: {duration:.1f}s ({idle_start} to {idle_end})")
             

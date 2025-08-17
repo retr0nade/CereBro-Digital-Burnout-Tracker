@@ -15,6 +15,7 @@ import platform
 import os
 import signal
 import sys
+from cerebro_db import CerebroDB
 
 # Platform-specific imports for idle detection
 if platform.system() == "Windows":
@@ -35,10 +36,9 @@ elif platform.system() == "Linux":
 class FocusTimer:
     """Focus session timer with interruption detection"""
     
-    def __init__(self, db_path: str = "focus_sessions.db", 
-                 idle_threshold: int = 60):  # 1 minute of inactivity
-        self.db_path = db_path
+    def __init__(self, idle_threshold: int = 60, cerebro_db: CerebroDB = None):  # 1 minute of inactivity
         self.idle_threshold = idle_threshold
+        self.cerebro_db = cerebro_db or CerebroDB("cerebro.db")
         
         # Session state
         self.is_running = False
@@ -68,8 +68,7 @@ class FocusTimer:
         )
         self.logger = logging.getLogger(__name__)
         
-        # Initialize database
-        self._init_database()
+
         
         # Setup signal handlers
         signal.signal(signal.SIGINT, self._signal_handler)
@@ -283,16 +282,8 @@ class FocusTimer:
     def _log_session_start(self, notes: str = ""):
         """Log session start to database"""
         try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            
-            cursor.execute('''
-                INSERT INTO focus_sessions (session_id, start_time, target_duration, notes)
-                VALUES (?, ?, ?, ?)
-            ''', (self.session_id, self.session_start, self.target_duration, notes))
-            
-            conn.commit()
-            conn.close()
+            # Session start is logged when session ends
+            pass
             
         except Exception as e:
             self.logger.error(f"Failed to log session start: {e}")
@@ -300,20 +291,13 @@ class FocusTimer:
     def _log_session_end(self, actual_duration: float, notes: str = ""):
         """Log session end to database"""
         try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            
-            # Update session record
-            cursor.execute('''
-                UPDATE focus_sessions 
-                SET end_time = ?, actual_duration = ?, interrupted = ?, 
-                    interruption_duration = ?, notes = ?
-                WHERE session_id = ?
-            ''', (self.session_end, actual_duration, self.interrupted,
-                  self.interruption_duration, notes, self.session_id))
-            
-            conn.commit()
-            conn.close()
+            # Log to unified cerebro database
+            self.cerebro_db.insert_focus_session(
+                start_time=int(self.session_start.timestamp()),
+                end_time=int(self.session_end.timestamp()),
+                was_interrupted=self.interrupted,
+                duration=int(actual_duration)
+            )
             
         except Exception as e:
             self.logger.error(f"Failed to log session end: {e}")
