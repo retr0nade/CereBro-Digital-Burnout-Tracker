@@ -85,9 +85,31 @@ The following features are actively being worked on:
 
 ### 2. Desktop App (Optional but Recommended)
 
+#### Install Dependencies
+
+Choose the appropriate requirements file for your operating system:
+
+**Windows:**
 ```bash
-cd desktop-app
-pip install -r requirements.txt
+cd desktop-app/backend
+pip install -r requirements-windows.txt
+```
+
+**macOS:**
+```bash
+cd desktop-app/backend
+pip install -r requirements-macos.txt
+```
+
+**Linux:**
+```bash
+cd desktop-app/backend
+pip install -r requirements-linux.txt
+```
+
+#### Run the Application
+
+```bash
 python app_service.py
 ```
 
@@ -168,6 +190,8 @@ Ex: track site types, form fill behaviors, social media reactions, or page “ra
   [Read these tips »](https://developer.chrome.com/docs/extensions/mv3/messaging/)
 - **No data sent to desktop app?**  
   Make sure your local server is running and accessible at `http://localhost:5005`.
+- **Installation issues?**  
+  Make sure you're using the correct requirements file for your operating system. The original `requirements.txt` includes all dependencies for all platforms, but platform-specific files are recommended for cleaner installations.
 
 
 ---

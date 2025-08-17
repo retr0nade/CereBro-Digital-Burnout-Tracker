@@ -1,0 +1,4 @@
+flask==3.0.0
+psutil==5.9.8
+pywin32>=307
+pynput>=1.7.6

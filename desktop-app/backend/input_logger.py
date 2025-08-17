@@ -14,6 +14,7 @@ from typing import Dict, Any, Optional
 import platform
 import os
 import json
+from data.unified_schema import BurnoutTrackerDB, InputActivity
 
 # Import pynput for input monitoring
 try:
@@ -29,20 +30,22 @@ class InputLogger:
     """Cross-platform input activity logger"""
     
     def __init__(self, db_path: str = "input_activity.db", log_interval: int = 60, 
-                 enable_keyboard: bool = True, enable_mouse: bool = True):
+                 enable_keyboard: bool = True, enable_mouse: bool = True, unified_db: BurnoutTrackerDB = None):
         """
         Initialize the input logger
         
         Args:
-            db_path: Path to SQLite database file
+            db_path: Path to SQLite database file (legacy support)
             log_interval: How often to log data in seconds (default: 60)
             enable_keyboard: Whether to monitor keyboard input
             enable_mouse: Whether to monitor mouse input
+            unified_db: Unified database instance for logging
         """
         self.db_path = db_path
         self.log_interval = log_interval
         self.enable_keyboard = enable_keyboard
         self.enable_mouse = enable_mouse
+        self.unified_db = unified_db or BurnoutTrackerDB("data/burnout_tracker.db")
         self.is_running = False
         self.logger_thread = None
         
@@ -70,7 +73,7 @@ class InputLogger:
         )
         self.logger = logging.getLogger(__name__)
         
-        # Initialize database
+        # Initialize legacy database (for backward compatibility)
         self._init_database()
         
         # Setup input monitoring
@@ -205,7 +208,17 @@ class InputLogger:
                 self.mouse_scroll_count = 0
                 self.mouse_move_count = 0
             
-            # Log to database
+            # Log to unified database
+            input_activity = InputActivity(
+                timestamp=int(time.time()),
+                keypress_count=keypresses,
+                mouse_click_count=mouse_clicks,
+                scroll_events=mouse_scrolls,
+                mouse_movement=mouse_moves
+            )
+            self.unified_db.insert_input_activity(input_activity)
+            
+            # Also log to legacy database for backward compatibility
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
             

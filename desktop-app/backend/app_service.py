@@ -2,7 +2,8 @@ import threading, time, sqlite3, json, os, platform
 from flask import Flask, request, jsonify
 from metrics.apps import get_foreground_app
 from metrics.idle import get_idle_seconds
-from data.models import init_db, store_app_event, store_idle_event, store_metric, list_usage, list_idle, list_switches, store_pref, get_pref
+from data.models import store_pref, get_pref
+from data.unified_schema import BurnoutTrackerDB, AppUsage, IdlePeriod, InputActivity, FocusSession, BreakLog, BreakType
 from api.routes import api
 from window_tracker import WindowTracker
 from idle_monitor import IdleMonitor
@@ -36,13 +37,16 @@ def update_pref(new_settings):
 settings = load_settings()
 app = Flask(__name__)
 app.register_blueprint(api, url_prefix='/api')
-init_db()
+
+# Initialize unified database
+unified_db = BurnoutTrackerDB("data/burnout_tracker.db")
+print("Unified database initialized successfully")
 
 # Initialize window tracker
 window_tracker = None
 if settings.get("track_windows", True):
     try:
-        window_tracker = WindowTracker(db_path="window_activity.db", log_interval=1.0)
+        window_tracker = WindowTracker(db_path="window_activity.db", log_interval=1.0, unified_db=unified_db)
         window_tracker.start()
         print("Window tracker started successfully")
     except Exception as e:
@@ -67,7 +71,8 @@ if settings.get("track_input", True):
             db_path="input_activity.db", 
             log_interval=60,  # Log every minute
             enable_keyboard=True,
-            enable_mouse=True
+            enable_mouse=True,
+            unified_db=unified_db
         )
         input_logger.start()
         print("Input logger started successfully")

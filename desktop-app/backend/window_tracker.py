@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Window Activity Tracker for CereBro Mental Burnout Tracker
-Tracks active window changes and logs them to SQLite database
+Tracks active window changes and logs them to unified database
 Supports Windows, macOS, and Linux
 """
 
@@ -13,6 +13,7 @@ from datetime import datetime, timedelta
 from typing import Optional, Tuple, Dict, Any
 import platform
 import os
+from data.unified_schema import BurnoutTrackerDB, AppUsage
 
 # Platform-specific imports
 if platform.system() == "Windows":
@@ -37,16 +38,18 @@ elif platform.system() == "Linux":
 class WindowTracker:
     """Cross-platform window activity tracker"""
     
-    def __init__(self, db_path: str = "window_activity.db", log_interval: float = 1.0):
+    def __init__(self, db_path: str = "window_activity.db", log_interval: float = 1.0, unified_db: BurnoutTrackerDB = None):
         """
         Initialize the window tracker
         
         Args:
-            db_path: Path to SQLite database file
+            db_path: Path to SQLite database file (legacy support)
             log_interval: How often to check for window changes (seconds)
+            unified_db: Unified database instance for logging
         """
         self.db_path = db_path
         self.log_interval = log_interval
+        self.unified_db = unified_db or BurnoutTrackerDB("data/burnout_tracker.db")
         self.current_window = None
         self.current_start_time = None
         self.is_running = False
@@ -63,7 +66,7 @@ class WindowTracker:
         )
         self.logger = logging.getLogger(__name__)
         
-        # Initialize database
+        # Initialize legacy database (for backward compatibility)
         self._init_database()
         
         # Platform-specific setup
@@ -268,6 +271,18 @@ class WindowTracker:
                            end_time: datetime, duration: float, pid: int):
         """Log window activity to database"""
         try:
+            # Log to unified database
+            app_usage = AppUsage(
+                app_name=app_name,
+                start_time=int(start_time.timestamp()),
+                end_time=int(end_time.timestamp()),
+                duration=int(duration),
+                window_title=window_title,
+                category=self._categorize_app(app_name)
+            )
+            self.unified_db.insert_app_usage(app_usage)
+            
+            # Also log to legacy database for backward compatibility
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
             
@@ -284,6 +299,36 @@ class WindowTracker:
             
         except Exception as e:
             self.logger.error(f"Failed to log window activity: {e}")
+    
+    def _categorize_app(self, app_name: str) -> str:
+        """Categorize application based on name"""
+        app_name_lower = app_name.lower()
+        
+        # Development tools
+        if any(dev in app_name_lower for dev in ['code', 'studio', 'pycharm', 'intellij', 'eclipse', 'vim', 'emacs', 'sublime']):
+            return 'development'
+        
+        # Communication tools
+        if any(comm in app_name_lower for comm in ['slack', 'teams', 'discord', 'zoom', 'skype', 'whatsapp', 'telegram']):
+            return 'communication'
+        
+        # Productivity tools
+        if any(prod in app_name_lower for prod in ['excel', 'word', 'powerpoint', 'outlook', 'onenote', 'notion', 'trello']):
+            return 'productivity'
+        
+        # Browsers
+        if any(browser in app_name_lower for browser in ['chrome', 'firefox', 'safari', 'edge', 'opera']):
+            return 'browsing'
+        
+        # Entertainment
+        if any(ent in app_name_lower for ent in ['youtube', 'netflix', 'spotify', 'steam', 'game']):
+            return 'entertainment'
+        
+        # System tools
+        if any(sys in app_name_lower for sys in ['explorer', 'finder', 'terminal', 'cmd', 'powershell']):
+            return 'system'
+        
+        return 'other'
     
     def _tracking_loop(self):
         """Main tracking loop"""
