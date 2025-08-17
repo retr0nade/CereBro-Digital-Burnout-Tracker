@@ -200,16 +200,38 @@ class IdleMonitor:
         """Log idle period to database"""
         try:
             # Log to unified cerebro database
-            self.cerebro_db.insert_idle_period(
-                start_time=int(idle_start.timestamp()),
-                end_time=int(idle_end.timestamp()),
-                duration=int(duration)
-            )
-            
-            self.logger.info(f"Logged idle period: {duration:.1f}s ({idle_start} to {idle_end})")
-            
+            try:
+                self.cerebro_db.insert_idle_period(
+                    start_time=int(idle_start.timestamp()),
+                    end_time=int(idle_end.timestamp()),
+                    duration=int(duration)
+                )
+                
+                self.logger.info(f"Logged idle period: {duration:.1f}s ({idle_start} to {idle_end})")
+                
+            except Exception as db_error:
+                error_msg = f"Database error in idle monitor: {db_error}"
+                self.logger.error(error_msg, exc_info=True)
+                
+                # Log to cerebro.log for service manager monitoring
+                try:
+                    with open('cerebro.log', 'a') as f:
+                        f.write(f"{datetime.now().isoformat()} - IDLE_MONITOR - DATABASE ERROR: {error_msg}\n")
+                except:
+                    pass
+                
+                # Don't raise the exception - continue running
+                
         except Exception as e:
-            self.logger.error(f"Failed to log idle period: {e}")
+            error_msg = f"Failed to log idle period: {e}"
+            self.logger.error(error_msg, exc_info=True)
+            
+            # Log to cerebro.log for service manager monitoring
+            try:
+                with open('cerebro.log', 'a') as f:
+                    f.write(f"{datetime.now().isoformat()} - IDLE_MONITOR - LOGGING ERROR: {error_msg}\n")
+            except:
+                pass
     
     def _monitoring_loop(self):
         """Main monitoring loop"""
@@ -224,14 +246,25 @@ class IdleMonitor:
                     # User is active
                     if self.is_idle:
                         # User just became active after being idle
-                        idle_end = datetime.now()
-                        duration = (idle_end - self.current_idle_start).total_seconds()
-                        
-                        self._log_idle_period(self.current_idle_start, idle_end, duration)
-                        
-                        self.is_idle = False
-                        self.current_idle_start = None
-                        self.logger.info(f"User became active after {duration:.1f}s of inactivity")
+                        try:
+                            idle_end = datetime.now()
+                            duration = (idle_end - self.current_idle_start).total_seconds()
+                            
+                            self._log_idle_period(self.current_idle_start, idle_end, duration)
+                            
+                            self.is_idle = False
+                            self.current_idle_start = None
+                            self.logger.info(f"User became active after {duration:.1f}s of inactivity")
+                        except Exception as log_error:
+                            error_msg = f"Error logging idle period end: {log_error}"
+                            self.logger.error(error_msg, exc_info=True)
+                            
+                            # Log to cerebro.log for service manager monitoring
+                            try:
+                                with open('cerebro.log', 'a') as f:
+                                    f.write(f"{datetime.now().isoformat()} - IDLE_MONITOR - LOGGING ERROR: {error_msg}\n")
+                            except:
+                                pass
                     
                     # Update last activity time
                     self.last_activity_time = current_time
@@ -246,9 +279,22 @@ class IdleMonitor:
                 
                 time.sleep(self.check_interval)
                 
+            except KeyboardInterrupt:
+                self.logger.info("Idle monitor interrupted by user")
+                break
             except Exception as e:
-                self.logger.error(f"Error in monitoring loop: {e}")
-                time.sleep(self.check_interval)
+                error_msg = f"Critical error in idle monitor main loop: {e}"
+                self.logger.error(error_msg, exc_info=True)
+                
+                # Log to cerebro.log for service manager monitoring
+                try:
+                    with open('cerebro.log', 'a') as f:
+                        f.write(f"{datetime.now().isoformat()} - IDLE_MONITOR - CRITICAL ERROR: {error_msg}\n")
+                except:
+                    pass
+                
+                # Brief pause before retrying
+                time.sleep(5)
     
     def start(self):
         """Start idle monitoring"""
@@ -256,10 +302,24 @@ class IdleMonitor:
             self.logger.warning("Idle monitor is already running")
             return
         
-        self.is_running = True
-        self.monitor_thread = threading.Thread(target=self._monitoring_loop, daemon=True)
-        self.monitor_thread.start()
-        self.logger.info("Idle monitor started")
+        try:
+            self.is_running = True
+            self.monitor_thread = threading.Thread(target=self._monitoring_loop, daemon=True)
+            self.monitor_thread.start()
+            self.logger.info("Idle monitor started")
+            
+        except Exception as e:
+            error_msg = f"Failed to start idle monitor: {e}"
+            self.logger.error(error_msg, exc_info=True)
+            
+            # Log to cerebro.log for service manager monitoring
+            try:
+                with open('cerebro.log', 'a') as f:
+                    f.write(f"{datetime.now().isoformat()} - IDLE_MONITOR - STARTUP ERROR: {error_msg}\n")
+            except:
+                pass
+            
+            raise
     
     def stop(self):
         """Stop idle monitoring"""
@@ -267,18 +327,36 @@ class IdleMonitor:
             self.logger.warning("Idle monitor is not running")
             return
         
-        self.is_running = False
-        
-        # Log final idle period if user is currently idle
-        if self.is_idle and self.current_idle_start:
-            idle_end = datetime.now()
-            duration = (idle_end - self.current_idle_start).total_seconds()
-            self._log_idle_period(self.current_idle_start, idle_end, duration)
-        
-        if self.monitor_thread:
-            self.monitor_thread.join(timeout=5)
-        
-        self.logger.info("Idle monitor stopped")
+        try:
+            self.is_running = False
+            
+            # Log final idle period if user is currently idle
+            if self.is_idle and self.current_idle_start:
+                try:
+                    idle_end = datetime.now()
+                    duration = (idle_end - self.current_idle_start).total_seconds()
+                    self._log_idle_period(self.current_idle_start, idle_end, duration)
+                except Exception as e:
+                    self.logger.error(f"Error logging final idle period: {e}")
+            
+            if self.monitor_thread:
+                try:
+                    self.monitor_thread.join(timeout=5)
+                except Exception as e:
+                    self.logger.error(f"Error joining monitor thread: {e}")
+            
+            self.logger.info("Idle monitor stopped")
+            
+        except Exception as e:
+            error_msg = f"Error stopping idle monitor: {e}"
+            self.logger.error(error_msg, exc_info=True)
+            
+            # Log to cerebro.log for service manager monitoring
+            try:
+                with open('cerebro.log', 'a') as f:
+                    f.write(f"{datetime.now().isoformat()} - IDLE_MONITOR - STOP ERROR: {error_msg}\n")
+            except:
+                pass
     
     def get_recent_idle_periods(self, hours: int = 24) -> list:
         """Get recent idle periods"""

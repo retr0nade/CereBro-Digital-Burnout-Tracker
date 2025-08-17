@@ -236,17 +236,39 @@ class WindowTracker:
         """Log window activity to database"""
         try:
             # Log to unified cerebro database
-            self.cerebro_db.insert_app_usage(
-                app_name=app_name,
-                start_time=int(start_time.timestamp()),
-                end_time=int(end_time.timestamp()),
-                duration=int(duration)
-            )
-            
-            self.logger.debug(f"Logged: {app_name} - {duration:.1f}s")
-            
+            try:
+                self.cerebro_db.insert_app_usage(
+                    app_name=app_name,
+                    start_time=int(start_time.timestamp()),
+                    end_time=int(end_time.timestamp()),
+                    duration=int(duration)
+                )
+                
+                self.logger.debug(f"Logged: {app_name} - {duration:.1f}s")
+                
+            except Exception as db_error:
+                error_msg = f"Database error in window tracker: {db_error}"
+                self.logger.error(error_msg, exc_info=True)
+                
+                # Log to cerebro.log for service manager monitoring
+                try:
+                    with open('cerebro.log', 'a') as f:
+                        f.write(f"{datetime.now().isoformat()} - WINDOW_TRACKER - DATABASE ERROR: {error_msg}\n")
+                except:
+                    pass
+                
+                # Don't raise the exception - continue running
+                
         except Exception as e:
-            self.logger.error(f"Failed to log window activity: {e}")
+            error_msg = f"Failed to log window activity: {e}"
+            self.logger.error(error_msg, exc_info=True)
+            
+            # Log to cerebro.log for service manager monitoring
+            try:
+                with open('cerebro.log', 'a') as f:
+                    f.write(f"{datetime.now().isoformat()} - WINDOW_TRACKER - LOGGING ERROR: {error_msg}\n")
+            except:
+                pass
     
     def _categorize_app(self, app_name: str) -> str:
         """Categorize application based on name"""
@@ -297,15 +319,26 @@ class WindowTracker:
                         
                         # Log previous window if exists
                         if self.current_window and self.current_start_time:
-                            duration = (current_time - self.current_start_time).total_seconds()
-                            self._log_window_activity(
-                                self.current_window[0],  # app_name
-                                self.current_window[1],  # window_title
-                                self.current_start_time,
-                                current_time,
-                                duration,
-                                0  # pid for previous window
-                            )
+                            try:
+                                duration = (current_time - self.current_start_time).total_seconds()
+                                self._log_window_activity(
+                                    self.current_window[0],  # app_name
+                                    self.current_window[1],  # window_title
+                                    self.current_start_time,
+                                    current_time,
+                                    duration,
+                                    0  # pid for previous window
+                                )
+                            except Exception as log_error:
+                                error_msg = f"Error logging previous window activity: {log_error}"
+                                self.logger.error(error_msg, exc_info=True)
+                                
+                                # Log to cerebro.log for service manager monitoring
+                                try:
+                                    with open('cerebro.log', 'a') as f:
+                                        f.write(f"{datetime.now().isoformat()} - WINDOW_TRACKER - LOGGING ERROR: {error_msg}\n")
+                                except:
+                                    pass
                         
                         # Update current window
                         self.current_window = (app_name, window_title)
@@ -314,9 +347,22 @@ class WindowTracker:
                 
                 time.sleep(self.log_interval)
                 
+            except KeyboardInterrupt:
+                self.logger.info("Window tracker interrupted by user")
+                break
             except Exception as e:
-                self.logger.error(f"Error in tracking loop: {e}")
-                time.sleep(self.log_interval)
+                error_msg = f"Critical error in window tracker main loop: {e}"
+                self.logger.error(error_msg, exc_info=True)
+                
+                # Log to cerebro.log for service manager monitoring
+                try:
+                    with open('cerebro.log', 'a') as f:
+                        f.write(f"{datetime.now().isoformat()} - WINDOW_TRACKER - CRITICAL ERROR: {error_msg}\n")
+                except:
+                    pass
+                
+                # Brief pause before retrying
+                time.sleep(5)
     
     def start(self):
         """Start window tracking"""
@@ -324,10 +370,24 @@ class WindowTracker:
             self.logger.warning("Window tracker is already running")
             return
         
-        self.is_running = True
-        self.tracker_thread = threading.Thread(target=self._tracking_loop, daemon=True)
-        self.tracker_thread.start()
-        self.logger.info("Window tracker started")
+        try:
+            self.is_running = True
+            self.tracker_thread = threading.Thread(target=self._tracking_loop, daemon=True)
+            self.tracker_thread.start()
+            self.logger.info("Window tracker started")
+            
+        except Exception as e:
+            error_msg = f"Failed to start window tracker: {e}"
+            self.logger.error(error_msg, exc_info=True)
+            
+            # Log to cerebro.log for service manager monitoring
+            try:
+                with open('cerebro.log', 'a') as f:
+                    f.write(f"{datetime.now().isoformat()} - WINDOW_TRACKER - STARTUP ERROR: {error_msg}\n")
+            except:
+                pass
+            
+            raise
     
     def stop(self):
         """Stop window tracking"""
@@ -335,25 +395,43 @@ class WindowTracker:
             self.logger.warning("Window tracker is not running")
             return
         
-        self.is_running = False
-        
-        # Log final window if exists
-        if self.current_window and self.current_start_time:
-            current_time = datetime.now()
-            duration = (current_time - self.current_start_time).total_seconds()
-            self._log_window_activity(
-                self.current_window[0],
-                self.current_window[1],
-                self.current_start_time,
-                current_time,
-                duration,
-                0
-            )
-        
-        if self.tracker_thread:
-            self.tracker_thread.join(timeout=5)
-        
-        self.logger.info("Window tracker stopped")
+        try:
+            self.is_running = False
+            
+            # Log final window if exists
+            if self.current_window and self.current_start_time:
+                try:
+                    current_time = datetime.now()
+                    duration = (current_time - self.current_start_time).total_seconds()
+                    self._log_window_activity(
+                        self.current_window[0],
+                        self.current_window[1],
+                        self.current_start_time,
+                        current_time,
+                        duration,
+                        0
+                    )
+                except Exception as e:
+                    self.logger.error(f"Error logging final window activity: {e}")
+            
+            if self.tracker_thread:
+                try:
+                    self.tracker_thread.join(timeout=5)
+                except Exception as e:
+                    self.logger.error(f"Error joining tracker thread: {e}")
+            
+            self.logger.info("Window tracker stopped")
+            
+        except Exception as e:
+            error_msg = f"Error stopping window tracker: {e}"
+            self.logger.error(error_msg, exc_info=True)
+            
+            # Log to cerebro.log for service manager monitoring
+            try:
+                with open('cerebro.log', 'a') as f:
+                    f.write(f"{datetime.now().isoformat()} - WINDOW_TRACKER - STOP ERROR: {error_msg}\n")
+            except:
+                pass
     
     def get_recent_activity(self, hours: int = 24) -> list:
         """Get recent window activity"""

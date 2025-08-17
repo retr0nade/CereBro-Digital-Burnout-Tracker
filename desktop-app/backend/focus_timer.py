@@ -177,9 +177,21 @@ class FocusTimer:
                 
                 time.sleep(60)  # Check every minute
                 
+            except KeyboardInterrupt:
+                self.logger.info("Activity monitor interrupted by user")
+                break
             except Exception as e:
-                self.logger.error(f"Error in activity monitoring: {e}")
-                time.sleep(1)
+                error_msg = f"Error in activity monitoring: {e}"
+                self.logger.error(error_msg, exc_info=True)
+                
+                # Log to cerebro.log for service manager monitoring
+                try:
+                    with open('cerebro.log', 'a') as f:
+                        f.write(f"{datetime.now().isoformat()} - FOCUS_TIMER - ACTIVITY MONITOR ERROR: {error_msg}\n")
+                except:
+                    pass
+                
+                time.sleep(5)
     
     def _timer_loop(self):
         """Main timer loop"""
@@ -199,72 +211,126 @@ class FocusTimer:
                 
                 time.sleep(1)
                 
+            except KeyboardInterrupt:
+                self.logger.info("Focus timer interrupted by user")
+                break
             except Exception as e:
-                self.logger.error(f"Error in timer loop: {e}")
-                time.sleep(1)
+                error_msg = f"Critical error in focus timer main loop: {e}"
+                self.logger.error(error_msg, exc_info=True)
+                
+                # Log to cerebro.log for service manager monitoring
+                try:
+                    with open('cerebro.log', 'a') as f:
+                        f.write(f"{datetime.now().isoformat()} - FOCUS_TIMER - CRITICAL ERROR: {error_msg}\n")
+                except:
+                    pass
+                
+                # Brief pause before retrying
+                time.sleep(5)
     
     def start_session(self, duration_minutes: int = 25, notes: str = "") -> str:
         """Start a new focus session"""
         if self.is_running:
             raise RuntimeError("Session already running")
         
-        # Generate session ID
-        self.session_id = f"session_{int(time.time())}"
-        self.session_start = datetime.now()
-        self.target_duration = duration_minutes * 60
-        self.elapsed_time = 0.0
-        self.interrupted = False
-        self.interruption_duration = 0.0
-        
-        # Start monitoring threads
-        self.is_running = True
-        self.timer_thread = threading.Thread(target=self._timer_loop, daemon=True)
-        self.monitor_thread = threading.Thread(target=self._monitor_activity, daemon=True)
-        
-        self.timer_thread.start()
-        self.monitor_thread.start()
-        
-        # Log session start
-        self._log_session_start(notes)
-        
-        self.logger.info(f"Started focus session: {self.session_id} ({duration_minutes} minutes)")
-        return self.session_id
+        try:
+            # Generate session ID
+            self.session_id = f"session_{int(time.time())}"
+            self.session_start = datetime.now()
+            self.target_duration = duration_minutes * 60
+            self.elapsed_time = 0.0
+            self.interrupted = False
+            self.interruption_duration = 0.0
+            
+            # Start monitoring threads
+            self.is_running = True
+            self.timer_thread = threading.Thread(target=self._timer_loop, daemon=True)
+            self.monitor_thread = threading.Thread(target=self._monitor_activity, daemon=True)
+            
+            self.timer_thread.start()
+            self.monitor_thread.start()
+            
+            # Log session start
+            try:
+                self._log_session_start(notes)
+            except Exception as e:
+                self.logger.error(f"Error logging session start: {e}")
+            
+            self.logger.info(f"Started focus session: {self.session_id} ({duration_minutes} minutes)")
+            return self.session_id
+            
+        except Exception as e:
+            error_msg = f"Failed to start focus session: {e}"
+            self.logger.error(error_msg, exc_info=True)
+            
+            # Log to cerebro.log for service manager monitoring
+            try:
+                with open('cerebro.log', 'a') as f:
+                    f.write(f"{datetime.now().isoformat()} - FOCUS_TIMER - STARTUP ERROR: {error_msg}\n")
+            except:
+                pass
+            
+            raise
     
     def stop_session(self, notes: str = "") -> Dict[str, Any]:
         """Stop the current focus session"""
         if not self.is_running:
             raise RuntimeError("No session running")
         
-        # Stop monitoring
-        self.is_running = False
-        
-        # Wait for threads to finish
-        if self.timer_thread:
-            self.timer_thread.join(timeout=5)
-        if self.monitor_thread:
-            self.monitor_thread.join(timeout=5)
-        
-        # Calculate final duration
-        self.session_end = datetime.now()
-        actual_duration = (self.session_end - self.session_start).total_seconds()
-        
-        # Log session end
-        self._log_session_end(actual_duration, notes)
-        
-        # Prepare result
-        result = {
-            'session_id': self.session_id,
-            'start_time': self.session_start,
-            'end_time': self.session_end,
-            'target_duration': self.target_duration,
-            'actual_duration': actual_duration,
-            'interrupted': self.interrupted,
-            'interruption_duration': self.interruption_duration,
-            'completion_percentage': (actual_duration / self.target_duration) * 100
-        }
-        
-        self.logger.info(f"Stopped focus session: {self.session_id}")
-        return result
+        try:
+            # Stop monitoring
+            self.is_running = False
+            
+            # Wait for threads to finish
+            if self.timer_thread:
+                try:
+                    self.timer_thread.join(timeout=5)
+                except Exception as e:
+                    self.logger.error(f"Error joining timer thread: {e}")
+                    
+            if self.monitor_thread:
+                try:
+                    self.monitor_thread.join(timeout=5)
+                except Exception as e:
+                    self.logger.error(f"Error joining monitor thread: {e}")
+            
+            # Calculate final duration
+            self.session_end = datetime.now()
+            actual_duration = (self.session_end - self.session_start).total_seconds()
+            
+            # Log session end
+            try:
+                self._log_session_end(actual_duration, notes)
+            except Exception as e:
+                self.logger.error(f"Error logging session end: {e}")
+            
+            # Prepare result
+            result = {
+                'session_id': self.session_id,
+                'start_time': self.session_start,
+                'end_time': self.session_end,
+                'target_duration': self.target_duration,
+                'actual_duration': actual_duration,
+                'interrupted': self.interrupted,
+                'interruption_duration': self.interruption_duration,
+                'completion_percentage': (actual_duration / self.target_duration) * 100
+            }
+            
+            self.logger.info(f"Stopped focus session: {self.session_id}")
+            return result
+            
+        except Exception as e:
+            error_msg = f"Error stopping focus session: {e}"
+            self.logger.error(error_msg, exc_info=True)
+            
+            # Log to cerebro.log for service manager monitoring
+            try:
+                with open('cerebro.log', 'a') as f:
+                    f.write(f"{datetime.now().isoformat()} - FOCUS_TIMER - STOP ERROR: {error_msg}\n")
+            except:
+                pass
+            
+            raise
     
     def get_session_status(self) -> Dict[str, Any]:
         """Get current session status"""
@@ -296,15 +362,37 @@ class FocusTimer:
         """Log session end to database"""
         try:
             # Log to unified cerebro database
-            self.cerebro_db.insert_focus_session(
-                start_time=int(self.session_start.timestamp()),
-                end_time=int(self.session_end.timestamp()),
-                was_interrupted=self.interrupted,
-                duration=int(actual_duration)
-            )
-            
+            try:
+                self.cerebro_db.insert_focus_session(
+                    start_time=int(self.session_start.timestamp()),
+                    end_time=int(self.session_end.timestamp()),
+                    was_interrupted=self.interrupted,
+                    duration=int(actual_duration)
+                )
+                
+            except Exception as db_error:
+                error_msg = f"Database error in focus timer: {db_error}"
+                self.logger.error(error_msg, exc_info=True)
+                
+                # Log to cerebro.log for service manager monitoring
+                try:
+                    with open('cerebro.log', 'a') as f:
+                        f.write(f"{datetime.now().isoformat()} - FOCUS_TIMER - DATABASE ERROR: {error_msg}\n")
+                except:
+                    pass
+                
+                # Don't raise the exception - continue running
+                
         except Exception as e:
-            self.logger.error(f"Failed to log session end: {e}")
+            error_msg = f"Failed to log session end: {e}"
+            self.logger.error(error_msg, exc_info=True)
+            
+            # Log to cerebro.log for service manager monitoring
+            try:
+                with open('cerebro.log', 'a') as f:
+                    f.write(f"{datetime.now().isoformat()} - FOCUS_TIMER - LOGGING ERROR: {error_msg}\n")
+            except:
+                pass
     
     def get_session_history(self, days: int = 7) -> List[Dict[str, Any]]:
         """Get session history from the last N days"""

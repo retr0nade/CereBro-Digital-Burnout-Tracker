@@ -114,7 +114,15 @@ class InputLogger:
                 self.keypress_count += 1
                 self.logger.debug(f"Key press: {key}")
         except Exception as e:
-            self.logger.error(f"Error handling key press: {e}")
+            error_msg = f"Error handling key press: {e}"
+            self.logger.error(error_msg, exc_info=True)
+            
+            # Log to cerebro.log for service manager monitoring
+            try:
+                with open('cerebro.log', 'a') as f:
+                    f.write(f"{datetime.now().isoformat()} - INPUT_LOGGER - KEYPRESS ERROR: {error_msg}\n")
+            except:
+                pass
     
     def _on_key_release(self, key):
         """Handle keyboard key release"""
@@ -122,7 +130,15 @@ class InputLogger:
             # Only log on release to avoid double counting
             self.logger.debug(f"Key release: {key}")
         except Exception as e:
-            self.logger.error(f"Error handling key release: {e}")
+            error_msg = f"Error handling key release: {e}"
+            self.logger.error(error_msg, exc_info=True)
+            
+            # Log to cerebro.log for service manager monitoring
+            try:
+                with open('cerebro.log', 'a') as f:
+                    f.write(f"{datetime.now().isoformat()} - INPUT_LOGGER - KEYRELEASE ERROR: {error_msg}\n")
+            except:
+                pass
     
     def _on_mouse_click(self, x, y, button, pressed):
         """Handle mouse click"""
@@ -132,7 +148,15 @@ class InputLogger:
                     self.mouse_click_count += 1
                     self.logger.debug(f"Mouse click: {button} at ({x}, {y})")
         except Exception as e:
-            self.logger.error(f"Error handling mouse click: {e}")
+            error_msg = f"Error handling mouse click: {e}"
+            self.logger.error(error_msg, exc_info=True)
+            
+            # Log to cerebro.log for service manager monitoring
+            try:
+                with open('cerebro.log', 'a') as f:
+                    f.write(f"{datetime.now().isoformat()} - INPUT_LOGGER - MOUSECLICK ERROR: {error_msg}\n")
+            except:
+                pass
     
     def _on_mouse_scroll(self, x, y, dx, dy):
         """Handle mouse scroll"""
@@ -141,7 +165,15 @@ class InputLogger:
                 self.mouse_scroll_count += 1
                 self.logger.debug(f"Mouse scroll: ({dx}, {dy}) at ({x}, {y})")
         except Exception as e:
-            self.logger.error(f"Error handling mouse scroll: {e}")
+            error_msg = f"Error handling mouse scroll: {e}"
+            self.logger.error(error_msg, exc_info=True)
+            
+            # Log to cerebro.log for service manager monitoring
+            try:
+                with open('cerebro.log', 'a') as f:
+                    f.write(f"{datetime.now().isoformat()} - INPUT_LOGGER - MOUSESCROLL ERROR: {error_msg}\n")
+            except:
+                pass
     
     def _on_mouse_move(self, x, y):
         """Handle mouse movement"""
@@ -152,7 +184,15 @@ class InputLogger:
                 if self.mouse_move_count % 100 == 0:
                     self.logger.debug(f"Mouse move: ({x}, {y})")
         except Exception as e:
-            self.logger.error(f"Error handling mouse move: {e}")
+            error_msg = f"Error handling mouse move: {e}"
+            self.logger.error(error_msg, exc_info=True)
+            
+            # Log to cerebro.log for service manager monitoring
+            try:
+                with open('cerebro.log', 'a') as f:
+                    f.write(f"{datetime.now().isoformat()} - INPUT_LOGGER - MOUSEMOVE ERROR: {error_msg}\n")
+            except:
+                pass
     
     def _log_input_activity(self):
         """Log current input activity to database"""
@@ -172,17 +212,39 @@ class InputLogger:
                 self.mouse_move_count = 0
             
             # Log to unified cerebro database
-            self.cerebro_db.insert_input_activity(
-                timestamp=int(time.time()),
-                keypress_count=keypresses,
-                mouse_click_count=mouse_clicks
-            )
-            
-            self.logger.info(f"Logged input activity: {keypresses} keys, {mouse_clicks} clicks, "
-                           f"{mouse_scrolls} scrolls, {mouse_moves} moves, {total_inputs} total")
-            
+            try:
+                self.cerebro_db.insert_input_activity(
+                    timestamp=int(time.time()),
+                    keypress_count=keypresses,
+                    mouse_click_count=mouse_clicks
+                )
+                
+                self.logger.info(f"Logged input activity: {keypresses} keys, {mouse_clicks} clicks, "
+                               f"{mouse_scrolls} scrolls, {mouse_moves} moves, {total_inputs} total")
+                
+            except Exception as db_error:
+                error_msg = f"Database error in input logger: {db_error}"
+                self.logger.error(error_msg, exc_info=True)
+                
+                # Log to cerebro.log for service manager monitoring
+                try:
+                    with open('cerebro.log', 'a') as f:
+                        f.write(f"{datetime.now().isoformat()} - INPUT_LOGGER - DATABASE ERROR: {error_msg}\n")
+                except:
+                    pass
+                
+                # Don't raise the exception - continue running
+                
         except Exception as e:
-            self.logger.error(f"Failed to log input activity: {e}")
+            error_msg = f"Failed to log input activity: {e}"
+            self.logger.error(error_msg, exc_info=True)
+            
+            # Log to cerebro.log for service manager monitoring
+            try:
+                with open('cerebro.log', 'a') as f:
+                    f.write(f"{datetime.now().isoformat()} - INPUT_LOGGER - LOGGING ERROR: {error_msg}\n")
+            except:
+                pass
     
     def _logging_loop(self):
         """Main logging loop"""
@@ -196,9 +258,22 @@ class InputLogger:
                 if self.is_running:  # Check again in case we were stopped
                     self._log_input_activity()
                 
+            except KeyboardInterrupt:
+                self.logger.info("Input logger interrupted by user")
+                break
             except Exception as e:
-                self.logger.error(f"Error in logging loop: {e}")
-                time.sleep(1)  # Brief pause before retrying
+                error_msg = f"Critical error in input logger main loop: {e}"
+                self.logger.error(error_msg, exc_info=True)
+                
+                # Log to cerebro.log for service manager monitoring
+                try:
+                    with open('cerebro.log', 'a') as f:
+                        f.write(f"{datetime.now().isoformat()} - INPUT_LOGGER - CRITICAL ERROR: {error_msg}\n")
+                except:
+                    pass  # Don't let logging errors crash the service
+                
+                # Brief pause before retrying
+                time.sleep(5)
     
     def start(self):
         """Start input logging"""
@@ -207,7 +282,15 @@ class InputLogger:
             return
         
         if not PYNPUT_AVAILABLE:
-            self.logger.error("Cannot start - pynput not available")
+            error_msg = "Cannot start - pynput not available"
+            self.logger.error(error_msg)
+            
+            # Log to cerebro.log for service manager monitoring
+            try:
+                with open('cerebro.log', 'a') as f:
+                    f.write(f"{datetime.now().isoformat()} - INPUT_LOGGER - STARTUP ERROR: {error_msg}\n")
+            except:
+                pass
             return
         
         try:
@@ -228,7 +311,16 @@ class InputLogger:
             self.logger.info("Input logger started")
             
         except Exception as e:
-            self.logger.error(f"Failed to start input logger: {e}")
+            error_msg = f"Failed to start input logger: {e}"
+            self.logger.error(error_msg, exc_info=True)
+            
+            # Log to cerebro.log for service manager monitoring
+            try:
+                with open('cerebro.log', 'a') as f:
+                    f.write(f"{datetime.now().isoformat()} - INPUT_LOGGER - STARTUP ERROR: {error_msg}\n")
+            except:
+                pass
+            
             raise
     
     def stop(self):
@@ -237,24 +329,48 @@ class InputLogger:
             self.logger.warning("Input logger is not running")
             return
         
-        self.is_running = False
-        
-        # Log final activity
-        self._log_input_activity()
-        
-        # Stop input listeners
-        if self.keyboard_listener:
-            self.keyboard_listener.stop()
-            self.logger.info("Keyboard listener stopped")
-        
-        if self.mouse_listener:
-            self.mouse_listener.stop()
-            self.logger.info("Mouse listener stopped")
-        
-        if self.logger_thread:
-            self.logger_thread.join(timeout=5)
-        
-        self.logger.info("Input logger stopped")
+        try:
+            self.is_running = False
+            
+            # Log final activity
+            try:
+                self._log_input_activity()
+            except Exception as e:
+                self.logger.error(f"Error logging final activity: {e}")
+            
+            # Stop input listeners
+            if self.keyboard_listener:
+                try:
+                    self.keyboard_listener.stop()
+                    self.logger.info("Keyboard listener stopped")
+                except Exception as e:
+                    self.logger.error(f"Error stopping keyboard listener: {e}")
+            
+            if self.mouse_listener:
+                try:
+                    self.mouse_listener.stop()
+                    self.logger.info("Mouse listener stopped")
+                except Exception as e:
+                    self.logger.error(f"Error stopping mouse listener: {e}")
+            
+            if self.logger_thread:
+                try:
+                    self.logger_thread.join(timeout=5)
+                except Exception as e:
+                    self.logger.error(f"Error joining logger thread: {e}")
+            
+            self.logger.info("Input logger stopped")
+            
+        except Exception as e:
+            error_msg = f"Error stopping input logger: {e}"
+            self.logger.error(error_msg, exc_info=True)
+            
+            # Log to cerebro.log for service manager monitoring
+            try:
+                with open('cerebro.log', 'a') as f:
+                    f.write(f"{datetime.now().isoformat()} - INPUT_LOGGER - STOP ERROR: {error_msg}\n")
+            except:
+                pass
     
     def get_recent_activity(self, hours: int = 24) -> list:
         """Get recent input activity"""

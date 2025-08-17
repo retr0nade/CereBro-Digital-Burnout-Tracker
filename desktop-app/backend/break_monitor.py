@@ -44,7 +44,8 @@ class BreakMonitor:
                  min_break_duration: int = 120,  # 2 minutes minimum
                  max_break_duration: int = 900,  # 15 minutes maximum
                  check_interval: float = 1.0,  # Check every second
-                 detect_lock_events: bool = True):  # Detect system lock/unlock
+                 detect_lock_events: bool = True,  # Detect system lock/unlock
+                 cerebro_db = None):  # Unified CerebroDB instance
         """
         Initialize the break monitor
         
@@ -54,12 +55,14 @@ class BreakMonitor:
             max_break_duration: Maximum break duration in seconds (default: 900)
             check_interval: How often to check for activity in seconds
             detect_lock_events: Whether to detect system lock/unlock events
+            cerebro_db: Unified CerebroDB instance for logging
         """
         self.db_path = db_path
         self.min_break_duration = min_break_duration
         self.max_break_duration = max_break_duration
         self.check_interval = check_interval
         self.detect_lock_events = detect_lock_events
+        self.cerebro_db = cerebro_db
         
         # Monitoring state
         self.is_running = False
@@ -301,8 +304,13 @@ class BreakMonitor:
         """Monitor for user inactivity breaks"""
         while self.is_running:
             try:
-                is_active = self._check_activity()
-                current_time = datetime.now()
+                try:
+                    is_active = self._check_activity()
+                    current_time = datetime.now()
+                except Exception as e:
+                    self.logger.error(f"Error checking activity: {e}")
+                    is_active = True  # Assume active on error
+                    current_time = datetime.now()
                 
                 with self.state_lock:
                     if not is_active and not self.is_on_break:
@@ -315,19 +323,22 @@ class BreakMonitor:
                     elif is_active and self.is_on_break:
                         # Ending break
                         if self.break_start:
-                            break_duration = (current_time - self.break_start).total_seconds()
-                            
-                            # Only log if break meets minimum duration criteria
-                            if break_duration >= self.min_break_duration:
-                                self._log_break(
-                                    self.break_start, 
-                                    current_time, 
-                                    break_duration,
-                                    "inactivity",
-                                    f"Break ended by user activity"
-                                )
-                            else:
-                                self.logger.info(f"Short inactivity period ignored: {break_duration:.1f}s")
+                            try:
+                                break_duration = (current_time - self.break_start).total_seconds()
+                                
+                                # Only log if break meets minimum duration criteria
+                                if break_duration >= self.min_break_duration:
+                                    self._log_break(
+                                        self.break_start, 
+                                        current_time, 
+                                        break_duration,
+                                        "inactivity",
+                                        f"Break ended by user activity"
+                                    )
+                                else:
+                                    self.logger.info(f"Short inactivity period ignored: {break_duration:.1f}s")
+                            except Exception as e:
+                                self.logger.error(f"Error logging break end: {e}")
                         
                         self.is_on_break = False
                         self.break_start = None
@@ -340,13 +351,17 @@ class BreakMonitor:
                         
                         # Check if break exceeds maximum duration
                         if self.break_duration >= self.max_break_duration:
-                            self._log_break(
-                                self.break_start,
-                                current_time,
-                                self.break_duration,
-                                "inactivity",
-                                f"Break exceeded maximum duration ({self.max_break_duration}s)"
-                            )
+                            try:
+                                self._log_break(
+                                    self.break_start,
+                                    current_time,
+                                    self.break_duration,
+                                    "inactivity",
+                                    f"Break exceeded maximum duration ({self.max_break_duration}s)"
+                                )
+                            except Exception as e:
+                                self.logger.error(f"Error logging max duration break: {e}")
+                            
                             self.is_on_break = False
                             self.break_start = None
                             self.break_duration = 0.0
@@ -354,9 +369,22 @@ class BreakMonitor:
                 
                 time.sleep(self.check_interval)
                 
+            except KeyboardInterrupt:
+                self.logger.info("Break monitor interrupted by user")
+                break
             except Exception as e:
-                self.logger.error(f"Error in break monitoring: {e}")
-                time.sleep(1)
+                error_msg = f"Critical error in break monitor main loop: {e}"
+                self.logger.error(error_msg, exc_info=True)
+                
+                # Log to cerebro.log for service manager monitoring
+                try:
+                    with open('cerebro.log', 'a') as f:
+                        f.write(f"{datetime.now().isoformat()} - BREAK_MONITOR - CRITICAL ERROR: {error_msg}\n")
+                except:
+                    pass
+                
+                # Brief pause before retrying
+                time.sleep(5)
     
     def _monitor_lock_events(self):
         """Monitor for system lock/unlock events"""
@@ -365,8 +393,13 @@ class BreakMonitor:
             
         while self.is_running:
             try:
-                current_lock_state = self._check_system_lock_state()
-                current_time = datetime.now()
+                try:
+                    current_lock_state = self._check_system_lock_state()
+                    current_time = datetime.now()
+                except Exception as e:
+                    self.logger.error(f"Error checking system lock state: {e}")
+                    time.sleep(5)
+                    continue
                 
                 if current_lock_state is not None:
                     with self.state_lock:
@@ -375,22 +408,37 @@ class BreakMonitor:
                             self.last_lock_state = current_lock_state
                         elif current_lock_state != self.last_lock_state:
                             # Lock state changed
-                            event_type = f"system_{current_lock_state}"
-                            
-                            self._log_lock_event(
-                                current_time,
-                                event_type,
-                                0.0,
-                                f"System {current_lock_state}"
-                            )
-                            
-                            self.last_lock_state = current_lock_state
-                            self.logger.info(f"System {current_lock_state}")
+                            try:
+                                event_type = f"system_{current_lock_state}"
+                                
+                                self._log_lock_event(
+                                    current_time,
+                                    event_type,
+                                    0.0,
+                                    f"System {current_lock_state}"
+                                )
+                                
+                                self.last_lock_state = current_lock_state
+                                self.logger.info(f"System {current_lock_state}")
+                            except Exception as e:
+                                self.logger.error(f"Error logging lock event: {e}")
                 
                 time.sleep(5)  # Check lock state every 5 seconds
                 
+            except KeyboardInterrupt:
+                self.logger.info("Lock monitor interrupted by user")
+                break
             except Exception as e:
-                self.logger.error(f"Error in lock monitoring: {e}")
+                error_msg = f"Error in lock monitoring: {e}"
+                self.logger.error(error_msg, exc_info=True)
+                
+                # Log to cerebro.log for service manager monitoring
+                try:
+                    with open('cerebro.log', 'a') as f:
+                        f.write(f"{datetime.now().isoformat()} - BREAK_MONITOR - LOCK MONITOR ERROR: {error_msg}\n")
+                except:
+                    pass
+                
                 time.sleep(5)
     
     def start(self):
@@ -398,44 +446,80 @@ class BreakMonitor:
         if self.is_running:
             raise RuntimeError("Break monitor already running")
         
-        self.is_running = True
-        self.monitor_thread = threading.Thread(target=self._monitor_breaks, daemon=True)
-        self.monitor_thread.start()
-        
-        if self.detect_lock_events:
-            self.lock_thread = threading.Thread(target=self._monitor_lock_events, daemon=True)
-            self.lock_thread.start()
-        
-        self.logger.info("Break monitor started")
+        try:
+            self.is_running = True
+            self.monitor_thread = threading.Thread(target=self._monitor_breaks, daemon=True)
+            self.monitor_thread.start()
+            
+            if self.detect_lock_events:
+                self.lock_thread = threading.Thread(target=self._monitor_lock_events, daemon=True)
+                self.lock_thread.start()
+            
+            self.logger.info("Break monitor started")
+            
+        except Exception as e:
+            error_msg = f"Failed to start break monitor: {e}"
+            self.logger.error(error_msg, exc_info=True)
+            
+            # Log to cerebro.log for service manager monitoring
+            try:
+                with open('cerebro.log', 'a') as f:
+                    f.write(f"{datetime.now().isoformat()} - BREAK_MONITOR - STARTUP ERROR: {error_msg}\n")
+            except:
+                pass
+            
+            raise
     
     def stop(self):
         """Stop break monitoring"""
         if not self.is_running:
             return
         
-        self.is_running = False
-        
-        # Log any ongoing break
-        if self.is_on_break and self.break_start:
-            current_time = datetime.now()
-            break_duration = (current_time - self.break_start).total_seconds()
+        try:
+            self.is_running = False
             
-            if break_duration >= self.min_break_duration:
-                self._log_break(
-                    self.break_start,
-                    current_time,
-                    break_duration,
-                    "inactivity",
-                    "Break ended by monitor shutdown"
-                )
-        
-        # Wait for threads to finish
-        if self.monitor_thread:
-            self.monitor_thread.join(timeout=5)
-        if self.lock_thread:
-            self.lock_thread.join(timeout=5)
-        
-        self.logger.info("Break monitor stopped")
+            # Log any ongoing break
+            if self.is_on_break and self.break_start:
+                try:
+                    current_time = datetime.now()
+                    break_duration = (current_time - self.break_start).total_seconds()
+                    
+                    if break_duration >= self.min_break_duration:
+                        self._log_break(
+                            self.break_start,
+                            current_time,
+                            break_duration,
+                            "inactivity",
+                            "Break ended by monitor shutdown"
+                        )
+                except Exception as e:
+                    self.logger.error(f"Error logging final break: {e}")
+            
+            # Wait for threads to finish
+            if self.monitor_thread:
+                try:
+                    self.monitor_thread.join(timeout=5)
+                except Exception as e:
+                    self.logger.error(f"Error joining monitor thread: {e}")
+                    
+            if self.lock_thread:
+                try:
+                    self.lock_thread.join(timeout=5)
+                except Exception as e:
+                    self.logger.error(f"Error joining lock thread: {e}")
+            
+            self.logger.info("Break monitor stopped")
+            
+        except Exception as e:
+            error_msg = f"Error stopping break monitor: {e}"
+            self.logger.error(error_msg, exc_info=True)
+            
+            # Log to cerebro.log for service manager monitoring
+            try:
+                with open('cerebro.log', 'a') as f:
+                    f.write(f"{datetime.now().isoformat()} - BREAK_MONITOR - STOP ERROR: {error_msg}\n")
+            except:
+                pass
     
     def get_current_status(self) -> Dict[str, Any]:
         """Get current monitoring status"""

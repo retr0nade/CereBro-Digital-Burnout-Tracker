@@ -47,7 +47,8 @@ class ScreenTimeTracker:
     def __init__(self, db_path: str = "screen_time.db", 
                  idle_threshold: int = 60,  # 60 seconds of inactivity
                  check_interval: float = 1.0,  # Check every second
-                 daily_reset_hour: int = 0):  # Reset at midnight
+                 daily_reset_hour: int = 0,  # Reset at midnight
+                 cerebro_db = None):  # Unified CerebroDB instance
         """
         Initialize the screen time tracker
         
@@ -56,11 +57,13 @@ class ScreenTimeTracker:
             idle_threshold: Seconds of inactivity before considering idle
             check_interval: How often to check for activity in seconds
             daily_reset_hour: Hour of day to reset daily totals (0 = midnight)
+            cerebro_db: Unified CerebroDB instance for logging
         """
         self.db_path = db_path
         self.idle_threshold = idle_threshold
         self.check_interval = check_interval
         self.daily_reset_hour = daily_reset_hour
+        self.cerebro_db = cerebro_db
         
         # Tracking state
         self.is_running = False
@@ -346,11 +349,19 @@ class ScreenTimeTracker:
         while self.is_running:
             try:
                 # Check for daily reset
-                self._check_daily_reset()
+                try:
+                    self._check_daily_reset()
+                except Exception as e:
+                    self.logger.error(f"Error in daily reset check: {e}")
                 
                 # Check current activity
-                is_active = self._check_activity()
-                current_time = time.time()
+                try:
+                    is_active = self._check_activity()
+                    current_time = time.time()
+                except Exception as e:
+                    self.logger.error(f"Error checking activity: {e}")
+                    is_active = True  # Assume active on error
+                    current_time = time.time()
                 
                 with self.state_lock:
                     if is_active:
@@ -358,17 +369,20 @@ class ScreenTimeTracker:
                         if not self.is_currently_active:
                             # Starting new active session
                             if self.current_session_start is not None:
-                                # Log the previous idle session
-                                idle_duration = current_time - self.last_activity_time
-                                self.daily_idle_time += idle_duration
-                                self.daily_break_count += 1
-                                
-                                self._log_session(
-                                    datetime.fromtimestamp(self.last_activity_time),
-                                    datetime.fromtimestamp(current_time),
-                                    idle_duration,
-                                    is_active=False
-                                )
+                                try:
+                                    # Log the previous idle session
+                                    idle_duration = current_time - self.last_activity_time
+                                    self.daily_idle_time += idle_duration
+                                    self.daily_break_count += 1
+                                    
+                                    self._log_session(
+                                        datetime.fromtimestamp(self.last_activity_time),
+                                        datetime.fromtimestamp(current_time),
+                                        idle_duration,
+                                        is_active=False
+                                    )
+                                except Exception as e:
+                                    self.logger.error(f"Error logging idle session: {e}")
                             
                             # Start new active session
                             self.current_session_start = current_time
@@ -385,13 +399,16 @@ class ScreenTimeTracker:
                         if self.is_currently_active:
                             # Ending active session
                             if self.current_session_start:
-                                active_duration = current_time - self.current_session_start
-                                self._log_session(
-                                    datetime.fromtimestamp(self.current_session_start),
-                                    datetime.fromtimestamp(current_time),
-                                    active_duration,
-                                    is_active=True
-                                )
+                                try:
+                                    active_duration = current_time - self.current_session_start
+                                    self._log_session(
+                                        datetime.fromtimestamp(self.current_session_start),
+                                        datetime.fromtimestamp(current_time),
+                                        active_duration,
+                                        is_active=True
+                                    )
+                                except Exception as e:
+                                    self.logger.error(f"Error logging active session: {e}")
                             
                             self.current_session_start = None
                             self.is_currently_active = False
@@ -401,14 +418,30 @@ class ScreenTimeTracker:
                 
                 # Save data periodically (every 5 minutes)
                 if int(current_time) % 300 == 0:
-                    self._save_daily_data()
+                    try:
+                        self._save_daily_data()
+                    except Exception as e:
+                        self.logger.error(f"Error saving daily data: {e}")
                 
                 # Wait for next check
                 time.sleep(self.check_interval)
                 
+            except KeyboardInterrupt:
+                self.logger.info("Screen time tracker interrupted by user")
+                break
             except Exception as e:
-                self.logger.error(f"Error in tracking loop: {e}")
-                time.sleep(1)  # Brief pause before retrying
+                error_msg = f"Critical error in screen time tracker main loop: {e}"
+                self.logger.error(error_msg, exc_info=True)
+                
+                # Log to cerebro.log for service manager monitoring
+                try:
+                    with open('cerebro.log', 'a') as f:
+                        f.write(f"{datetime.now().isoformat()} - SCREEN_TIME_TRACKER - CRITICAL ERROR: {error_msg}\n")
+                except:
+                    pass
+                
+                # Brief pause before retrying
+                time.sleep(5)
     
     def start(self):
         """Start screen time tracking"""
@@ -416,11 +449,25 @@ class ScreenTimeTracker:
             self.logger.warning("Screen time tracker is already running")
             return
         
-        self.is_running = True
-        self.tracker_thread = threading.Thread(target=self._tracking_loop, daemon=True)
-        self.tracker_thread.start()
-        
-        self.logger.info("Screen time tracker started")
+        try:
+            self.is_running = True
+            self.tracker_thread = threading.Thread(target=self._tracking_loop, daemon=True)
+            self.tracker_thread.start()
+            
+            self.logger.info("Screen time tracker started")
+            
+        except Exception as e:
+            error_msg = f"Failed to start screen time tracker: {e}"
+            self.logger.error(error_msg, exc_info=True)
+            
+            # Log to cerebro.log for service manager monitoring
+            try:
+                with open('cerebro.log', 'a') as f:
+                    f.write(f"{datetime.now().isoformat()} - SCREEN_TIME_TRACKER - STARTUP ERROR: {error_msg}\n")
+            except:
+                pass
+            
+            raise
     
     def stop(self):
         """Stop screen time tracking"""
@@ -428,28 +475,49 @@ class ScreenTimeTracker:
             self.logger.warning("Screen time tracker is not running")
             return
         
-        self.is_running = False
-        
-        # Log final session if active
-        if self.is_currently_active and self.current_session_start:
-            current_time = time.time()
-            active_duration = current_time - self.current_session_start
-            self.daily_active_time += active_duration
+        try:
+            self.is_running = False
             
-            self._log_session(
-                datetime.fromtimestamp(self.current_session_start),
-                datetime.fromtimestamp(current_time),
-                active_duration,
-                is_active=True
-            )
-        
-        # Save final data
-        self._save_daily_data()
-        
-        if self.tracker_thread:
-            self.tracker_thread.join(timeout=5)
-        
-        self.logger.info("Screen time tracker stopped")
+            # Log final session if active
+            if self.is_currently_active and self.current_session_start:
+                try:
+                    current_time = time.time()
+                    active_duration = current_time - self.current_session_start
+                    self.daily_active_time += active_duration
+                    
+                    self._log_session(
+                        datetime.fromtimestamp(self.current_session_start),
+                        datetime.fromtimestamp(current_time),
+                        active_duration,
+                        is_active=True
+                    )
+                except Exception as e:
+                    self.logger.error(f"Error logging final session: {e}")
+            
+            # Save final data
+            try:
+                self._save_daily_data()
+            except Exception as e:
+                self.logger.error(f"Error saving final data: {e}")
+            
+            if self.tracker_thread:
+                try:
+                    self.tracker_thread.join(timeout=5)
+                except Exception as e:
+                    self.logger.error(f"Error joining tracker thread: {e}")
+            
+            self.logger.info("Screen time tracker stopped")
+            
+        except Exception as e:
+            error_msg = f"Error stopping screen time tracker: {e}"
+            self.logger.error(error_msg, exc_info=True)
+            
+            # Log to cerebro.log for service manager monitoring
+            try:
+                with open('cerebro.log', 'a') as f:
+                    f.write(f"{datetime.now().isoformat()} - SCREEN_TIME_TRACKER - STOP ERROR: {error_msg}\n")
+            except:
+                pass
     
     def get_today_summary(self) -> Dict[str, Any]:
         """Get today's screen time summary"""

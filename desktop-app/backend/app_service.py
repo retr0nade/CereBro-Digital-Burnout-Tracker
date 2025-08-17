@@ -1,9 +1,10 @@
 import threading, time, sqlite3, json, os, platform
+from datetime import datetime
 from flask import Flask, request, jsonify
 from metrics.apps import get_foreground_app
 from metrics.idle import get_idle_seconds
 from data.models import store_pref, get_pref
-from data.unified_schema import BurnoutTrackerDB, AppUsage, IdlePeriod, InputActivity, FocusSession, BreakLog, BreakType
+from cerebro_db import CerebroDB
 from api.routes import api
 from window_tracker import WindowTracker
 from idle_monitor import IdleMonitor
@@ -12,6 +13,7 @@ from screen_time_tracker import ScreenTimeTracker
 from focus_timer import FocusTimer
 from break_monitor import BreakMonitor
 from config_manager import config
+from service_manager import ServiceManager
 
 SETTINGS_PATH = "settings.json"
 
@@ -40,8 +42,11 @@ app = Flask(__name__)
 app.register_blueprint(api, url_prefix='/api')
 
 # Initialize unified database
-unified_db = BurnoutTrackerDB(config.get_database_path())
+unified_db = CerebroDB(config.get_database_path())
 print("Unified database initialized successfully")
+
+# Initialize service manager for status tracking (will be created when needed)
+service_manager = None
 
 # Initialize window tracker
 window_tracker = None
@@ -563,6 +568,185 @@ def api_export_break_csv():
             "success": True,
             "file_path": csv_path,
             "message": f"Exported {hours} hours of break data to {csv_path}"
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# New unified API endpoints for cerebro.db data
+@app.route('/api/status', methods=["GET"])
+def api_status():
+    """Get status of all trackers"""
+    try:
+        # Create a simple status response without using ServiceManager
+        status = {
+            "window_tracker": {
+                "name": "Window Tracker",
+                "status": "running" if window_tracker and window_tracker.is_running else "stopped",
+                "start_time": None,
+                "last_error": None,
+                "restart_count": 0,
+                "max_restarts": 3,
+                "uptime": None
+            },
+            "idle_monitor": {
+                "name": "Idle Monitor", 
+                "status": "running" if idle_monitor and idle_monitor.is_running else "stopped",
+                "start_time": None,
+                "last_error": None,
+                "restart_count": 0,
+                "max_restarts": 3,
+                "uptime": None
+            },
+            "input_logger": {
+                "name": "Input Logger",
+                "status": "running" if input_logger and input_logger.is_running else "stopped", 
+                "start_time": None,
+                "last_error": None,
+                "restart_count": 0,
+                "max_restarts": 3,
+                "uptime": None
+            },
+            "screen_time_tracker": {
+                "name": "Screen Time Tracker",
+                "status": "running" if screen_time_tracker and screen_time_tracker.is_running else "stopped",
+                "start_time": None,
+                "last_error": None,
+                "restart_count": 0,
+                "max_restarts": 3,
+                "uptime": None
+            },
+            "focus_timer": {
+                "name": "Focus Timer",
+                "status": "initialized" if focus_timer else "not_initialized",
+                "start_time": None,
+                "last_error": None,
+                "restart_count": 0,
+                "max_restarts": 3,
+                "uptime": None
+            },
+            "break_monitor": {
+                "name": "Break Monitor",
+                "status": "running" if break_monitor and break_monitor.is_running else "stopped",
+                "start_time": None,
+                "last_error": None,
+                "restart_count": 0,
+                "max_restarts": 3,
+                "uptime": None
+            }
+        }
+        
+        return jsonify({
+            "status": "success",
+            "services": status,
+            "timestamp": int(time.time())
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/logs/app_usage', methods=["GET"])
+def api_logs_app_usage():
+    """Get app usage logs from cerebro.db"""
+    try:
+        limit = request.args.get('limit', 100, type=int)
+        
+        # Use get_app_usage method from CerebroDB
+        app_usage_data = unified_db.get_app_usage(limit=limit)
+        
+        return jsonify({
+            "status": "success",
+            "data": app_usage_data,
+            "total_entries": len(app_usage_data),
+            "timestamp": int(time.time())
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/logs/idle', methods=["GET"])
+def api_logs_idle():
+    """Get idle logs from cerebro.db"""
+    try:
+        limit = request.args.get('limit', 100, type=int)
+        
+        # Use get_idle_periods method from CerebroDB
+        idle_data = unified_db.get_idle_periods(limit=limit)
+        
+        return jsonify({
+            "status": "success",
+            "data": idle_data,
+            "total_entries": len(idle_data),
+            "timestamp": int(time.time())
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/logs/input', methods=["GET"])
+def api_logs_input():
+    """Get input logs from cerebro.db"""
+    try:
+        limit = request.args.get('limit', 100, type=int)
+        
+        # Use get_input_activity method from CerebroDB
+        input_data = unified_db.get_input_activity(limit=limit)
+        
+        return jsonify({
+            "status": "success",
+            "data": input_data,
+            "total_entries": len(input_data),
+            "timestamp": int(time.time())
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/logs/focus', methods=["GET"])
+def api_logs_focus():
+    """Get focus logs from cerebro.db"""
+    try:
+        limit = request.args.get('limit', 100, type=int)
+        
+        # Use get_focus_sessions method from CerebroDB
+        focus_data = unified_db.get_focus_sessions(limit=limit)
+        
+        return jsonify({
+            "status": "success",
+            "data": focus_data,
+            "total_entries": len(focus_data),
+            "timestamp": int(time.time())
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/logs/breaks', methods=["GET"])
+def api_logs_breaks():
+    """Get break logs from cerebro.db"""
+    try:
+        limit = request.args.get('limit', 100, type=int)
+        
+        # Use get_breaks method from CerebroDB
+        breaks_data = unified_db.get_breaks(limit=limit)
+        
+        return jsonify({
+            "status": "success",
+            "data": breaks_data,
+            "total_entries": len(breaks_data),
+            "timestamp": int(time.time())
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/logs/browser', methods=["GET"])
+def api_logs_browser():
+    """Get browser logs from cerebro.db"""
+    try:
+        limit = request.args.get('limit', 100, type=int)
+        
+        # Use get_browser_activity method from CerebroDB
+        browser_data = unified_db.get_browser_activity(limit=limit)
+        
+        return jsonify({
+            "status": "success",
+            "data": browser_data,
+            "total_entries": len(browser_data),
+            "timestamp": int(time.time())
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
