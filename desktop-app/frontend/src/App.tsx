@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import Dashboard from "./Dashboard";
 import ScreenTime from "./ScreenTime";
 import Preferences from "./Preferences";
+import ServiceManager from "./ServiceManager";
 import BackendStatus from "./BackendStatus";
 
 interface BackendStatusType {
@@ -19,7 +20,7 @@ declare global {
 }
 
 export default function App() {
-  const [currentView, setCurrentView] = useState<'dashboard' | 'screentime' | 'preferences'>('dashboard');
+  const [currentView, setCurrentView] = useState<'dashboard' | 'screentime' | 'preferences' | 'services'>('dashboard');
   const [backendStatus, setBackendStatus] = useState<BackendStatusType>({
     running: false,
     port: 5005,
@@ -107,6 +108,16 @@ export default function App() {
             >
               Preferences
             </button>
+            <button
+              onClick={() => setCurrentView('services')}
+              className={`px-3 py-2 rounded-lg transition-colors ${
+                currentView === 'services' 
+                  ? 'bg-pink-500 text-white' 
+                  : 'text-gray-300 hover:text-white hover:bg-pink-500/20'
+              }`}
+            >
+              Services
+            </button>
           </nav>
         </div>
 
@@ -131,6 +142,7 @@ export default function App() {
         {currentView === 'dashboard' && <Dashboard />}
         {currentView === 'screentime' && <ScreenTime />}
         {currentView === 'preferences' && <Preferences />}
+        {currentView === 'services' && <ServiceManager />}
       </main>
 
       <footer className="w-full py-4 text-center text-xs text-white/40 mt-8">

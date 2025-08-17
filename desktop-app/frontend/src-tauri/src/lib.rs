@@ -2,12 +2,31 @@ use serde::{Deserialize, Serialize};
 use std::process::Command;
 use std::sync::{Arc, Mutex};
 use tauri::Manager;
+use std::collections::HashMap;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct BackendStatus {
     running: bool,
     port: u16,
     error: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct ServiceStatus {
+    name: String,
+    status: String,
+    start_time: Option<String>,
+    last_error: Option<String>,
+    restart_count: u32,
+    max_restarts: u32,
+    uptime: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct ServiceControlResponse {
+    success: bool,
+    message: String,
+    service_name: String,
 }
 
 struct BackendState {
@@ -41,7 +60,10 @@ pub fn run() {
             stop_backend_command,
             get_backend_status,
             check_backend_health,
-            get_system_metrics
+            get_system_metrics,
+            start_service,
+            stop_service,
+            get_service_status
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -116,7 +138,7 @@ async fn check_backend_health() -> Result<bool, String> {
 #[tauri::command]
 async fn get_system_metrics() -> Result<serde_json::Value, String> {
     let client = reqwest::Client::new();
-    match client.get("http://localhost:5005/api/metrics").send().await {
+    match client.get("http://localhost:5006/api/metrics").send().await {
         Ok(response) => {
             if response.status().is_success() {
                 response.json().await.map_err(|e| e.to_string())
@@ -125,5 +147,82 @@ async fn get_system_metrics() -> Result<serde_json::Value, String> {
             }
         }
         Err(e) => Err(format!("Failed to connect to backend: {}", e)),
+    }
+}
+
+#[tauri::command]
+async fn start_service(name: String) -> Result<ServiceControlResponse, String> {
+    let client = reqwest::Client::new();
+    
+    // Call the Python backend API to start the service
+    let response = client
+        .post(&format!("http://localhost:5006/api/service/{}/start", name))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to connect to backend: {}", e))?;
+
+    if response.status().is_success() {
+        let result: ServiceControlResponse = response
+            .json()
+            .await
+            .map_err(|e| format!("Failed to parse response: {}", e))?;
+        Ok(result)
+    } else {
+        let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+        Err(format!("Backend returned error: {}", error_text))
+    }
+}
+
+#[tauri::command]
+async fn stop_service(name: String) -> Result<ServiceControlResponse, String> {
+    let client = reqwest::Client::new();
+    
+    // Call the Python backend API to stop the service
+    let response = client
+        .post(&format!("http://localhost:5006/api/service/{}/stop", name))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to connect to backend: {}", e))?;
+
+    if response.status().is_success() {
+        let result: ServiceControlResponse = response
+            .json()
+            .await
+            .map_err(|e| format!("Failed to parse response: {}", e))?;
+        Ok(result)
+    } else {
+        let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+        Err(format!("Backend returned error: {}", error_text))
+    }
+}
+
+#[tauri::command]
+async fn get_service_status() -> Result<HashMap<String, ServiceStatus>, String> {
+    let client = reqwest::Client::new();
+    
+    // Call the Python backend API to get service status
+    let response = client
+        .get("http://localhost:5006/api/status")
+        .send()
+        .await
+        .map_err(|e| format!("Failed to connect to backend: {}", e))?;
+
+    if response.status().is_success() {
+        let result: serde_json::Value = response
+            .json()
+            .await
+            .map_err(|e| format!("Failed to parse response: {}", e))?;
+        
+        // Extract services from the response
+        if let Some(services) = result.get("services") {
+            let services_map: HashMap<String, ServiceStatus> = serde_json::from_value(services.clone())
+                .map_err(|e| format!("Failed to parse services: {}", e))?;
+            Ok(services_map)
+        } else {
+            Err("No services found in response".to_string())
+        }
+    } else {
+        let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+        Err(format!("Backend returned error: {}", error_text))
     }
 }

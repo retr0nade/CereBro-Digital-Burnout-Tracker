@@ -751,6 +751,184 @@ def api_logs_browser():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+# Service control endpoints
+@app.route('/api/service/<service_name>/start', methods=["POST"])
+def api_start_service(service_name):
+    """Start a specific service"""
+    try:
+        global window_tracker, idle_monitor, input_logger, screen_time_tracker, focus_timer, break_monitor
+        
+        if service_name == "window_tracker" and window_tracker is None:
+            service_config = config.get_service_config('window_tracker')
+            window_tracker = WindowTracker(
+                log_interval=service_config.get('log_interval', 1.0),
+                cerebro_db=unified_db
+            )
+            window_tracker.start()
+            return jsonify({
+                "success": True,
+                "message": "Window tracker started successfully",
+                "service_name": service_name
+            })
+        
+        elif service_name == "idle_monitor" and idle_monitor is None:
+            service_config = config.get_service_config('idle_monitor')
+            idle_monitor = IdleMonitor(
+                timeout_seconds=service_config.get('timeout_seconds', 300),
+                check_interval=service_config.get('check_interval', 1.0),
+                cerebro_db=unified_db
+            )
+            idle_monitor.start()
+            return jsonify({
+                "success": True,
+                "message": "Idle monitor started successfully",
+                "service_name": service_name
+            })
+        
+        elif service_name == "input_logger" and input_logger is None:
+            service_config = config.get_service_config('input_logger')
+            input_logger = InputLogger(
+                log_interval=service_config.get('log_interval', 60),
+                enable_keyboard=service_config.get('enable_keyboard', True),
+                enable_mouse=service_config.get('enable_mouse', True),
+                cerebro_db=unified_db
+            )
+            input_logger.start()
+            return jsonify({
+                "success": True,
+                "message": "Input logger started successfully",
+                "service_name": service_name
+            })
+        
+        elif service_name == "screen_time_tracker" and screen_time_tracker is None:
+            service_config = config.get_service_config('screen_time_tracker')
+            screen_time_tracker = ScreenTimeTracker(
+                idle_threshold=service_config.get('idle_threshold', 60),
+                check_interval=service_config.get('check_interval', 1.0),
+                daily_reset_hour=service_config.get('daily_reset_hour', 0)
+            )
+            screen_time_tracker.start()
+            return jsonify({
+                "success": True,
+                "message": "Screen time tracker started successfully",
+                "service_name": service_name
+            })
+        
+        elif service_name == "focus_timer" and focus_timer is None:
+            service_config = config.get_service_config('focus_timer')
+            focus_timer = FocusTimer(
+                idle_threshold=service_config.get('idle_threshold', 60),
+                cerebro_db=unified_db
+            )
+            return jsonify({
+                "success": True,
+                "message": "Focus timer initialized successfully",
+                "service_name": service_name
+            })
+        
+        elif service_name == "break_monitor" and break_monitor is None:
+            service_config = config.get_service_config('break_monitor')
+            break_monitor = BreakMonitor(
+                min_break_duration=service_config.get('min_break_duration', 120),
+                max_break_duration=service_config.get('max_break_duration', 900),
+                check_interval=service_config.get('check_interval', 1.0),
+                detect_lock_events=service_config.get('detect_lock_events', True)
+            )
+            break_monitor.start()
+            return jsonify({
+                "success": True,
+                "message": "Break monitor started successfully",
+                "service_name": service_name
+            })
+        
+        else:
+            return jsonify({
+                "success": False,
+                "message": f"Service {service_name} is already running or not found",
+                "service_name": service_name
+            }), 400
+            
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "message": f"Failed to start {service_name}: {str(e)}",
+            "service_name": service_name
+        }), 500
+
+@app.route('/api/service/<service_name>/stop', methods=["POST"])
+def api_stop_service(service_name):
+    """Stop a specific service"""
+    try:
+        global window_tracker, idle_monitor, input_logger, screen_time_tracker, focus_timer, break_monitor
+        
+        if service_name == "window_tracker" and window_tracker is not None:
+            window_tracker.stop()
+            window_tracker = None
+            return jsonify({
+                "success": True,
+                "message": "Window tracker stopped successfully",
+                "service_name": service_name
+            })
+        
+        elif service_name == "idle_monitor" and idle_monitor is not None:
+            idle_monitor.stop()
+            idle_monitor = None
+            return jsonify({
+                "success": True,
+                "message": "Idle monitor stopped successfully",
+                "service_name": service_name
+            })
+        
+        elif service_name == "input_logger" and input_logger is not None:
+            input_logger.stop()
+            input_logger = None
+            return jsonify({
+                "success": True,
+                "message": "Input logger stopped successfully",
+                "service_name": service_name
+            })
+        
+        elif service_name == "screen_time_tracker" and screen_time_tracker is not None:
+            screen_time_tracker.stop()
+            screen_time_tracker = None
+            return jsonify({
+                "success": True,
+                "message": "Screen time tracker stopped successfully",
+                "service_name": service_name
+            })
+        
+        elif service_name == "focus_timer" and focus_timer is not None:
+            # Focus timer doesn't have a stop method, just set to None
+            focus_timer = None
+            return jsonify({
+                "success": True,
+                "message": "Focus timer stopped successfully",
+                "service_name": service_name
+            })
+        
+        elif service_name == "break_monitor" and break_monitor is not None:
+            break_monitor.stop()
+            break_monitor = None
+            return jsonify({
+                "success": True,
+                "message": "Break monitor stopped successfully",
+                "service_name": service_name
+            })
+        
+        else:
+            return jsonify({
+                "success": False,
+                "message": f"Service {service_name} is not running or not found",
+                "service_name": service_name
+            }), 400
+            
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "message": f"Failed to stop {service_name}: {str(e)}",
+            "service_name": service_name
+        }), 500
+
 if __name__ == "__main__":
     threading.Thread(target=collect_app_usage, daemon=True).start()
     threading.Thread(target=collect_idle, daemon=True).start()
