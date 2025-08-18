@@ -1,4 +1,5 @@
 flask==3.0.0
+flask-socketio==5.3.6
 psutil==5.9.8
 pywin32>=307
 python-xlib>=0.33

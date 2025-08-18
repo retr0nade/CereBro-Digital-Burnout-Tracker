@@ -264,6 +264,7 @@ class BreakMonitor:
                    duration: float, break_type: str = "inactivity", notes: str = ""):
         """Log a break to the database"""
         try:
+            # Log to local database
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
             
@@ -276,6 +277,39 @@ class BreakMonitor:
             conn.close()
             
             self.logger.info(f"Logged break: {duration:.1f}s ({break_type})")
+            
+            # Log to unified cerebro database if available
+            if self.cerebro_db:
+                try:
+                    from data.unified_schema import BreakLog, BreakType
+                    break_log = BreakLog(
+                        start_time=int(break_start.timestamp()),
+                        end_time=int(break_end.timestamp()),
+                        break_type=BreakType.INACTIVITY if break_type == "inactivity" else BreakType.MANUAL,
+                        duration=int(duration),
+                        was_productive=False,
+                        notes=notes
+                    )
+                    self.cerebro_db.insert_break_log(break_log)
+                    
+                    # Emit WebSocket event for break update
+                    try:
+                        from websocket_events import get_event_manager
+                        event_manager = get_event_manager()
+                        if event_manager:
+                            event_manager.emit_break_update({
+                                "start_time": int(break_start.timestamp()),
+                                "end_time": int(break_end.timestamp()),
+                                "duration": int(duration),
+                                "break_type": break_type,
+                                "notes": notes,
+                                "status": "completed"
+                            })
+                    except Exception as ws_error:
+                        self.logger.debug(f"WebSocket event emission failed: {ws_error}")
+                        
+                except Exception as db_error:
+                    self.logger.debug(f"Unified database logging failed: {db_error}")
             
         except Exception as e:
             self.logger.error(f"Failed to log break: {e}")

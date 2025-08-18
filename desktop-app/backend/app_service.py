@@ -1,6 +1,7 @@
 import threading, time, sqlite3, json, os, platform
 from datetime import datetime
 from flask import Flask, request, jsonify
+from flask_socketio import SocketIO
 from metrics.apps import get_foreground_app
 from metrics.idle import get_idle_seconds
 from data.models import store_pref, get_pref
@@ -14,6 +15,7 @@ from focus_timer import FocusTimer
 from break_monitor import BreakMonitor
 from config_manager import config
 from service_manager import ServiceManager
+from websocket_events import init_event_manager, setup_socketio_handlers, get_event_manager
 
 SETTINGS_PATH = "settings.json"
 
@@ -40,6 +42,11 @@ def update_pref(new_settings):
 settings = load_settings()
 app = Flask(__name__)
 app.register_blueprint(api, url_prefix='/api')
+
+# Initialize SocketIO
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
+init_event_manager(socketio)
+setup_socketio_handlers(socketio)
 
 # Initialize unified database
 unified_db = CerebroDB(config.get_database_path())
@@ -139,6 +146,7 @@ if settings.get("track_breaks", True):
 
 def collect_app_usage():
     last_app = None
+    last_app_start = None
     while True:
         settings = load_settings()
         if not settings.get("track_apps"):
@@ -147,20 +155,58 @@ def collect_app_usage():
         app_name, win_title = get_foreground_app()
         ts = int(time.time())
         store_app_event(app_name, win_title, ts)
-        if last_app is not None and last_app != app_name:
-            store_metric("app_switch", app_name, ts)
+        
+        # Emit WebSocket event for app usage update
+        try:
+            event_manager = get_event_manager()
+            if event_manager and last_app is not None and last_app != app_name:
+                # Calculate duration for the previous app
+                duration = ts - last_app_start if last_app_start else 1
+                event_manager.emit_app_usage_update({
+                    "app_name": last_app,
+                    "window_title": win_title,
+                    "start_time": last_app_start or ts,
+                    "end_time": ts,
+                    "duration": duration,
+                    "pid": 0  # We don't have PID in this context
+                })
+                store_metric("app_switch", app_name, ts)
+        except Exception as e:
+            print(f"Failed to emit app usage WebSocket event: {e}")
+        
+        if last_app != app_name:
+            last_app_start = ts
         last_app = app_name
         time.sleep(1)
 
 def collect_idle():
+    last_idle_status = False
     while True:
         settings = load_settings()
         if not settings.get("track_idle"):
             time.sleep(5)
             continue
         idle_sec = get_idle_seconds()
-        if idle_sec > settings["idle_threshold"]:
+        current_idle_status = idle_sec > settings["idle_threshold"]
+        
+        if current_idle_status:
             store_idle_event(idle_sec, int(time.time()))
+        
+        # Emit WebSocket event when idle status changes
+        if current_idle_status != last_idle_status:
+            try:
+                event_manager = get_event_manager()
+                if event_manager:
+                    event_manager.emit_idle_status({
+                        "is_idle": current_idle_status,
+                        "idle_seconds": idle_sec,
+                        "threshold": settings["idle_threshold"],
+                        "timestamp": int(time.time())
+                    })
+            except Exception as e:
+                print(f"Failed to emit idle status WebSocket event: {e}")
+        
+        last_idle_status = current_idle_status
         time.sleep(15)
 
 @app.route('/api/metrics', methods=["GET"])
@@ -936,7 +982,8 @@ if __name__ == "__main__":
     
     # Get API configuration
     api_config = config.get_api_config()
-    app.run(
+    socketio.run(
+        app,
         host=api_config.get('host', 'localhost'),
         port=api_config.get('port', 5005),
         debug=api_config.get('debug', False)

@@ -1,4 +1,5 @@
 from flask import Blueprint, request, jsonify
+from flask_socketio import emit
 from data.models import get_pref, store_pref
 from data.unified_schema import BurnoutTrackerDB, AppUsage, IdlePeriod, InputActivity, FocusSession, BreakLog, BreakType
 from metrics.util import calculate_focus_score, detect_burnout_signals, format_duration
@@ -346,5 +347,28 @@ def log_burnout_signal():
             metadata=data.get('metadata')
         )
         return jsonify({"status": "success", "id": result})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@api.route('/websocket/status', methods=['GET'])
+def websocket_status():
+    """Get WebSocket connection status"""
+    try:
+        from websocket_events import get_event_manager
+        event_manager = get_event_manager()
+        if event_manager:
+            return jsonify({
+                "status": "available",
+                "connected_clients": len(event_manager.clients),
+                "events": [
+                    "app_usage_update",
+                    "idle_status", 
+                    "input_activity",
+                    "focus_session_update",
+                    "break_update"
+                ]
+            })
+        else:
+            return jsonify({"status": "unavailable"}), 503
     except Exception as e:
         return jsonify({"error": str(e)}), 500

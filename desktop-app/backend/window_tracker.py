@@ -246,6 +246,22 @@ class WindowTracker:
                 
                 self.logger.debug(f"Logged: {app_name} - {duration:.1f}s")
                 
+                # Emit WebSocket event for app usage update
+                try:
+                    from websocket_events import get_event_manager
+                    event_manager = get_event_manager()
+                    if event_manager:
+                        event_manager.emit_app_usage_update({
+                            "app_name": app_name,
+                            "window_title": window_title,
+                            "start_time": int(start_time.timestamp()),
+                            "end_time": int(end_time.timestamp()),
+                            "duration": int(duration),
+                            "pid": pid
+                        })
+                except Exception as ws_error:
+                    self.logger.debug(f"WebSocket event emission failed: {ws_error}")
+                
             except Exception as db_error:
                 error_msg = f"Database error in window tracker: {db_error}"
                 self.logger.error(error_msg, exc_info=True)

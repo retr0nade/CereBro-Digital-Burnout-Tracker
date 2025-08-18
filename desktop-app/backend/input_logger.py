@@ -222,6 +222,22 @@ class InputLogger:
                 self.logger.info(f"Logged input activity: {keypresses} keys, {mouse_clicks} clicks, "
                                f"{mouse_scrolls} scrolls, {mouse_moves} moves, {total_inputs} total")
                 
+                # Emit WebSocket event for input activity update
+                try:
+                    from websocket_events import get_event_manager
+                    event_manager = get_event_manager()
+                    if event_manager:
+                        event_manager.emit_input_activity({
+                            "timestamp": int(time.time()),
+                            "keypress_count": keypresses,
+                            "mouse_click_count": mouse_clicks,
+                            "mouse_scroll_count": mouse_scrolls,
+                            "mouse_move_count": mouse_moves,
+                            "total_inputs": total_inputs
+                        })
+                except Exception as ws_error:
+                    self.logger.debug(f"WebSocket event emission failed: {ws_error}")
+                
             except Exception as db_error:
                 error_msg = f"Database error in input logger: {db_error}"
                 self.logger.error(error_msg, exc_info=True)

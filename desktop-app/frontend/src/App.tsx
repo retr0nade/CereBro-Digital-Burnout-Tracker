@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import Dashboard from "./Dashboard";
+import RealTimeDashboard from "./RealTimeDashboard";
 import ScreenTime from "./ScreenTime";
 import Preferences from "./Preferences";
 import ServiceManager from "./ServiceManager";
@@ -20,7 +21,7 @@ declare global {
 }
 
 export default function App() {
-  const [currentView, setCurrentView] = useState<'dashboard' | 'screentime' | 'preferences' | 'services'>('dashboard');
+  const [currentView, setCurrentView] = useState<'dashboard' | 'realtime' | 'screentime' | 'preferences' | 'services'>('dashboard');
   const [backendStatus, setBackendStatus] = useState<BackendStatusType>({
     running: false,
     port: 5005,
@@ -89,6 +90,16 @@ export default function App() {
               Dashboard
             </button>
             <button
+              onClick={() => setCurrentView('realtime')}
+              className={`px-3 py-2 rounded-lg transition-colors ${
+                currentView === 'realtime' 
+                  ? 'bg-pink-500 text-white' 
+                  : 'text-gray-300 hover:text-white hover:bg-pink-500/20'
+              }`}
+            >
+              Real-time
+            </button>
+            <button
               onClick={() => setCurrentView('screentime')}
               className={`px-3 py-2 rounded-lg transition-colors ${
                 currentView === 'screentime' 
@@ -140,6 +151,7 @@ export default function App() {
       {/* Main Content */}
       <main className="flex flex-col items-center justify-center px-2">
         {currentView === 'dashboard' && <Dashboard />}
+        {currentView === 'realtime' && <RealTimeDashboard />}
         {currentView === 'screentime' && <ScreenTime />}
         {currentView === 'preferences' && <Preferences />}
         {currentView === 'services' && <ServiceManager />}

@@ -370,6 +370,23 @@ class FocusTimer:
                     duration=int(actual_duration)
                 )
                 
+                # Emit WebSocket event for focus session update
+                try:
+                    from websocket_events import get_event_manager
+                    event_manager = get_event_manager()
+                    if event_manager:
+                        event_manager.emit_focus_session_update({
+                            "session_id": self.current_session_id,
+                            "start_time": int(self.session_start.timestamp()),
+                            "end_time": int(self.session_end.timestamp()),
+                            "was_interrupted": self.interrupted,
+                            "duration": int(actual_duration),
+                            "notes": notes,
+                            "status": "completed"
+                        })
+                except Exception as ws_error:
+                    self.logger.debug(f"WebSocket event emission failed: {ws_error}")
+                
             except Exception as db_error:
                 error_msg = f"Database error in focus timer: {db_error}"
                 self.logger.error(error_msg, exc_info=True)

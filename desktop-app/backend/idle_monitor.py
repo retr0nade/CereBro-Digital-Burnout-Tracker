@@ -209,6 +209,21 @@ class IdleMonitor:
                 
                 self.logger.info(f"Logged idle period: {duration:.1f}s ({idle_start} to {idle_end})")
                 
+                # Emit WebSocket event for idle status update
+                try:
+                    from websocket_events import get_event_manager
+                    event_manager = get_event_manager()
+                    if event_manager:
+                        event_manager.emit_idle_status({
+                            "is_idle": False,  # User just became active
+                            "idle_start": int(idle_start.timestamp()),
+                            "idle_end": int(idle_end.timestamp()),
+                            "duration": int(duration),
+                            "reason": "user_activity_resumed"
+                        })
+                except Exception as ws_error:
+                    self.logger.debug(f"WebSocket event emission failed: {ws_error}")
+                
             except Exception as db_error:
                 error_msg = f"Database error in idle monitor: {db_error}"
                 self.logger.error(error_msg, exc_info=True)
@@ -276,6 +291,19 @@ class IdleMonitor:
                         self.is_idle = True
                         self.current_idle_start = datetime.now()
                         self.logger.info(f"User became idle (timeout: {self.timeout_seconds}s)")
+                        
+                        # Emit WebSocket event for idle status update
+                        try:
+                            from websocket_events import get_event_manager
+                            event_manager = get_event_manager()
+                            if event_manager:
+                                event_manager.emit_idle_status({
+                                    "is_idle": True,
+                                    "idle_start": int(self.current_idle_start.timestamp()),
+                                    "reason": "user_inactivity"
+                                })
+                        except Exception as ws_error:
+                            self.logger.debug(f"WebSocket event emission failed: {ws_error}")
                 
                 time.sleep(self.check_interval)
                 
