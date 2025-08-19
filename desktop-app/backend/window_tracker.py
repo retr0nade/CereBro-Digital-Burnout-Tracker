@@ -47,6 +47,9 @@ class WindowTracker:
             log_interval: How often to check for window changes (seconds)
             cerebro_db: Unified CerebroDB instance for logging
         """
+        # Validate configuration
+        if log_interval is None or log_interval <= 0:
+            raise ValueError("log_interval must be a positive number")
         self.log_interval = log_interval
         self.cerebro_db = cerebro_db or CerebroDB("cerebro.db")
         self.current_window = None
@@ -221,7 +224,29 @@ class WindowTracker:
             return None
     
     def _get_active_window(self) -> Optional[Tuple[str, str, int]]:
-        """Get active window info based on platform"""
+        """Get active window info based on platform.
+
+        First tries the shared metrics.apps.get_foreground_app helper (so tests can patch it),
+        falling back to platform-specific implementations.
+        """
+        # Preferred: shared helper (enables easy mocking in tests)
+        try:
+            from metrics.apps import get_foreground_app  # type: ignore
+            result = get_foreground_app()
+            if result is None:
+                return None
+            if isinstance(result, tuple):
+                if len(result) == 3:
+                    # app_name, window_title, pid
+                    return result  # type: ignore[return-value]
+                if len(result) == 2:
+                    app_name, window_title = result
+                    return app_name, window_title, 0
+        except Exception:
+            # Ignore and fall back
+            pass
+
+        # Fallback: platform-specific
         if self.system == "Windows":
             return self._get_active_window_windows()
         elif self.system == "Darwin":
@@ -231,16 +256,26 @@ class WindowTracker:
         else:
             return None
     
-    def _log_window_activity(self, app_name: str, window_title: str, start_time: datetime, 
-                           end_time: datetime, duration: float, pid: int):
+    def _log_window_activity(self, app_name: str, window_title: str, start_time, 
+                           end_time, duration: float, pid: int):
         """Log window activity to database"""
         try:
             # Log to unified cerebro database
             try:
+                # Normalize time inputs (accept datetime or epoch seconds)
+                if hasattr(start_time, 'timestamp'):
+                    norm_start = int(start_time.timestamp())
+                else:
+                    norm_start = int(start_time)
+                if hasattr(end_time, 'timestamp'):
+                    norm_end = int(end_time.timestamp())
+                else:
+                    norm_end = int(end_time)
+
                 self.cerebro_db.insert_app_usage(
                     app_name=app_name,
-                    start_time=int(start_time.timestamp()),
-                    end_time=int(end_time.timestamp()),
+                    start_time=norm_start,
+                    end_time=norm_end,
                     duration=int(duration)
                 )
                 
@@ -254,8 +289,8 @@ class WindowTracker:
                         event_manager.emit_app_usage_update({
                             "app_name": app_name,
                             "window_title": window_title,
-                            "start_time": int(start_time.timestamp()),
-                            "end_time": int(end_time.timestamp()),
+                            "start_time": norm_start,
+                            "end_time": norm_end,
                             "duration": int(duration),
                             "pid": pid
                         })
@@ -379,6 +414,52 @@ class WindowTracker:
                 
                 # Brief pause before retrying
                 time.sleep(5)
+
+    def _tracking_loop_iteration(self):
+        """Single iteration of tracking loop (test-friendly)."""
+        try:
+            window_info = self._get_active_window()
+
+            if window_info:
+                app_name, window_title, pid = window_info
+                current_time = int(time.time())
+
+                # Check if window changed
+                if self.current_window is None or self.current_window != (app_name, window_title):
+                    # Log previous window if exists
+                    if self.current_window is not None and self.current_start_time is not None:
+                        try:
+                            duration = current_time - int(self.current_start_time)
+                            self._log_window_activity(
+                                app_name=self.current_window[0],
+                                window_title=self.current_window[1],
+                                start_time=int(self.current_start_time),
+                                end_time=current_time,
+                                duration=duration,
+                                pid=0
+                            )
+                        except Exception as log_error:
+                            error_msg = f"Error logging previous window activity: {log_error}"
+                            self.logger.error(error_msg, exc_info=True)
+
+                            try:
+                                with open('cerebro.log', 'a') as f:
+                                    f.write(f"{datetime.now().isoformat()} - WINDOW_TRACKER - LOGGING ERROR: {error_msg}\n")
+                            except:
+                                pass
+
+                    # Update current window
+                    self.current_window = (app_name, window_title)
+                    self.current_start_time = current_time
+                    self.logger.info(f"Active window: {app_name} - {window_title}")
+        except Exception as e:
+            error_msg = f"Critical error in tracking loop iteration: {e}"
+            self.logger.error(error_msg, exc_info=True)
+            try:
+                with open('cerebro.log', 'a') as f:
+                    f.write(f"{datetime.now().isoformat()} - WINDOW_TRACKER - CRITICAL ERROR: {error_msg}\n")
+            except:
+                pass
     
     def start(self):
         """Start window tracking"""
