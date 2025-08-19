@@ -25,7 +25,7 @@
     },
     "idle_monitor": {
       "enabled": true,
-      "timeout_seconds": 300,
+      "timeout_seconds": 600,
       "check_interval": 1.0,
       "max_restarts": 3,
       "restart_delay": 5

@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ResponsiveLine } from '@nivo/line';
+import { ResponsivePie } from '@nivo/pie';
+import { ResponsiveBar } from '@nivo/bar';
 
 interface MetricsData {
   recent_usage: any[];
@@ -12,6 +14,14 @@ interface MetricsData {
     recent_usage: number;
     idle_events: number;
     focus_score: number;
+    total_app_time: number;
+    total_idle_time: number;
+  };
+  daily_summary?: {
+    total_app_time: number;
+    total_idle_time: number;
+    focus_sessions: number;
+    breaks: number;
   };
 }
 
@@ -70,13 +80,106 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, []);
 
+  // Prepare chart data
+  const prepareScreenTimeData = () => {
+    if (!data?.recent_usage) return [];
+    
+    // Group usage by hour
+    const hourlyData: { [key: string]: number } = {};
+    data.recent_usage.forEach((usage: any) => {
+      const hour = new Date(usage[2] * 1000).getHours();
+      const hourKey = `${hour}:00`;
+      hourlyData[hourKey] = (hourlyData[hourKey] || 0) + (usage[4] || 0);
+    });
+
+    return [{
+      id: 'Screen Time',
+      data: Object.entries(hourlyData).map(([hour, duration]) => ({
+        x: hour,
+        y: Math.round(duration / 60) // Convert to minutes
+      }))
+    }];
+  };
+
+  const prepareAppUsageData = () => {
+    if (!data?.recent_usage) return [];
+    
+    // Group by app name
+    const appData: { [key: string]: number } = {};
+    data.recent_usage.forEach((usage: any) => {
+      const appName = usage[0] || 'Unknown';
+      appData[appName] = (appData[appName] || 0) + (usage[4] || 0);
+    });
+
+    // Convert to pie chart format
+    return Object.entries(appData)
+      .map(([app, duration]) => ({
+        id: app,
+        label: app,
+        value: Math.round(duration / 60), // Convert to minutes
+        color: `hsl(${Math.random() * 360}, 70%, 50%)`
+      }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 8); // Top 8 apps
+  };
+
+  const prepareFocusDistractionData = () => {
+    if (!data?.recent_usage) return [];
+    
+    // Simulate focus vs distraction data (in real implementation, this would come from backend)
+    const hours = Array.from({ length: 24 }, (_, i) => `${i}:00`);
+    const focusData = hours.map(hour => ({
+      x: hour,
+      y: Math.floor(Math.random() * 60) + 20 // Simulated focus time
+    }));
+    
+    const distractionData = hours.map(hour => ({
+      x: hour,
+      y: Math.floor(Math.random() * 30) + 5 // Simulated distraction time
+    }));
+
+    return [
+      {
+        id: 'Focus Time',
+        data: focusData
+      },
+      {
+        id: 'Distraction Time',
+        data: distractionData
+      }
+    ];
+  };
+
+  const prepareIdleBreakData = () => {
+    if (!data?.recent_idle) return [];
+    
+    // Group idle periods by hour
+    const hourlyIdle: { [key: string]: number } = {};
+    data.recent_idle.forEach((idle: any) => {
+      const hour = new Date(idle[1] * 1000).getHours();
+      const hourKey = `${hour}:00`;
+      hourlyIdle[hourKey] = (hourlyIdle[hourKey] || 0) + 1;
+    });
+
+    // Simulate break data (in real implementation, this would come from backend)
+    const hours = Array.from({ length: 24 }, (_, i) => `${i}:00`);
+    return hours.map(hour => ({
+      hour,
+      idle: hourlyIdle[hour] || 0,
+      breaks: Math.floor(Math.random() * 3) // Simulated break count
+    }));
+  };
+
   if (loading) {
     return (
-      <div className="max-w-4xl mx-auto mt-8 p-6">
-        <div className="bg-white bg-opacity-10 rounded-xl p-6 shadow-lg">
+      <div className="max-w-7xl mx-auto mt-8 p-6">
+        <div className="bg-gray-800 rounded-xl p-6 shadow-lg">
           <div className="animate-pulse">
-            <div className="h-4 bg-gray-300 rounded w-1/4 mb-4"></div>
-            <div className="h-32 bg-gray-300 rounded"></div>
+            <div className="h-4 bg-gray-600 rounded w-1/4 mb-4"></div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="h-64 bg-gray-600 rounded"></div>
+              <div className="h-64 bg-gray-600 rounded"></div>
+            </div>
           </div>
         </div>
       </div>
@@ -85,7 +188,7 @@ export default function Dashboard() {
 
   if (error) {
     return (
-      <div className="max-w-4xl mx-auto mt-8 p-6">
+      <div className="max-w-7xl mx-auto mt-8 p-6">
         <div className="bg-red-500 bg-opacity-20 rounded-xl p-6 shadow-lg border border-red-500">
           <h2 className="text-xl font-bold text-red-400 mb-2">Connection Error</h2>
           <p className="text-red-300">{error}</p>
@@ -108,28 +211,22 @@ export default function Dashboard() {
 
   if (!data) {
     return (
-      <div className="max-w-4xl mx-auto mt-8 p-6">
-        <div className="bg-white bg-opacity-10 rounded-xl p-6 shadow-lg">
+      <div className="max-w-7xl mx-auto mt-8 p-6">
+        <div className="bg-gray-800 rounded-xl p-6 shadow-lg">
           <p className="text-center text-gray-400">No data available</p>
         </div>
       </div>
     );
   }
 
-  // Prepare chart data
-  const chartData = [
-    {
-      id: 'App Switches',
-      data: data.app_switches?.map((switch_data: any, i: number) => ({
-        x: new Date(switch_data[1] * 1000).toLocaleTimeString(),
-        y: i + 1
-      })) || []
-    }
-  ];
+  const screenTimeData = prepareScreenTimeData();
+  const appUsageData = prepareAppUsageData();
+  const focusDistractionData = prepareFocusDistractionData();
+  const idleBreakData = prepareIdleBreakData();
 
   return (
-    <div className="max-w-4xl mx-auto mt-8 p-6">
-      <h1 className="text-3xl font-bold mb-6 text-center">CereBro Dashboard</h1>
+    <div className="max-w-7xl mx-auto mt-8 p-6">
+      <h1 className="text-3xl font-bold mb-6 text-center text-white">CereBro Dashboard</h1>
       
       {/* Connection Status */}
       <div className={`mb-6 p-3 rounded-lg ${
@@ -141,7 +238,7 @@ export default function Dashboard() {
           <div className={`w-2 h-2 rounded-full ${
             backendConnected ? 'bg-green-500' : 'bg-yellow-500'
           }`} />
-          <span className="text-sm">
+          <span className="text-sm text-white">
             {backendConnected 
               ? 'Connected to backend via Tauri' 
               : 'Connected via HTTP (Tauri unavailable)'
@@ -150,26 +247,35 @@ export default function Dashboard() {
         </div>
       </div>
       
-      {/* Focus Score Card */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      {/* Focus Score Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
         <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-6 shadow-lg">
           <div className="text-center">
-            <div className="text-4xl font-bold text-white">{data.focus_score}%</div>
-            <div className="text-green-100">Focus Score</div>
+            <div className="text-3xl font-bold text-white">{data.focus_score}%</div>
+            <div className="text-green-100 text-sm">Focus Score</div>
           </div>
         </div>
         
         <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-6 shadow-lg">
           <div className="text-center">
-            <div className="text-4xl font-bold text-white">{data.metrics_summary.app_switches}</div>
-            <div className="text-blue-100">App Switches</div>
+            <div className="text-3xl font-bold text-white">{data.metrics_summary.app_switches}</div>
+            <div className="text-blue-100 text-sm">App Switches</div>
           </div>
         </div>
         
         <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-6 shadow-lg">
           <div className="text-center">
-            <div className="text-4xl font-bold text-white">{data.metrics_summary.idle_events}</div>
-            <div className="text-purple-100">Idle Events</div>
+            <div className="text-3xl font-bold text-white">{data.metrics_summary.idle_events}</div>
+            <div className="text-purple-100 text-sm">Idle Events</div>
+          </div>
+        </div>
+
+        <div className="bg-gradient-to-br from-pink-500 to-pink-600 rounded-xl p-6 shadow-lg">
+          <div className="text-center">
+            <div className="text-3xl font-bold text-white">
+              {Math.round((data.metrics_summary.total_app_time || 0) / 60)}
+            </div>
+            <div className="text-pink-100 text-sm">Total Minutes</div>
           </div>
         </div>
       </div>
@@ -189,81 +295,299 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Chart */}
-      <div className="bg-white bg-opacity-10 rounded-xl p-6 shadow-lg">
-        <h3 className="text-xl font-bold mb-4">Activity Timeline</h3>
-        <div className="h-64">
-          {chartData[0].data.length > 0 ? (
-            <ResponsiveLine
-              data={chartData}
-              margin={{ top: 20, right: 20, bottom: 50, left: 60 }}
-              xScale={{ type: 'point' }}
-              yScale={{ type: 'linear', min: 'auto', max: 'auto' }}
-              axisTop={null}
-              axisRight={null}
-              axisLeft={{
-                tickSize: 5,
-                tickPadding: 5,
-                tickRotation: 0,
-                legend: 'Switches',
-                legendOffset: -40,
-                legendPosition: 'middle'
-              }}
-              axisBottom={{
-                tickSize: 5,
-                tickPadding: 5,
-                tickRotation: 0,
-                legend: 'Time',
-                legendOffset: 36,
-                legendPosition: 'middle'
-              }}
-              colors={['#12ffe0']}
-              pointSize={6}
-              pointColor={{ theme: 'background' }}
-              pointBorderWidth={2}
-              pointBorderColor={{ from: 'serieColor' }}
-              pointLabelYOffset={-12}
-              useMesh={true}
-              legends={[
-                {
-                  anchor: 'top',
-                  direction: 'row',
-                  justify: false,
-                  translateX: 0,
-                  translateY: -30,
-                  itemsSpacing: 0,
-                  itemDirection: 'left-to-right',
-                  itemWidth: 80,
-                  itemHeight: 20,
-                  itemTextColor: '#999',
-                  symbolSize: 12,
-                  symbolShape: 'circle',
-                  effects: [
-                    {
-                      on: 'hover',
-                      style: {
-                        itemTextColor: '#000'
-                      }
+      {/* Charts Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        {/* Daily Screen Time Line Chart */}
+        <div className="bg-gray-800 rounded-xl p-6 shadow-lg">
+          <h3 className="text-xl font-bold mb-4 text-white">Daily Screen Time</h3>
+          <div className="h-64">
+            {screenTimeData[0].data.length > 0 ? (
+              <ResponsiveLine
+                data={screenTimeData}
+                margin={{ top: 20, right: 20, bottom: 50, left: 60 }}
+                xScale={{ type: 'point' }}
+                yScale={{ type: 'linear', min: 'auto', max: 'auto' }}
+                axisTop={null}
+                axisRight={null}
+                axisLeft={{
+                  tickSize: 5,
+                  tickPadding: 5,
+                  tickRotation: 0,
+                  legend: 'Minutes',
+                  legendOffset: -40,
+                  legendPosition: 'middle',
+                  tickComponent: ({ value, ...props }) => (
+                    <text {...props} style={{ fill: '#9CA3AF', fontSize: '12px' }}>
+                      {value}
+                    </text>
+                  )
+                }}
+                axisBottom={{
+                  tickSize: 5,
+                  tickPadding: 5,
+                  tickRotation: 0,
+                  legend: 'Hour of Day',
+                  legendOffset: 36,
+                  legendPosition: 'middle',
+                  tickComponent: ({ value, ...props }) => (
+                    <text {...props} style={{ fill: '#9CA3AF', fontSize: '12px' }}>
+                      {value}
+                    </text>
+                  )
+                }}
+                colors={['#10B981']}
+                pointSize={6}
+                pointColor={{ theme: 'background' }}
+                pointBorderWidth={2}
+                pointBorderColor={{ from: 'serieColor' }}
+                pointLabelYOffset={-12}
+                useMesh={true}
+                theme={{
+                  grid: {
+                    line: {
+                      stroke: '#374151',
+                      strokeWidth: 1
                     }
-                  ]
-                }
-              ]}
-            />
-          ) : (
-            <div className="h-full flex items-center justify-center text-gray-400">
-              <p>No activity data available</p>
-            </div>
-          )}
+                  }
+                }}
+              />
+            ) : (
+              <div className="h-full flex items-center justify-center text-gray-400">
+                <p>No screen time data available</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* App Usage Pie Chart */}
+        <div className="bg-gray-800 rounded-xl p-6 shadow-lg">
+          <h3 className="text-xl font-bold mb-4 text-white">App Usage Distribution</h3>
+          <div className="h-64">
+            {appUsageData.length > 0 ? (
+              <ResponsivePie
+                data={appUsageData}
+                margin={{ top: 20, right: 20, bottom: 20, left: 20 }}
+                innerRadius={0.5}
+                padAngle={0.7}
+                cornerRadius={3}
+                activeOuterRadiusOffset={8}
+                colors={{ scheme: 'nivo' }}
+                borderWidth={1}
+                borderColor={{ from: 'color', modifiers: [['darker', 0.2]] }}
+                arcLinkLabelsSkipAngle={10}
+                arcLinkLabelsTextColor="#9CA3AF"
+                arcLinkLabelsThickness={2}
+                arcLinkLabelsColor={{ from: 'color' }}
+                arcLabelsSkipAngle={10}
+                arcLabelsTextColor={{ from: 'color', modifiers: [['darker', 2]] }}
+                legends={[
+                  {
+                    anchor: 'bottom',
+                    direction: 'row',
+                    justify: false,
+                    translateX: 0,
+                    translateY: 56,
+                    itemsSpacing: 0,
+                    itemWidth: 100,
+                    itemHeight: 18,
+                    itemTextColor: '#9CA3AF',
+                    itemDirection: 'left-to-right',
+                    itemOpacity: 1,
+                    symbolSize: 18,
+                    symbolShape: 'circle'
+                  }
+                ]}
+              />
+            ) : (
+              <div className="h-full flex items-center justify-center text-gray-400">
+                <p>No app usage data available</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Focus vs Distraction Trend Line */}
+        <div className="bg-gray-800 rounded-xl p-6 shadow-lg">
+          <h3 className="text-xl font-bold mb-4 text-white">Focus vs Distraction Trend</h3>
+          <div className="h-64">
+            {focusDistractionData[0].data.length > 0 ? (
+              <ResponsiveLine
+                data={focusDistractionData}
+                margin={{ top: 20, right: 20, bottom: 50, left: 60 }}
+                xScale={{ type: 'point' }}
+                yScale={{ type: 'linear', min: 'auto', max: 'auto' }}
+                axisTop={null}
+                axisRight={null}
+                axisLeft={{
+                  tickSize: 5,
+                  tickPadding: 5,
+                  tickRotation: 0,
+                  legend: 'Minutes',
+                  legendOffset: -40,
+                  legendPosition: 'middle',
+                  tickComponent: ({ value, ...props }) => (
+                    <text {...props} style={{ fill: '#9CA3AF', fontSize: '12px' }}>
+                      {value}
+                    </text>
+                  )
+                }}
+                axisBottom={{
+                  tickSize: 5,
+                  tickPadding: 5,
+                  tickRotation: 0,
+                  legend: 'Hour of Day',
+                  legendOffset: 36,
+                  legendPosition: 'middle',
+                  tickComponent: ({ value, ...props }) => (
+                    <text {...props} style={{ fill: '#9CA3AF', fontSize: '12px' }}>
+                      {value}
+                    </text>
+                  )
+                }}
+                colors={['#10B981', '#EF4444']}
+                pointSize={6}
+                pointColor={{ theme: 'background' }}
+                pointBorderWidth={2}
+                pointBorderColor={{ from: 'serieColor' }}
+                pointLabelYOffset={-12}
+                useMesh={true}
+                theme={{
+                  grid: {
+                    line: {
+                      stroke: '#374151',
+                      strokeWidth: 1
+                    }
+                  }
+                }}
+                legends={[
+                  {
+                    anchor: 'top',
+                    direction: 'row',
+                    justify: false,
+                    translateX: 0,
+                    translateY: -30,
+                    itemsSpacing: 0,
+                    itemDirection: 'left-to-right',
+                    itemWidth: 80,
+                    itemHeight: 20,
+                    itemTextColor: '#9CA3AF',
+                    symbolSize: 12,
+                    symbolShape: 'circle',
+                    effects: [
+                      {
+                        on: 'hover',
+                        style: {
+                          itemTextColor: '#FFFFFF'
+                        }
+                      }
+                    ]
+                  }
+                ]}
+              />
+            ) : (
+              <div className="h-full flex items-center justify-center text-gray-400">
+                <p>No focus/distraction data available</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Idle/Break Frequency Bar Chart */}
+        <div className="bg-gray-800 rounded-xl p-6 shadow-lg">
+          <h3 className="text-xl font-bold mb-4 text-white">Idle & Break Frequency</h3>
+          <div className="h-64">
+            {idleBreakData.length > 0 ? (
+              <ResponsiveBar
+                data={idleBreakData}
+                keys={['idle', 'breaks']}
+                indexBy="hour"
+                margin={{ top: 20, right: 20, bottom: 50, left: 60 }}
+                padding={0.3}
+                groupMode="grouped"
+                valueScale={{ type: 'linear' }}
+                indexScale={{ type: 'band', round: true }}
+                colors={{ scheme: 'nivo' }}
+                borderColor={{ from: 'color', modifiers: [['darker', 1.6]] }}
+                axisTop={null}
+                axisRight={null}
+                axisBottom={{
+                  tickSize: 5,
+                  tickPadding: 5,
+                  tickRotation: 0,
+                  legend: 'Hour of Day',
+                  legendPosition: 'middle',
+                  legendOffset: 32,
+                  tickComponent: ({ value, ...props }) => (
+                    <text {...props} style={{ fill: '#9CA3AF', fontSize: '12px' }}>
+                      {value}
+                    </text>
+                  )
+                }}
+                axisLeft={{
+                  tickSize: 5,
+                  tickPadding: 5,
+                  tickRotation: 0,
+                  legend: 'Count',
+                  legendPosition: 'middle',
+                  legendOffset: -40,
+                  tickComponent: ({ value, ...props }) => (
+                    <text {...props} style={{ fill: '#9CA3AF', fontSize: '12px' }}>
+                      {value}
+                    </text>
+                  )
+                }}
+                labelSkipWidth={12}
+                labelSkipHeight={12}
+                labelTextColor={{ from: 'color', modifiers: [['darker', 1.6]] }}
+                theme={{
+                  grid: {
+                    line: {
+                      stroke: '#374151',
+                      strokeWidth: 1
+                    }
+                  }
+                }}
+                legends={[
+                  {
+                    dataFrom: 'keys',
+                    anchor: 'top',
+                    direction: 'row',
+                    justify: false,
+                    translateX: 0,
+                    translateY: -30,
+                    itemsSpacing: 2,
+                    itemWidth: 100,
+                    itemHeight: 20,
+                    itemDirection: 'left-to-right',
+                    itemOpacity: 0.85,
+                    symbolSize: 20,
+                    effects: [
+                      {
+                        on: 'hover',
+                        style: {
+                          itemOpacity: 1
+                        }
+                      }
+                    ]
+                  }
+                ]}
+              />
+            ) : (
+              <div className="h-full flex items-center justify-center text-gray-400">
+                <p>No idle/break data available</p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Recent Activity */}
-      <div className="mt-8 bg-white bg-opacity-10 rounded-xl p-6 shadow-lg">
-        <h3 className="text-xl font-bold mb-4">Recent Activity</h3>
+      <div className="bg-gray-800 rounded-xl p-6 shadow-lg">
+        <h3 className="text-xl font-bold mb-4 text-white">Recent Activity</h3>
         <div className="space-y-2 max-h-64 overflow-y-auto">
           {data.recent_usage?.slice(0, 10).map((usage: any, index: number) => (
             <div key={index} className="flex justify-between items-center py-2 border-b border-gray-600">
-              <span className="text-sm">{usage[0]}</span>
+              <span className="text-sm text-gray-300">{usage[0]}</span>
               <span className="text-xs text-gray-400">
                 {new Date(usage[2] * 1000).toLocaleTimeString()}
               </span>

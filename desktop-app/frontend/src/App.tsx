@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import Dashboard from "./Dashboard";
 import RealTimeDashboard from "./RealTimeDashboard";
 import ScreenTime from "./ScreenTime";
-import Preferences from "./Preferences";
+import Settings from "./Settings";
 import ServiceManager from "./ServiceManager";
 import DataExport from "./DataExport";
 import BackendStatus from "./BackendStatus";
@@ -22,7 +22,7 @@ declare global {
 }
 
 export default function App() {
-  const [currentView, setCurrentView] = useState<'dashboard' | 'realtime' | 'screentime' | 'preferences' | 'services' | 'export'>('dashboard');
+  const [currentView, setCurrentView] = useState<'dashboard' | 'realtime' | 'screentime' | 'settings' | 'services' | 'export'>('dashboard');
   const [backendStatus, setBackendStatus] = useState<BackendStatusType>({
     running: false,
     port: 5005,
@@ -111,14 +111,14 @@ export default function App() {
               Screen Time
             </button>
             <button
-              onClick={() => setCurrentView('preferences')}
+              onClick={() => setCurrentView('settings')}
               className={`px-3 py-2 rounded-lg transition-colors ${
-                currentView === 'preferences' 
+                currentView === 'settings' 
                   ? 'bg-pink-500 text-white' 
                   : 'text-gray-300 hover:text-white hover:bg-pink-500/20'
               }`}
             >
-              Preferences
+              Settings
             </button>
             <button
               onClick={() => setCurrentView('services')}
@@ -164,7 +164,7 @@ export default function App() {
         {currentView === 'dashboard' && <Dashboard />}
         {currentView === 'realtime' && <RealTimeDashboard />}
         {currentView === 'screentime' && <ScreenTime />}
-        {currentView === 'preferences' && <Preferences />}
+        {currentView === 'settings' && <Settings />}
         {currentView === 'services' && <ServiceManager />}
         {currentView === 'export' && <DataExport />}
       </main>

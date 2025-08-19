@@ -190,6 +190,28 @@ def handle_preferences():
     else:
         return jsonify(get_pref())
 
+@api.route('/config', methods=['GET', 'PUT'])
+def handle_config():
+    """Get or update application configuration"""
+    if request.method == 'PUT':
+        try:
+            updates = request.get_json()
+            if not updates:
+                return jsonify({"error": "No configuration data provided"}), 400
+            
+            # Update the configuration
+            config.update_config(updates)
+            
+            return jsonify({"status": "success", "message": "Configuration updated successfully"})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+    else:
+        try:
+            # Return current configuration
+            return jsonify(config.config)
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
 @api.route('/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""
