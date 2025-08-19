@@ -26,7 +26,8 @@ class TestDatabaseSchema:
                 'input_activity',
                 'focus_sessions',
                 'breaks',
-                'browser_activity'
+                'browser_activity',
+                'system_metrics'
             ]
             
             for table in expected_tables:
@@ -154,6 +155,24 @@ class TestDatabaseSchema:
             
             for col, col_type in expected_columns.items():
                 assert col in columns, f"Column {col} should exist in browser_activity table"
+                assert columns[col] == col_type, f"Column {col} should be of type {col_type}"
+
+    def test_system_metrics_table_schema(self, test_db):
+        """Test system_metrics table schema"""
+        import sqlite3
+        with sqlite3.connect(test_db.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("PRAGMA table_info(system_metrics);")
+            columns = {row[1]: row[2] for row in cursor.fetchall()}
+            expected_columns = {
+                'id': 'INTEGER',
+                'timestamp': 'INTEGER',
+                'cpu_usage': 'REAL',
+                'ram_usage': 'REAL',
+                'created_at': 'INTEGER'
+            }
+            for col, col_type in expected_columns.items():
+                assert col in columns, f"Column {col} should exist in system_metrics table"
                 assert columns[col] == col_type, f"Column {col} should be of type {col_type}"
 
 

@@ -4,6 +4,7 @@ import RealTimeDashboard from "./RealTimeDashboard";
 import ScreenTime from "./ScreenTime";
 import Preferences from "./Preferences";
 import ServiceManager from "./ServiceManager";
+import DataExport from "./DataExport";
 import BackendStatus from "./BackendStatus";
 
 interface BackendStatusType {
@@ -21,7 +22,7 @@ declare global {
 }
 
 export default function App() {
-  const [currentView, setCurrentView] = useState<'dashboard' | 'realtime' | 'screentime' | 'preferences' | 'services'>('dashboard');
+  const [currentView, setCurrentView] = useState<'dashboard' | 'realtime' | 'screentime' | 'preferences' | 'services' | 'export'>('dashboard');
   const [backendStatus, setBackendStatus] = useState<BackendStatusType>({
     running: false,
     port: 5005,
@@ -129,6 +130,16 @@ export default function App() {
             >
               Services
             </button>
+            <button
+              onClick={() => setCurrentView('export')}
+              className={`px-3 py-2 rounded-lg transition-colors ${
+                currentView === 'export' 
+                  ? 'bg-pink-500 text-white' 
+                  : 'text-gray-300 hover:text-white hover:bg-pink-500/20'
+              }`}
+            >
+              Export
+            </button>
           </nav>
         </div>
 
@@ -155,6 +166,7 @@ export default function App() {
         {currentView === 'screentime' && <ScreenTime />}
         {currentView === 'preferences' && <Preferences />}
         {currentView === 'services' && <ServiceManager />}
+        {currentView === 'export' && <DataExport />}
       </main>
 
       <footer className="w-full py-4 text-center text-xs text-white/40 mt-8">

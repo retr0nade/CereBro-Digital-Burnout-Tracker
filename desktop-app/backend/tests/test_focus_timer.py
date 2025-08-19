@@ -252,10 +252,9 @@ class TestFocusTimer:
         sessions = test_db.get_focus_sessions(limit=1)
         assert len(sessions) == 1
         session_data = sessions[0]
-        assert session_data['session_id'] == session_id
+        # The unified schema doesn't store session_id/notes
         assert session_data['duration'] == 1500
         assert session_data['was_interrupted'] == False
-        assert session_data['notes'] == "Session completed"
 
     def test_session_statistics(self, test_db, mock_config):
         """Test session statistics calculation"""

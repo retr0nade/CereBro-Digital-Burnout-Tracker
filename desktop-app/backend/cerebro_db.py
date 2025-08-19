@@ -92,6 +92,17 @@ class CerebroDB:
                 )
             """)
             
+            # 7. System Metrics Table
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS system_metrics (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp INTEGER NOT NULL,
+                    cpu_usage REAL NOT NULL,
+                    ram_usage REAL NOT NULL,
+                    created_at INTEGER DEFAULT (strftime('%s', 'now'))
+                )
+            """)
+            
             # Create indexes for better performance
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_app_usage_start_time ON app_usage(start_time)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_app_usage_app_name ON app_usage(app_name)")
@@ -271,6 +282,36 @@ class CerebroDB:
             for table in tables:
                 cursor.execute(f"DELETE FROM {table}")
             conn.commit()
+
+    # System Metrics Methods
+    def insert_system_metrics(self, timestamp: int, cpu_usage: float, ram_usage: float) -> int:
+        """Insert a system metrics record"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                INSERT INTO system_metrics (timestamp, cpu_usage, ram_usage)
+                VALUES (?, ?, ?)
+                """,
+                (timestamp, cpu_usage, ram_usage)
+            )
+            conn.commit()
+            return cursor.lastrowid
+
+    def get_system_metrics(self, limit: int = 100) -> List[Dict]:
+        """Get recent system metrics records"""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT * FROM system_metrics
+                ORDER BY timestamp DESC
+                LIMIT ?
+                """,
+                (limit,)
+            )
+            return [dict(row) for row in cursor.fetchall()]
 
 # Global database instance
 db = CerebroDB()

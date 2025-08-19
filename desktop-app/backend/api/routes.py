@@ -1,16 +1,20 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, Response
 from flask_socketio import emit
 from data.models import get_pref, store_pref
 from data.unified_schema import BurnoutTrackerDB, AppUsage, IdlePeriod, InputActivity, FocusSession, BreakLog, BreakType
 from metrics.util import calculate_focus_score, detect_burnout_signals, format_duration
+from cerebro_db import CerebroDB
 import json
 import time
+import csv
+import io
 from datetime import datetime
 
 api = Blueprint('api', __name__)
 
 # Initialize unified database instance
 unified_db = BurnoutTrackerDB("data/burnout_tracker.db")
+cerebro_db = CerebroDB()
 
 @api.route('/track', methods=['POST'])
 def track_extension_data():
@@ -370,5 +374,134 @@ def websocket_status():
             })
         else:
             return jsonify({"status": "unavailable"}), 503
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@api.route('/export/csv', methods=['GET'])
+def export_csv():
+    """Export all data from cerebro.db as CSV"""
+    try:
+        # Get query parameters
+        table = request.args.get('table', 'all')
+        limit = request.args.get('limit', 1000, type=int)
+        
+        # Create CSV data
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        if table == 'all' or table == 'app_usage':
+            writer.writerow(['Table: app_usage'])
+            writer.writerow(['id', 'app_name', 'start_time', 'end_time', 'duration', 'created_at'])
+            app_usage = cerebro_db.get_app_usage(limit=limit)
+            for row in app_usage:
+                writer.writerow([row['id'], row['app_name'], row['start_time'], row['end_time'], row['duration'], row['created_at']])
+            writer.writerow([])
+        
+        if table == 'all' or table == 'idle_periods':
+            writer.writerow(['Table: idle_periods'])
+            writer.writerow(['id', 'start_time', 'end_time', 'duration', 'created_at'])
+            idle_periods = cerebro_db.get_idle_periods(limit=limit)
+            for row in idle_periods:
+                writer.writerow([row['id'], row['start_time'], row['end_time'], row['duration'], row['created_at']])
+            writer.writerow([])
+        
+        if table == 'all' or table == 'input_activity':
+            writer.writerow(['Table: input_activity'])
+            writer.writerow(['id', 'timestamp', 'keypress_count', 'mouse_click_count', 'created_at'])
+            input_activity = cerebro_db.get_input_activity(limit=limit)
+            for row in input_activity:
+                writer.writerow([row['id'], row['timestamp'], row['keypress_count'], row['mouse_click_count'], row['created_at']])
+            writer.writerow([])
+        
+        if table == 'all' or table == 'focus_sessions':
+            writer.writerow(['Table: focus_sessions'])
+            writer.writerow(['id', 'start_time', 'end_time', 'was_interrupted', 'duration', 'created_at'])
+            focus_sessions = cerebro_db.get_focus_sessions(limit=limit)
+            for row in focus_sessions:
+                writer.writerow([row['id'], row['start_time'], row['end_time'], row['was_interrupted'], row['duration'], row['created_at']])
+            writer.writerow([])
+        
+        if table == 'all' or table == 'breaks':
+            writer.writerow(['Table: breaks'])
+            writer.writerow(['id', 'start_time', 'end_time', 'type', 'created_at'])
+            breaks = cerebro_db.get_breaks(limit=limit)
+            for row in breaks:
+                writer.writerow([row['id'], row['start_time'], row['end_time'], row['type'], row['created_at']])
+            writer.writerow([])
+        
+        if table == 'all' or table == 'browser_activity':
+            writer.writerow(['Table: browser_activity'])
+            writer.writerow(['id', 'domain', 'url', 'start_time', 'end_time', 'duration', 'created_at'])
+            browser_activity = cerebro_db.get_browser_activity(limit=limit)
+            for row in browser_activity:
+                writer.writerow([row['id'], row['domain'], row['url'], row['start_time'], row['end_time'], row['duration'], row['created_at']])
+            writer.writerow([])
+        
+        if table == 'all' or table == 'system_metrics':
+            writer.writerow(['Table: system_metrics'])
+            writer.writerow(['id', 'timestamp', 'cpu_usage', 'ram_usage', 'created_at'])
+            system_metrics = cerebro_db.get_system_metrics(limit=limit)
+            for row in system_metrics:
+                writer.writerow([row['id'], row['timestamp'], row['cpu_usage'], row['ram_usage'], row['created_at']])
+            writer.writerow([])
+        
+        # Create response
+        output.seek(0)
+        csv_data = output.getvalue()
+        
+        return Response(
+            csv_data,
+            mimetype='text/csv',
+            headers={'Content-Disposition': f'attachment; filename=cerebro_export_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'}
+        )
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@api.route('/export/json', methods=['GET'])
+def export_json():
+    """Export all data from cerebro.db as JSON"""
+    try:
+        # Get query parameters
+        table = request.args.get('table', 'all')
+        limit = request.args.get('limit', 1000, type=int)
+        
+        # Prepare export data
+        export_data = {
+            'export_timestamp': datetime.now().isoformat(),
+            'database': 'cerebro.db',
+            'tables': {}
+        }
+        
+        if table == 'all' or table == 'app_usage':
+            export_data['tables']['app_usage'] = cerebro_db.get_app_usage(limit=limit)
+        
+        if table == 'all' or table == 'idle_periods':
+            export_data['tables']['idle_periods'] = cerebro_db.get_idle_periods(limit=limit)
+        
+        if table == 'all' or table == 'input_activity':
+            export_data['tables']['input_activity'] = cerebro_db.get_input_activity(limit=limit)
+        
+        if table == 'all' or table == 'focus_sessions':
+            export_data['tables']['focus_sessions'] = cerebro_db.get_focus_sessions(limit=limit)
+        
+        if table == 'all' or table == 'breaks':
+            export_data['tables']['breaks'] = cerebro_db.get_breaks(limit=limit)
+        
+        if table == 'all' or table == 'browser_activity':
+            export_data['tables']['browser_activity'] = cerebro_db.get_browser_activity(limit=limit)
+        
+        if table == 'all' or table == 'system_metrics':
+            export_data['tables']['system_metrics'] = cerebro_db.get_system_metrics(limit=limit)
+        
+        # Create response
+        json_data = json.dumps(export_data, indent=2, default=str)
+        
+        return Response(
+            json_data,
+            mimetype='application/json',
+            headers={'Content-Disposition': f'attachment; filename=cerebro_export_{datetime.now().strftime("%Y%m%d_%H%M%S")}.json'}
+        )
+        
     except Exception as e:
         return jsonify({"error": str(e)}), 500

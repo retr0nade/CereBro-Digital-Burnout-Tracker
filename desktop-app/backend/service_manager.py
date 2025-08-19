@@ -12,6 +12,7 @@ import sys
 from datetime import datetime
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass
+import psutil
 from enum import Enum
 
 # Import all trackers
@@ -66,6 +67,8 @@ class ServiceManager:
         self.is_running = False
         self.shutdown_event = threading.Event()
         self.manager_thread = None
+        self.metrics_thread: Optional[threading.Thread] = None
+        self.metrics_running: bool = False
         
         # Setup logging
         self._setup_logging()
@@ -394,6 +397,9 @@ class ServiceManager:
         # Start manager thread
         self.manager_thread = threading.Thread(target=self._manager_loop, daemon=True)
         self.manager_thread.start()
+
+        # Start system metrics monitor
+        self._start_metrics_monitor()
         
         self.logger.info("All services started")
         return True
@@ -412,6 +418,9 @@ class ServiceManager:
         for service_name in self.services.keys():
             self._stop_service(service_name)
         
+        # Stop system metrics monitor
+        self._stop_metrics_monitor()
+
         # Wait for monitor threads to finish
         thread_timeout = config.get_monitoring_config().get('thread_timeout', 5)
         for service_name, monitor_thread in self.monitor_threads.items():
@@ -424,6 +433,45 @@ class ServiceManager:
         
         self.logger.info("All services stopped")
         return True
+
+    def _metrics_loop(self):
+        """Background loop to sample CPU and RAM usage and store in DB every 10 minutes."""
+        self.logger.info("System metrics monitor started")
+        while self.metrics_running and not self.shutdown_event.is_set():
+            try:
+                cpu = float(psutil.cpu_percent(interval=1))
+                ram = float(psutil.virtual_memory().percent)
+                self.cerebro_db.insert_system_metrics(
+                    timestamp=int(time.time()),
+                    cpu_usage=cpu,
+                    ram_usage=ram,
+                )
+            except Exception as e:
+                self.logger.debug(f"System metrics collection error: {e}")
+
+            # Sleep for ~10 minutes (600 seconds), but wake early on shutdown
+            for _ in range(600):
+                if not self.metrics_running or self.shutdown_event.is_set():
+                    break
+                time.sleep(1)
+
+        self.logger.info("System metrics monitor stopped")
+
+    def _start_metrics_monitor(self):
+        if self.metrics_running:
+            return
+        self.metrics_running = True
+        self.metrics_thread = threading.Thread(target=self._metrics_loop, daemon=True)
+        self.metrics_thread.start()
+
+    def _stop_metrics_monitor(self):
+        self.metrics_running = False
+        if self.metrics_thread and self.metrics_thread.is_alive():
+            try:
+                self.metrics_thread.join(timeout=5)
+            except Exception:
+                pass
+        self.metrics_thread = None
     
     def shutdown(self):
         """Graceful shutdown of all services"""
