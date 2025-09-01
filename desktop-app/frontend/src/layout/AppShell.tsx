@@ -11,7 +11,6 @@ interface BackendStatusType {
 }
 
 interface AppShellProps {
-  children: React.ReactNode;
   currentView: string;
   onViewChange: (view: string) => void;
   backendStatus: BackendStatusType;
@@ -22,11 +21,10 @@ interface AppShellProps {
 }
 
 interface MainAreaProps {
-  children: React.ReactNode;
   sidebarCollapsed: boolean;
 }
 
-function MainArea({ children, sidebarCollapsed }: MainAreaProps) {
+function MainArea({ children, sidebarCollapsed }: React.PropsWithChildren<MainAreaProps>) {
   return (
     <motion.div
       className="flex-1 flex flex-col min-h-screen"
@@ -92,7 +90,7 @@ export default function AppShell({
   onStopBackend,
   theme,
   onThemeToggle,
-}: AppShellProps) {
+}: React.PropsWithChildren<AppShellProps>) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     // Check localStorage for saved preference
     const saved = localStorage.getItem('sidebar-collapsed');

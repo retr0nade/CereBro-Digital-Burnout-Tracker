@@ -2,6 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { ResponsiveLine } from '@nivo/line';
 import { ResponsivePie } from '@nivo/pie';
 import { ResponsiveBar } from '@nivo/bar';
+import { BarChart3, MousePointer, Clock, Timer } from 'lucide-react';
+import MetricTile from './ui/MetricTile';
+import InsightBanner from './ui/InsightBanner';
+import GlassCard from './ui/GlassCard';
 
 interface MetricsData {
   recent_usage: any[];
@@ -47,6 +51,28 @@ declare global {
     };
   }
 }
+
+// Helper functions for metric tones
+const getFocusScoreTone = (score: number): 'default' | 'ok' | 'warn' | 'danger' => {
+  if (score >= 80) return 'ok';
+  if (score >= 60) return 'warn';
+  return 'danger';
+};
+
+const getAppSwitchesTone = (switches: number): 'default' | 'ok' | 'warn' | 'danger' => {
+  if (switches <= 50) return 'ok';
+  if (switches <= 100) return 'warn';
+  return 'danger';
+};
+
+const getInsightStatus = (suggestions: InsightSuggestion[]): 'ok' | 'warn' | 'danger' => {
+  const hasError = suggestions.some(s => s.severity === 'error');
+  const hasWarning = suggestions.some(s => s.severity === 'warning');
+  
+  if (hasError) return 'danger';
+  if (hasWarning) return 'warn';
+  return 'ok';
+};
 
 export default function Dashboard() {
   const [data, setData] = useState<MetricsData | null>(null);
@@ -271,74 +297,74 @@ export default function Dashboard() {
       
       {/* AI Insights */}
       {insights?.suggestions && insights.suggestions.length > 0 && (
-        <div className="bg-blue-500 bg-opacity-20 rounded-xl p-6 shadow-lg border border-blue-500 mb-8">
-          <h3 className="text-xl font-bold text-blue-300 mb-3">🧠 AI Insights</h3>
-          <ul className="space-y-2">
-            {insights.suggestions.map((s) => (
-              <li key={s.id} className="flex items-start">
-                <span className={`mt-1 mr-3 w-2 h-2 rounded-full ${
-                  s.severity === 'warning' ? 'bg-yellow-400' : s.severity === 'error' ? 'bg-red-400' : 'bg-blue-400'
-                }`} />
-                <div>
-                  <div className="text-white text-sm">{s.message}</div>
-                  <div className="text-xs text-gray-400 mt-1 uppercase tracking-wider">{s.type.replace('_',' ')} • {new Date(s.timestamp * 1000).toLocaleTimeString()}</div>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
+        <InsightBanner
+          title="AI Insights"
+          insights={insights.suggestions}
+          status={getInsightStatus(insights.suggestions)}
+          defaultExpanded={false}
+          className="mb-8"
+        />
       )}
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="card">
-          <div className="text-center">
-            <div className="text-3xl font-bold text-brand-300">{data.focus_score}%</div>
-            <div className="muted text-sm">Focus Score</div>
-          </div>
-        </div>
-        <div className="card">
-          <div className="text-center">
-            <div className="text-3xl font-bold">{data.metrics_summary.app_switches}</div>
-            <div className="muted text-sm">App Switches</div>
-          </div>
-        </div>
-        <div className="card">
-          <div className="text-center">
-            <div className="text-3xl font-bold">{data.metrics_summary.idle_events}</div>
-            <div className="muted text-sm">Idle Events</div>
-          </div>
-        </div>
-        <div className="card">
-          <div className="text-center">
-            <div className="text-3xl font-bold">
-              {Math.round((data.metrics_summary.total_app_time || 0) / 60)}
-            </div>
-            <div className="muted text-sm">Total Minutes</div>
-          </div>
-        </div>
+      {/* KPI Metrics */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <MetricTile
+          icon={<BarChart3 />}
+          label="Focus Score"
+          value={`${data.focus_score}%`}
+          hint="Percentage of productive time vs total active time"
+          tone={getFocusScoreTone(data.focus_score)}
+          interactive
+        />
+        <MetricTile
+          icon={<MousePointer />}
+          label="App Switches"
+          value={data.metrics_summary.app_switches}
+          hint="Number of application context switches"
+          tone={getAppSwitchesTone(data.metrics_summary.app_switches)}
+          interactive
+        />
+        <MetricTile
+          icon={<Clock />}
+          label="Idle Events"
+          value={data.metrics_summary.idle_events}
+          hint="Times you stepped away from the computer"
+          tone="default"
+          interactive
+        />
+        <MetricTile
+          icon={<Timer />}
+          label="Total Minutes"
+          value={Math.round((data.metrics_summary.total_app_time || 0) / 60)}
+          hint="Total active screen time today"
+          tone="default"
+          interactive
+        />
       </div>
 
       {/* Burnout Signals */}
       {data.burnout_signals && data.burnout_signals.length > 0 && (
-        <div className="bg-yellow-500 bg-opacity-20 rounded-xl p-6 shadow-lg border border-yellow-500 mb-8">
-          <h3 className="text-xl font-bold text-yellow-400 mb-4">⚠️ Burnout Signals Detected</h3>
-          <ul className="space-y-2">
-            {data.burnout_signals.map((signal, index) => (
-              <li key={index} className="text-yellow-300 flex items-center">
-                <span className="mr-2">•</span>
-                {signal}
-              </li>
-            ))}
-          </ul>
-        </div>
+        <InsightBanner
+          title="Burnout Signals Detected"
+          insights={data.burnout_signals.map((signal, index) => ({
+            id: `burnout-${index}`,
+            type: 'burnout_signal',
+            severity: 'warning',
+            message: signal,
+            rule: 'burnout_detection',
+            timestamp: Date.now() / 1000,
+          }))}
+          status="warn"
+          defaultExpanded={true}
+          className="mb-8"
+        />
       )}
 
       {/* Charts Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Daily Screen Time Line Chart */}
-        <div className="card">
-          <h3 className="card-title">Daily Screen Time</h3>
+        <GlassCard className="p-6">
+          <h3 className="text-lg font-semibold mb-4 text-text">Daily Screen Time</h3>
           <div className="h-64">
             {screenTimeData[0].data.length > 0 ? (
               <ResponsiveLine
@@ -400,11 +426,11 @@ export default function Dashboard() {
               </div>
             )}
           </div>
-        </div>
+        </GlassCard>
 
         {/* App Usage Pie Chart */}
-        <div className="card">
-          <h3 className="card-title">App Usage Distribution</h3>
+        <GlassCard className="p-6">
+          <h3 className="text-lg font-semibold mb-4 text-text">App Usage Distribution</h3>
           <div className="h-64">
             {appUsageData.length > 0 ? (
               <ResponsivePie
@@ -447,11 +473,11 @@ export default function Dashboard() {
               </div>
             )}
           </div>
-        </div>
+        </GlassCard>
 
         {/* Focus vs Distraction Trend Line */}
-        <div className="card">
-          <h3 className="card-title">Focus vs Distraction Trend</h3>
+        <GlassCard className="p-6">
+          <h3 className="text-lg font-semibold mb-4 text-text">Focus vs Distraction Trend</h3>
           <div className="h-64">
             {focusDistractionData[0].data.length > 0 ? (
               <ResponsiveLine
@@ -537,11 +563,11 @@ export default function Dashboard() {
               </div>
             )}
           </div>
-        </div>
+        </GlassCard>
 
         {/* Idle/Break Frequency Bar Chart */}
-        <div className="card">
-          <h3 className="card-title">Idle & Break Frequency</h3>
+        <GlassCard className="p-6">
+          <h3 className="text-lg font-semibold mb-4 text-text">Idle & Break Frequency</h3>
           <div className="h-64">
             {idleBreakData.length > 0 ? (
               <ResponsiveBar
@@ -629,12 +655,12 @@ export default function Dashboard() {
               </div>
             )}
           </div>
-        </div>
+        </GlassCard>
       </div>
 
       {/* Recent Activity */}
-      <div className="card">
-        <h3 className="card-title">Recent Activity</h3>
+      <GlassCard className="p-6">
+        <h3 className="text-lg font-semibold mb-4 text-text">Recent Activity</h3>
         <div className="space-y-2 max-h-64 overflow-y-auto">
           {data.recent_usage?.slice(0, 10).map((usage: any, index: number) => (
             <div key={index} className="flex justify-between items-center py-2 border-b border-white/10">
@@ -645,7 +671,7 @@ export default function Dashboard() {
             </div>
           ))}
         </div>
-      </div>
+      </GlassCard>
     </div>
   );
 }
