@@ -130,7 +130,7 @@ export default function MetricTile({
             {/* Hint */}
             {hint && (
               <motion.p 
-                className="text-xs text-text-muted leading-relaxed"
+                className="text-dashboard-sm text-text-muted leading-relaxed"
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
                 transition={{ delay: 0.2 }}

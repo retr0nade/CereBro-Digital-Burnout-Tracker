@@ -51,7 +51,7 @@ function MainArea({ children, sidebarCollapsed }: React.PropsWithChildren<MainAr
         {/* Footer */}
         <footer className="border-t border-border bg-surface/50 backdrop-blur-sm">
           <div className="max-w-screen-2xl mx-auto px-6 py-4">
-            <div className="flex items-center justify-between text-xs text-text-muted">
+            <div className="flex items-center justify-between text-dashboard-sm text-text-muted">
               <div className="flex items-center gap-4">
                 <span>© {new Date().getFullYear()} retr0nade</span>
                 <span className="hidden sm:inline">CereBro Mental Burnout Tracker</span>

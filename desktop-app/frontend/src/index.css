@@ -12,8 +12,8 @@
   --color-bg: #0a0a0a;
   --color-surface: #131313;
   --color-surface-alt: #1a1a1a;
-  --color-text: #f4f4f5;
-  --color-text-muted: #a1a1aa;
+  --color-text: #f9fafb; /* Improved contrast from #f4f4f5 */
+  --color-text-muted: #d1d5db; /* Improved contrast from #a1a1aa for 3:1 ratio */
   --color-brand: #3b82f6;
   --color-brand-hover: #2563eb;
   --color-brand-active: #1d4ed8;
@@ -43,8 +43,8 @@
   --color-bg: #ffffff;
   --color-surface: #f8fafc;
   --color-surface-alt: #f1f5f9;
-  --color-text: #0f172a;
-  --color-text-muted: #64748b;
+  --color-text: #0f172a; /* Already good contrast */
+  --color-text-muted: #4b5563; /* Improved contrast from #64748b for 3:1 ratio */
   --color-brand: #3b82f6;
   --color-brand-hover: #2563eb;
   --color-brand-active: #1d4ed8;
@@ -74,13 +74,61 @@ html, body, #root {
 body {
   font-family: 'Inter', 'Spline Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
   font-size: 15.5px;
-  line-height: 1.6;
+  line-height: 1.65; /* Increased from 1.6 for better readability */
   background-color: var(--color-bg);
   color: var(--color-text);
   font-feature-settings: 'cv11', 'ss01';
   font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Dashboard-specific text improvements */
+.dashboard-content {
+  font-size: 15.5px;
+  line-height: 1.65;
+}
+
+@media (min-width: 768px) {
+  .dashboard-content {
+    font-size: 16px;
+    line-height: 1.7;
+  }
+}
+
+/* Improved text defaults for better legibility */
+.text-dashboard-sm {
+  font-size: 13px;
+  line-height: 1.6;
+  letter-spacing: 0.025em;
+}
+
+.text-dashboard-base {
+  font-size: 15.5px;
+  line-height: 1.65;
+}
+
+@media (min-width: 768px) {
+  .text-dashboard-base {
+    font-size: 16px;
+  }
+}
+
+/* Improved section spacing */
+.section-spacing {
+  padding-top: 24px;
+  padding-bottom: 24px;
+}
+
+/* Improved card spacing */
+.card-spacing {
+  padding: 20px;
+}
+
+@media (min-width: 768px) {
+  .card-spacing {
+    padding: 22px;
+  }
 }
 
 /* Subtle background with noise texture */
@@ -164,9 +212,10 @@ body {
   transform: translateY(-1px);
 }
 
-/* Card components */
+/* Card components - Increased padding for better breathing room */
 .card { 
-  @apply glass p-6;
+  @apply glass;
+  padding: 22px; /* Increased from 24px (p-6) for better readability */
   border-radius: 1.25rem;
 }
 

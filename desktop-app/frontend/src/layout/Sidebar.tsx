@@ -151,7 +151,7 @@ export default function Sidebar({ currentView, onViewChange, collapsed = false, 
                     >
                       <span className="font-medium truncate">{item.label}</span>
                       {item.shortcut && (
-                        <span className="text-xs text-text-muted/60 font-mono">
+                        <span className="text-dashboard-sm text-text-muted/60 font-mono">
                           ⌘{item.shortcut}
                         </span>
                       )}
@@ -186,7 +186,7 @@ export default function Sidebar({ currentView, onViewChange, collapsed = false, 
                   >
                     {item.label}
                     {item.shortcut && (
-                      <span className="text-text-muted ml-2">⌘{item.shortcut}</span>
+                                              <span className="text-text-muted ml-2 text-dashboard-sm">⌘{item.shortcut}</span>
                     )}
                   </motion.div>
                 )}
@@ -204,7 +204,7 @@ export default function Sidebar({ currentView, onViewChange, collapsed = false, 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="text-xs text-text-muted text-center"
+              className="text-dashboard-sm text-text-muted text-center"
             >
               v{new Date().getFullYear()}
             </motion.div>

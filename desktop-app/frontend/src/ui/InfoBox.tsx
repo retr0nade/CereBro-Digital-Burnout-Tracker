@@ -127,7 +127,7 @@ export default function InfoBox({
       <div className="flex-1 min-w-0">
         <motion.h3
           className={clsx(
-            "font-medium text-sm leading-tight mb-1",
+            "font-medium text-dashboard-sm leading-tight mb-1",
             variant === 'empty' ? 'text-text-muted' : 'text-text'
           )}
           initial={{ opacity: 0, y: 5 }}
@@ -139,7 +139,7 @@ export default function InfoBox({
         
         <motion.p
           className={clsx(
-            "text-xs leading-relaxed",
+            "text-dashboard-sm leading-relaxed",
             styles.textColor
           )}
           initial={{ opacity: 0, y: 5 }}

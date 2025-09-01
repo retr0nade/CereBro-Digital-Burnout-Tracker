@@ -57,7 +57,7 @@ export default function Topbar({
             </div>
             <div className="hidden sm:block">
               <h1 className="font-semibold text-text">CereBro</h1>
-              <p className="text-xs text-text-muted -mt-0.5">Mental Burnout Tracker</p>
+              <p className="text-dashboard-sm text-text-muted -mt-0.5">Mental Burnout Tracker</p>
             </div>
           </motion.div>
         </div>
@@ -67,7 +67,7 @@ export default function Topbar({
           {/* Connection Status Chip */}
           <motion.div
             className={clsx(
-              "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium",
+              "flex items-center gap-2 px-3 py-1.5 rounded-full text-dashboard-sm font-medium",
               "border transition-all duration-200",
               backendStatus.running
                 ? "bg-ok-muted/20 border-ok/30 text-ok"
@@ -163,7 +163,7 @@ export default function Topbar({
             whileTap={{ scale: 0.98 }}
           >
             <Github className="w-4 h-4" />
-            <span className="hidden lg:inline text-xs font-medium uppercase tracking-wider">
+            <span className="hidden lg:inline text-dashboard-sm font-medium uppercase tracking-wider">
               GitHub
             </span>
           </motion.a>

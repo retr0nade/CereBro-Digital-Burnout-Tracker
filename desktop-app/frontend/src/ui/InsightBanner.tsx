@@ -150,7 +150,7 @@ export default function InsightBanner({
                 )} />
                 <span className="truncate">{insights[0].message}</span>
                 {insights.length > 1 && (
-                  <span className="text-xs bg-surface-alt px-2 py-0.5 rounded-full">
+                  <span className="text-dashboard-sm bg-surface-alt px-2 py-0.5 rounded-full">
                     +{insights.length - 1} more
                   </span>
                 )}
@@ -199,7 +199,7 @@ export default function InsightBanner({
                       <p className="text-sm text-text leading-relaxed">
                         {insight.message}
                       </p>
-                      <div className="flex items-center gap-3 mt-2 text-xs text-text-muted">
+                      <div className="flex items-center gap-3 mt-2 text-dashboard-sm text-text-muted">
                         <span className="capitalize font-medium">
                           {insight.type.replace('_', ' ')}
                         </span>

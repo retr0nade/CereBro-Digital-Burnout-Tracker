@@ -287,10 +287,10 @@ export default function Dashboard() {
   const idleBreakData = prepareIdleBreakData();
 
   return (
-    <div className="max-w-7xl mx-auto mt-4 p-4 space-y-4">
+    <div className="dashboard-content max-w-7xl mx-auto mt-4 p-4 space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Dashboard</h1>
-        <div className={`px-2 py-1 rounded text-xs ${
+        <div className={`px-3 py-1.5 rounded text-dashboard-sm ${
           backendConnected ? 'bg-green-500/20 text-green-300 border border-green-500/40' : 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/40'
         }`}>
           {backendConnected ? 'Connected (Tauri)' : 'Connected via HTTP'}
@@ -375,7 +375,7 @@ export default function Dashboard() {
       />
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Daily Screen Time Line Chart */}
-        <GlassCard className="p-6">
+        <GlassCard className="card-spacing">
           <SectionHeader
             title="Daily Screen Time"
             subtitle="Hourly breakdown of active computer usage"
@@ -418,14 +418,16 @@ export default function Dashboard() {
                   axis: {
                     ticks: {
                       text: {
-                        fill: '#a3a3a3',
-                        fontSize: 12
+                        fill: '#d1d5db', /* Improved contrast */
+                        fontSize: 13, /* Increased from 12px */
+                        letterSpacing: '0.025em' /* Added tracking-wide */
                       }
                     },
                     legend: {
                       text: {
-                        fill: '#a3a3a3',
-                        fontSize: 12
+                        fill: '#d1d5db', /* Improved contrast */
+                        fontSize: 13, /* Increased from 12px */
+                        letterSpacing: '0.025em' /* Added tracking-wide */
                       }
                     }
                   },
@@ -450,7 +452,7 @@ export default function Dashboard() {
         </GlassCard>
 
         {/* App Usage Pie Chart */}
-        <GlassCard className="p-6">
+        <GlassCard className="card-spacing">
           <SectionHeader
             title="App Usage Distribution"
             subtitle="Top applications by time spent"
@@ -506,7 +508,7 @@ export default function Dashboard() {
         </GlassCard>
 
         {/* Focus vs Distraction Trend Line */}
-        <GlassCard className="p-6">
+        <GlassCard className="card-spacing">
           <SectionHeader
             title="Focus vs Distraction Trend"
             subtitle="Productive vs non-productive time throughout the day"
@@ -549,14 +551,16 @@ export default function Dashboard() {
                   axis: {
                     ticks: {
                       text: {
-                        fill: '#a3a3a3',
-                        fontSize: 12
+                        fill: '#d1d5db', /* Improved contrast */
+                        fontSize: 13, /* Increased from 12px */
+                        letterSpacing: '0.025em' /* Added tracking-wide */
                       }
                     },
                     legend: {
                       text: {
-                        fill: '#a3a3a3',
-                        fontSize: 12
+                        fill: '#d1d5db', /* Improved contrast */
+                        fontSize: 13, /* Increased from 12px */
+                        letterSpacing: '0.025em' /* Added tracking-wide */
                       }
                     }
                   },
@@ -605,7 +609,7 @@ export default function Dashboard() {
         </GlassCard>
 
         {/* Idle/Break Frequency Bar Chart */}
-        <GlassCard className="p-6">
+        <GlassCard className="card-spacing">
           <SectionHeader
             title="Idle & Break Frequency"
             subtitle="When you step away from your computer"
@@ -650,14 +654,16 @@ export default function Dashboard() {
                   axis: {
                     ticks: {
                       text: {
-                        fill: '#a3a3a3',
-                        fontSize: 12
+                        fill: '#d1d5db', /* Improved contrast */
+                        fontSize: 13, /* Increased from 12px */
+                        letterSpacing: '0.025em' /* Added tracking-wide */
                       }
                     },
                     legend: {
                       text: {
-                        fill: '#a3a3a3',
-                        fontSize: 12
+                        fill: '#d1d5db', /* Improved contrast */
+                        fontSize: 13, /* Increased from 12px */
+                        letterSpacing: '0.025em' /* Added tracking-wide */
                       }
                     }
                   },
@@ -712,13 +718,13 @@ export default function Dashboard() {
         subtitle="Latest application usage events"
         tooltip="Real-time feed of your recent computer activity. Useful for reviewing what you've been working on and identifying patterns."
       />
-      <GlassCard className="p-6">
+      <GlassCard className="card-spacing">
         <div className="space-y-2 max-h-64 overflow-y-auto">
           {data.recent_usage && data.recent_usage.length > 0 ? (
             data.recent_usage.slice(0, 10).map((usage: any, index: number) => (
               <div key={index} className="flex justify-between items-center py-2 border-b border-white/10">
                 <span className="text-sm">{usage[0]}</span>
-                <span className="text-xs muted">
+                <span className="text-dashboard-sm muted">
                   {new Date(usage[2] * 1000).toLocaleTimeString()}
                 </span>
               </div>
