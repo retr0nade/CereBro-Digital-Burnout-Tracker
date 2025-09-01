@@ -178,10 +178,18 @@ class WebSocketService {
     }
   }
 
-  public onStatusChange(callback: (status: WebSocketStatus) => void) {
+  public onStatusChange(callback: (status: WebSocketStatus) => void): () => void {
     this.statusListeners.push(callback);
     // Immediately call with current status
     callback(this.status);
+
+    // Return unsubscribe function
+    return () => {
+      const index = this.statusListeners.indexOf(callback);
+      if (index !== -1) {
+        this.statusListeners.splice(index, 1);
+      }
+    };
   }
 
   public getStatus(): WebSocketStatus {

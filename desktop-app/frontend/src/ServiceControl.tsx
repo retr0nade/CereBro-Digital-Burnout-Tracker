@@ -24,7 +24,7 @@ declare global {
   }
 }
 
-export default function ServiceControl({ serviceName, displayName, description }: ServiceControlProps) {
+const ServiceControl: React.FC<ServiceControlProps> = ({ serviceName, displayName, description }) => {
   const [status, setStatus] = useState<ServiceStatus | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -95,7 +95,7 @@ export default function ServiceControl({ serviceName, displayName, description }
   const isStopped = status?.status === 'stopped' || status?.status === 'not_initialized';
 
   return (
-    <div className="bg-white bg-opacity-10 rounded-lg p-4 shadow-lg border border-gray-200 border-opacity-20">
+    <div className="card">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center space-x-3">
           <div 
@@ -108,8 +108,8 @@ export default function ServiceControl({ serviceName, displayName, description }
             }`}
           />
           <div>
-            <h3 className="text-lg font-semibold text-white">{displayName}</h3>
-            <p className="text-sm text-gray-300">{description}</p>
+            <h3 className="text-lg font-semibold">{displayName}</h3>
+            <p className="text-sm muted">{description}</p>
           </div>
         </div>
         
@@ -118,7 +118,7 @@ export default function ServiceControl({ serviceName, displayName, description }
             <button
               onClick={stopService}
               disabled={loading}
-              className="px-4 py-2 text-sm bg-red-600 hover:bg-red-700 disabled:bg-red-800 text-white rounded transition-colors"
+              className="btn btn-danger"
             >
               {loading ? 'Stopping...' : 'Stop'}
             </button>
@@ -126,7 +126,7 @@ export default function ServiceControl({ serviceName, displayName, description }
             <button
               onClick={startService}
               disabled={loading}
-              className="px-4 py-2 text-sm bg-green-600 hover:bg-green-700 disabled:bg-green-800 text-white rounded transition-colors"
+              className="btn btn-primary"
             >
               {loading ? 'Starting...' : 'Start'}
             </button>
@@ -137,7 +137,7 @@ export default function ServiceControl({ serviceName, displayName, description }
       {status && (
         <div className="grid grid-cols-2 gap-4 text-sm">
           <div>
-            <span className="text-gray-400">Status:</span>
+            <span className="muted">Status:</span>
             <span className={`ml-2 font-medium ${
               isRunning ? 'text-green-400' : 
               isStopped ? 'text-red-400' : 'text-yellow-400'
@@ -148,8 +148,8 @@ export default function ServiceControl({ serviceName, displayName, description }
           
           {status.restart_count > 0 && (
             <div>
-              <span className="text-gray-400">Restarts:</span>
-              <span className="ml-2 text-white">
+              <span className="muted">Restarts:</span>
+              <span className="ml-2">
                 {status.restart_count}/{status.max_restarts}
               </span>
             </div>
@@ -157,14 +157,14 @@ export default function ServiceControl({ serviceName, displayName, description }
           
           {status.uptime && (
             <div>
-              <span className="text-gray-400">Uptime:</span>
-              <span className="ml-2 text-white">{status.uptime}</span>
+              <span className="muted">Uptime:</span>
+              <span className="ml-2">{status.uptime}</span>
             </div>
           )}
           
           {status.last_error && (
             <div className="col-span-2">
-              <span className="text-gray-400">Last Error:</span>
+              <span className="muted">Last Error:</span>
               <span className="ml-2 text-red-400 text-xs">{status.last_error}</span>
             </div>
           )}
@@ -172,10 +172,12 @@ export default function ServiceControl({ serviceName, displayName, description }
       )}
 
       {error && (
-        <div className="mt-3 p-2 bg-red-500 bg-opacity-20 border border-red-500 rounded text-red-300 text-sm">
+        <div className="mt-3 p-2 border border-red-500/40 rounded text-red-300 text-sm">
           {error}
         </div>
       )}
     </div>
   );
 }
+
+export default ServiceControl;

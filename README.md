@@ -248,7 +248,7 @@ api_config = config.get_api_config()
 
 # Update configuration
 config.update_config({
-    "api": {"port": 5006},
+    "api": {"port": 5005},
     "services": {"window_tracker": {"log_interval": 2.0}}
 })
 ```

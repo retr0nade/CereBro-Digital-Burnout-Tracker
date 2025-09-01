@@ -465,73 +465,42 @@ class IdleMonitor:
                 pass
     
     def get_recent_idle_periods(self, hours: int = 24) -> list:
-        """Get recent idle periods"""
+        """Get recent idle periods from unified database"""
         try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            
-            # Get idle periods from last N hours
-            cutoff_time = datetime.now() - timedelta(hours=hours)
-            
-            cursor.execute('''
-                SELECT idle_start, idle_end, duration_seconds, timeout_seconds
-                FROM idle_activity
-                WHERE idle_start >= ?
-                ORDER BY idle_start DESC
-            ''', (cutoff_time,))
-            
-            results = cursor.fetchall()
-            conn.close()
-            
-            return results
-            
+            cutoff_ts = int(time.time()) - (hours * 3600)
+            rows = self.cerebro_db.get_idle_periods(limit=1000)
+            filtered = [r for r in rows if r.get('start_time', 0) >= cutoff_ts]
+            return [
+                {
+                    'start_time': r.get('start_time'),
+                    'end_time': r.get('end_time'),
+                    'duration': r.get('duration', 0)
+                }
+                for r in filtered
+            ]
         except Exception as e:
             self.logger.error(f"Failed to get recent idle periods: {e}")
             return []
     
     def get_idle_summary(self, hours: int = 24) -> Dict[str, Any]:
-        """Get summary of idle activity"""
+        """Get summary of idle activity from unified database"""
         try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            
-            cutoff_time = datetime.now() - timedelta(hours=hours)
-            
-            cursor.execute('''
-                SELECT 
-                    COUNT(*) as total_periods,
-                    SUM(duration_seconds) as total_idle_time,
-                    AVG(duration_seconds) as avg_idle_duration,
-                    MAX(duration_seconds) as max_idle_duration,
-                    MIN(duration_seconds) as min_idle_duration
-                FROM idle_activity
-                WHERE idle_start >= ?
-            ''', (cutoff_time,))
-            
-            result = cursor.fetchone()
-            conn.close()
-            
-            if result and result[0] > 0:
-                total_periods, total_idle_time, avg_duration, max_duration, min_duration = result
-                
-                return {
-                    'total_periods': total_periods,
-                    'total_idle_time': total_idle_time or 0,
-                    'avg_idle_duration': avg_duration or 0,
-                    'max_idle_duration': max_duration or 0,
-                    'min_idle_duration': min_duration or 0,
-                    'hours_analyzed': hours
-                }
-            else:
-                return {
-                    'total_periods': 0,
-                    'total_idle_time': 0,
-                    'avg_idle_duration': 0,
-                    'max_idle_duration': 0,
-                    'min_idle_duration': 0,
-                    'hours_analyzed': hours
-                }
-            
+            cutoff_ts = int(time.time()) - (hours * 3600)
+            rows = [r for r in self.cerebro_db.get_idle_periods(limit=5000) if r.get('start_time', 0) >= cutoff_ts]
+            total_periods = len(rows)
+            durations = [int(r.get('duration', 0) or 0) for r in rows]
+            total_idle_time = sum(durations)
+            avg_idle_duration = (total_idle_time / total_periods) if total_periods else 0
+            max_idle_duration = max(durations) if durations else 0
+            min_idle_duration = min(durations) if durations else 0
+            return {
+                'total_periods': total_periods,
+                'total_idle_time': total_idle_time,
+                'avg_idle_duration': avg_idle_duration,
+                'max_idle_duration': max_idle_duration,
+                'min_idle_duration': min_idle_duration,
+                'hours_analyzed': hours
+            }
         except Exception as e:
             self.logger.error(f"Failed to get idle summary: {e}")
             return {

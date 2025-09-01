@@ -4,6 +4,7 @@ from data.models import get_pref, store_pref
 from data.unified_schema import BurnoutTrackerDB, AppUsage, IdlePeriod, InputActivity, FocusSession, BreakLog, BreakType
 from metrics.util import calculate_focus_score, detect_burnout_signals, format_duration
 from cerebro_db import CerebroDB
+from ai_insights import compute_insights
 import json
 import time
 import csv
@@ -121,6 +122,15 @@ def get_metrics():
             "metrics_summary": metrics_data,
             "daily_summary": daily_summary
         })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@api.route('/insights', methods=['GET'])
+def get_insights():
+    """Compute and return AI insights based on recent activity."""
+    try:
+        results = compute_insights(unified_db)
+        return jsonify(results)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

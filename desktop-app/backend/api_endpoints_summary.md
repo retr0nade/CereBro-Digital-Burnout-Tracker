@@ -191,7 +191,7 @@ Successfully implemented and verified all required API endpoints for the CereBro
 
 ### Flask App Configuration
 - **Host**: localhost
-- **Port**: 5006 (configurable via config.json)
+- **Port**: 5005 (configurable via config.json)
 - **Debug Mode**: False (production-ready)
 - **Database Path**: Configurable via config.json
 
@@ -217,32 +217,32 @@ Successfully implemented and verified all required API endpoints for the CereBro
 ### Testing with curl
 ```bash
 # Get service status
-curl http://localhost:5006/api/status
+curl http://localhost:5005/api/status
 
 # Get app usage logs (limit 50)
-curl http://localhost:5006/api/logs/app_usage?limit=50
+curl http://localhost:5005/api/logs/app_usage?limit=50
 
 # Get idle logs
-curl http://localhost:5006/api/logs/idle
+curl http://localhost:5005/api/logs/idle
 
 # Get input activity logs
-curl http://localhost:5006/api/logs/input
+curl http://localhost:5005/api/logs/input
 
 # Get focus session logs
-curl http://localhost:5006/api/logs/focus
+curl http://localhost:5005/api/logs/focus
 
 # Get break logs
-curl http://localhost:5006/api/logs/breaks
+curl http://localhost:5005/api/logs/breaks
 
 # Get browser activity logs
-curl http://localhost:5006/api/logs/browser
+curl http://localhost:5005/api/logs/browser
 ```
 
 ### Testing with Python requests
 ```python
 import requests
 
-base_url = "http://localhost:5006"
+base_url = "http://localhost:5005"
 
 # Test all endpoints
 endpoints = [

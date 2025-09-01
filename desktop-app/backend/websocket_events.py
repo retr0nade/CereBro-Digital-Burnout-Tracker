@@ -83,8 +83,9 @@ def get_event_manager() -> WebSocketEventManager:
     """Get the global event manager instance"""
     return event_manager
 
-def setup_socketio_handlers(socketio: SocketIO):
+def setup_socketio_handlers(socketio: SocketIO) -> None:
     """Setup SocketIO event handlers"""
+    global event_manager
     
     @socketio.on('connect')
     def handle_connect():

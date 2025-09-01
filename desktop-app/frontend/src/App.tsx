@@ -6,6 +6,8 @@ import Settings from "./Settings";
 import ServiceManager from "./ServiceManager";
 import DataExport from "./DataExport";
 import BackendStatus from "./BackendStatus";
+import { useEffect as useReactEffect, useState as useReactState } from 'react';
+import { toast } from './services/eventHandlers';
 
 interface BackendStatusType {
   running: boolean;
@@ -54,9 +56,11 @@ export default function App() {
       if (window.__TAURI__) {
         await window.__TAURI__.invoke('start_backend_command');
         setTimeout(checkBackendStatus, 1000);
+        toast.notify('success', 'Backend started');
       }
     } catch (error) {
       console.error('Failed to start backend:', error);
+      toast.notify('error', 'Failed to start backend');
     }
   };
 
@@ -65,113 +69,100 @@ export default function App() {
       if (window.__TAURI__) {
         await window.__TAURI__.invoke('stop_backend_command');
         setTimeout(checkBackendStatus, 1000);
+        toast.notify('success', 'Backend stopped');
       }
     } catch (error) {
       console.error('Failed to stop backend:', error);
+      toast.notify('error', 'Failed to stop backend');
     }
   };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-700 text-white selection:bg-pink-400/40">
-      {/* Header Bar */}
-      <div className="w-full bg-black bg-opacity-20 px-8 py-4 flex items-center justify-between shadow">
-        <div className="flex items-center space-x-6">
-          <h1 className="text-2xl font-bold text-pink-400 tracking-tight">CereBro Burnout Tracker</h1>
-          
-          {/* Navigation */}
-          <nav className="flex space-x-4">
-            <button
-              onClick={() => setCurrentView('dashboard')}
-              className={`px-3 py-2 rounded-lg transition-colors ${
-                currentView === 'dashboard' 
-                  ? 'bg-pink-500 text-white' 
-                  : 'text-gray-300 hover:text-white hover:bg-pink-500/20'
-              }`}
-            >
-              Dashboard
-            </button>
-            <button
-              onClick={() => setCurrentView('realtime')}
-              className={`px-3 py-2 rounded-lg transition-colors ${
-                currentView === 'realtime' 
-                  ? 'bg-pink-500 text-white' 
-                  : 'text-gray-300 hover:text-white hover:bg-pink-500/20'
-              }`}
-            >
-              Real-time
-            </button>
-            <button
-              onClick={() => setCurrentView('screentime')}
-              className={`px-3 py-2 rounded-lg transition-colors ${
-                currentView === 'screentime' 
-                  ? 'bg-pink-500 text-white' 
-                  : 'text-gray-300 hover:text-white hover:bg-pink-500/20'
-              }`}
-            >
-              Screen Time
-            </button>
-            <button
-              onClick={() => setCurrentView('settings')}
-              className={`px-3 py-2 rounded-lg transition-colors ${
-                currentView === 'settings' 
-                  ? 'bg-pink-500 text-white' 
-                  : 'text-gray-300 hover:text-white hover:bg-pink-500/20'
-              }`}
-            >
-              Settings
-            </button>
-            <button
-              onClick={() => setCurrentView('services')}
-              className={`px-3 py-2 rounded-lg transition-colors ${
-                currentView === 'services' 
-                  ? 'bg-pink-500 text-white' 
-                  : 'text-gray-300 hover:text-white hover:bg-pink-500/20'
-              }`}
-            >
-              Services
-            </button>
-            <button
-              onClick={() => setCurrentView('export')}
-              className={`px-3 py-2 rounded-lg transition-colors ${
-                currentView === 'export' 
-                  ? 'bg-pink-500 text-white' 
-                  : 'text-gray-300 hover:text-white hover:bg-pink-500/20'
-              }`}
-            >
-              Export
-            </button>
-          </nav>
-        </div>
+  const navItem = (key: typeof currentView, label: string) => (
+    <button
+      onClick={() => setCurrentView(key)}
+      className={`w-full text-left px-3 py-2 rounded-md transition-colors ${
+        currentView === key
+          ? 'bg-brand-600/20 text-white border border-brand-600/40'
+          : 'text-neutral-300 hover:text-white hover:bg-white/5'
+      }`}
+    >
+      {label}
+    </button>
+  );
 
-        <div className="flex items-center space-x-4">
-          {/* Backend Status */}
-          <BackendStatus 
-            status={backendStatus}
-            onStart={startBackend}
-            onStop={stopBackend}
-          />
-          
-          <span className="text-xs uppercase tracking-widest text-white/70 font-semibold">
-            <a className="hover:underline" target="_blank" rel="noopener noreferrer" href="https://github.com/retr0nade/CereBro-Mental-Burnout-Tracker">
-              GitHub
-            </a>
-          </span>
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => 'dark');
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme === 'dark') root.classList.add('dark'); else root.classList.remove('dark');
+  }, [theme]);
+
+  const [toasts, setToasts] = useState<Array<{id:number; type:string; message:string}>>([]);
+  useEffect(() => toast.subscribe(setToasts), []);
+
+  return (
+    <div className="app-shell selection:bg-brand-400/30">
+      <div className="flex min-h-screen">
+        {/* Sidebar */}
+        <aside className="hidden md:flex md:w-64 flex-col gap-2 p-4 glass">
+          <div className="flex items-center justify-between mb-2">
+            <h1 className="text-xl font-bold text-brand-400">CereBro</h1>
+            <button
+              className="btn btn-secondary px-2 py-1 text-xs"
+              onClick={() => setTheme(t => (t === 'dark' ? 'light' : 'dark'))}
+              title="Toggle theme"
+            >
+              {theme === 'dark' ? 'Light' : 'Dark'}
+            </button>
+          </div>
+          <nav className="space-y-1">
+            {navItem('dashboard', 'Dashboard')}
+            {navItem('realtime', 'Real-time')}
+            {navItem('screentime', 'Screen Time')}
+            {navItem('services', 'Services')}
+            {navItem('settings', 'Settings')}
+            {navItem('export', 'Export')}
+          </nav>
+          <div className="mt-auto text-[10px] text-neutral-400">
+            v{new Date().getFullYear()}
+          </div>
+        </aside>
+
+        {/* Main area */}
+        <div className="flex-1 flex flex-col">
+          {/* Top bar */}
+          <header className="glass px-4 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="md:hidden font-semibold text-brand-400">CereBro</span>
+              <div className="hidden md:block text-sm muted">Mental Burnout Tracker</div>
+            </div>
+            <div className="flex items-center gap-3">
+              <BackendStatus status={backendStatus} onStart={startBackend} onStop={stopBackend} />
+              <a className="text-xs uppercase tracking-widest text-white/70 hover:underline" target="_blank" rel="noopener noreferrer" href="https://github.com/retr0nade/CereBro-Mental-Burnout-Tracker">GitHub</a>
+            </div>
+          </header>
+
+          {/* Content */}
+          <main className="p-4">
+            {currentView === 'dashboard' && <Dashboard />}
+            {currentView === 'realtime' && <RealTimeDashboard />}
+            {currentView === 'screentime' && <ScreenTime />}
+            {currentView === 'settings' && <Settings />}
+            {currentView === 'services' && <ServiceManager />}
+            {currentView === 'export' && <DataExport />}
+          </main>
+
+          <footer className="px-4 py-3 text-center text-xs text-white/40">
+            © {new Date().getFullYear()} retr0nade — CereBro Mental Burnout Tracker
+          </footer>
         </div>
       </div>
 
-      {/* Main Content */}
-      <main className="flex flex-col items-center justify-center px-2">
-        {currentView === 'dashboard' && <Dashboard />}
-        {currentView === 'realtime' && <RealTimeDashboard />}
-        {currentView === 'screentime' && <ScreenTime />}
-        {currentView === 'settings' && <Settings />}
-        {currentView === 'services' && <ServiceManager />}
-        {currentView === 'export' && <DataExport />}
-      </main>
-
-      <footer className="w-full py-4 text-center text-xs text-white/40 mt-8">
-        © {new Date().getFullYear()} retr0nade — CereBro Mental Burnout Tracker
-      </footer>
+      {/* Toasts */}
+      <div className="fixed bottom-4 right-4 space-y-2 z-50">
+        {toasts.map(t => (
+          <div key={t.id} className={`px-3 py-2 rounded shadow text-sm ${t.type === 'error' ? 'bg-red-600 text-white' : 'bg-neutral-800 text-white'}`}>{t.message}</div>
+        ))}
+      </div>
     </div>
   );
 }

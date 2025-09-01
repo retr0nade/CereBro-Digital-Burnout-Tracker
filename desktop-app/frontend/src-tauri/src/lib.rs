@@ -44,6 +44,8 @@ pub fn run() {
     };
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_http::init())
+        .plugin(tauri_plugin_shell::init())
         .manage(backend_state)
         .setup(|app| {
             if cfg!(debug_assertions) {
@@ -118,7 +120,30 @@ async fn stop_backend_command(app: tauri::AppHandle) -> Result<(), String> {
 #[tauri::command]
 async fn get_backend_status(app: tauri::AppHandle) -> Result<BackendStatus, String> {
     let backend_state = app.state::<BackendState>();
-    let status = backend_state.status.lock().unwrap();
+    
+    // Check if backend is actually running by calling health endpoint
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(5))
+        .build()
+        .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
+    
+    let is_running = match client.get("http://localhost:5005/api/health").send().await {
+        Ok(response) => response.status().is_success(),
+        Err(e) => {
+            println!("Backend health check failed: {:?}", e);
+            false
+        }
+    };
+    
+    // Update the status based on actual health check
+    let mut status = backend_state.status.lock().unwrap();
+    status.running = is_running;
+    if !is_running {
+        status.error = Some("Backend is not responding".to_string());
+    } else {
+        status.error = None;
+    }
+    
     Ok(BackendStatus {
         running: status.running,
         port: status.port,
@@ -137,16 +162,23 @@ async fn check_backend_health() -> Result<bool, String> {
 
 #[tauri::command]
 async fn get_system_metrics() -> Result<serde_json::Value, String> {
-    let client = reqwest::Client::new();
-    match client.get("http://localhost:5006/api/metrics").send().await {
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .build()
+        .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
+    
+    match client.get("http://localhost:5005/api/metrics").send().await {
         Ok(response) => {
             if response.status().is_success() {
-                response.json().await.map_err(|e| e.to_string())
+                response.json().await.map_err(|e| format!("Failed to parse JSON: {}", e))
             } else {
-                Err("Backend returned error status".to_string())
+                Err(format!("Backend returned error status: {}", response.status()))
             }
         }
-        Err(e) => Err(format!("Failed to connect to backend: {}", e)),
+        Err(e) => {
+            println!("Metrics request failed: {:?}", e);
+            Err(format!("Failed to connect to backend: {}", e))
+        }
     }
 }
 
@@ -156,7 +188,7 @@ async fn start_service(name: String) -> Result<ServiceControlResponse, String> {
     
     // Call the Python backend API to start the service
     let response = client
-        .post(&format!("http://localhost:5006/api/service/{}/start", name))
+        .post(&format!("http://localhost:5005/api/service/{}/start", name))
         .send()
         .await
         .map_err(|e| format!("Failed to connect to backend: {}", e))?;
@@ -179,7 +211,7 @@ async fn stop_service(name: String) -> Result<ServiceControlResponse, String> {
     
     // Call the Python backend API to stop the service
     let response = client
-        .post(&format!("http://localhost:5006/api/service/{}/stop", name))
+        .post(&format!("http://localhost:5005/api/service/{}/stop", name))
         .send()
         .await
         .map_err(|e| format!("Failed to connect to backend: {}", e))?;
@@ -202,7 +234,7 @@ async fn get_service_status() -> Result<HashMap<String, ServiceStatus>, String> 
     
     // Call the Python backend API to get service status
     let response = client
-        .get("http://localhost:5006/api/status")
+        .get("http://localhost:5005/api/status")
         .send()
         .await
         .map_err(|e| format!("Failed to connect to backend: {}", e))?;
@@ -226,3 +258,4 @@ async fn get_service_status() -> Result<HashMap<String, ServiceStatus>, String> 
         Err(format!("Backend returned error: {}", error_text))
     }
 }
+

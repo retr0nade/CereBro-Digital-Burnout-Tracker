@@ -26,7 +26,7 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; connect-src 'self' http://localhost:5005 ws://localhost:5005"
     }
   },
   "bundle": {
@@ -39,10 +39,5 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
-  },
-  "plugins": {
-    "log": {
-      "level": "info"
-    }
   }
 }

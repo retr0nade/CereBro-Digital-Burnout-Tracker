@@ -273,10 +273,10 @@ class WindowTracker:
                     norm_end = int(end_time)
 
                 self.cerebro_db.insert_app_usage(
-                    app_name=app_name,
-                    start_time=norm_start,
-                    end_time=norm_end,
-                    duration=int(duration)
+                    app_name,
+                    norm_start,
+                    norm_end,
+                    int(duration)
                 )
                 
                 self.logger.debug(f"Logged: {app_name} - {duration:.1f}s")
@@ -525,71 +525,57 @@ class WindowTracker:
                 pass
     
     def get_recent_activity(self, hours: int = 24) -> list:
-        """Get recent window activity"""
+        """Get recent window activity from unified database"""
         try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            
-            # Get activity from last N hours
-            cutoff_time = datetime.now() - timedelta(hours=hours)
-            
-            cursor.execute('''
-                SELECT app_name, window_title, start_time, end_time, duration_seconds
-                FROM window_activity
-                WHERE start_time >= ?
-                ORDER BY start_time DESC
-            ''', (cutoff_time,))
-            
-            results = cursor.fetchall()
-            conn.close()
-            
-            return results
-            
+            cutoff_ts = int(time.time()) - (hours * 3600)
+            rows = self.cerebro_db.get_app_usage(limit=1000)
+            filtered = [r for r in rows if r.get('start_time', 0) >= cutoff_ts]
+            # Map to a simple structure compatible with existing consumers
+            return [
+                {
+                    'app_name': r.get('app_name'),
+                    'window_title': None,
+                    'start_time': r.get('start_time'),
+                    'end_time': r.get('end_time'),
+                    'duration': r.get('duration', 0)
+                }
+                for r in filtered
+            ]
         except Exception as e:
             self.logger.error(f"Failed to get recent activity: {e}")
             return []
     
     def get_app_summary(self, hours: int = 24) -> Dict[str, Any]:
-        """Get summary of app usage"""
+        """Get summary of app usage from unified database"""
         try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            
-            cutoff_time = datetime.now() - timedelta(hours=hours)
-            
-            cursor.execute('''
-                SELECT 
-                    app_name,
-                    COUNT(*) as sessions,
-                    SUM(duration_seconds) as total_duration,
-                    AVG(duration_seconds) as avg_duration
-                FROM window_activity
-                WHERE start_time >= ?
-                GROUP BY app_name
-                ORDER BY total_duration DESC
-            ''', (cutoff_time,))
-            
-            results = cursor.fetchall()
-            conn.close()
-            
-            summary = {
+            cutoff_ts = int(time.time()) - (hours * 3600)
+            rows = self.cerebro_db.get_app_usage(limit=5000)
+            filtered = [r for r in rows if r.get('start_time', 0) >= cutoff_ts]
+            summary: Dict[str, Any] = {
                 'apps': [],
                 'total_sessions': 0,
                 'total_duration': 0
             }
-            
-            for app_name, sessions, total_duration, avg_duration in results:
+            agg: Dict[str, Dict[str, Any]] = {}
+            for r in filtered:
+                name = r.get('app_name') or 'Unknown'
+                duration = int(r.get('duration', 0) or 0)
+                stats = agg.setdefault(name, {'sessions': 0, 'total_duration': 0})
+                stats['sessions'] += 1
+                stats['total_duration'] += duration
+            for name, stats in sorted(agg.items(), key=lambda kv: kv[1]['total_duration'], reverse=True):
+                total_duration = stats['total_duration']
+                sessions = stats['sessions']
+                avg_duration = (total_duration / sessions) if sessions else 0
                 summary['apps'].append({
-                    'name': app_name,
+                    'name': name,
                     'sessions': sessions,
                     'total_duration': total_duration,
                     'avg_duration': avg_duration
                 })
                 summary['total_sessions'] += sessions
                 summary['total_duration'] += total_duration
-            
             return summary
-            
         except Exception as e:
             self.logger.error(f"Failed to get app summary: {e}")
             return {'apps': [], 'total_sessions': 0, 'total_duration': 0}

@@ -1,3 +1,36 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* App base styles */
+:root {
+  color-scheme: dark;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  @apply bg-neutral-900 text-neutral-100 antialiased;
+}
+
+.app-shell {
+  @apply min-h-screen bg-gradient-to-br from-neutral-900 via-neutral-900 to-neutral-800 text-neutral-100;
+}
+
+.glass {
+  @apply bg-white/5 backdrop-blur border border-white/10 shadow;
+}
+
+.btn {
+  @apply inline-flex items-center justify-center rounded-md px-3 py-2 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 disabled:opacity-50 disabled:pointer-events-none;
+}
+
+.btn-primary { @apply bg-brand-600 hover:bg-brand-500 text-white; }
+.btn-secondary { @apply bg-neutral-700 hover:bg-neutral-600 text-white; }
+.btn-danger { @apply bg-red-600 hover:bg-red-500 text-white; }
+
+.card { @apply glass rounded-xl p-4; }
+.card-title { @apply text-lg font-semibold mb-2; }
+.muted { @apply text-neutral-400; }

@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "tauri": "tauri",
-    "start": "react-scripts --openssl-legacy-provider start",
+    "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"

@@ -42,19 +42,9 @@ export default function BackendStatus({ status, onStart, onStop }: BackendStatus
       {/* Control Buttons */}
       <div className="flex space-x-2">
         {status.running ? (
-          <button
-            onClick={onStop}
-            className="px-3 py-1 text-xs bg-red-600 hover:bg-red-700 text-white rounded transition-colors"
-          >
-            Stop
-          </button>
+          <button onClick={onStop} className="btn btn-danger px-2 py-1 text-xs">Stop</button>
         ) : (
-          <button
-            onClick={onStart}
-            className="px-3 py-1 text-xs bg-green-600 hover:bg-green-700 text-white rounded transition-colors"
-          >
-            Start
-          </button>
+          <button onClick={onStart} className="btn btn-primary px-2 py-1 text-xs">Start</button>
         )}
       </div>
     </div>

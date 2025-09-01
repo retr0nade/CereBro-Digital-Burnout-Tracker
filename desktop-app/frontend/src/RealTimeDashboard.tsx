@@ -204,11 +204,11 @@ export default function RealTimeDashboard() {
 
   if (loading) {
     return (
-      <div className="max-w-4xl mx-auto mt-8 p-6">
-        <div className="bg-white bg-opacity-10 rounded-xl p-6 shadow-lg">
+      <div className="max-w-6xl mx-auto mt-4 p-4">
+        <div className="card">
           <div className="animate-pulse">
-            <div className="h-4 bg-gray-300 rounded w-1/4 mb-4"></div>
-            <div className="h-32 bg-gray-300 rounded"></div>
+            <div className="h-4 bg-neutral-700 rounded w-1/4 mb-4"></div>
+            <div className="h-32 bg-neutral-800 rounded"></div>
           </div>
         </div>
       </div>
@@ -217,8 +217,8 @@ export default function RealTimeDashboard() {
 
   if (error) {
     return (
-      <div className="max-w-4xl mx-auto mt-8 p-6">
-        <div className="bg-red-500 bg-opacity-20 rounded-xl p-6 shadow-lg border border-red-500">
+      <div className="max-w-6xl mx-auto mt-4 p-4">
+        <div className="card border border-red-500/40">
           <h2 className="text-xl font-bold text-red-400 mb-2">Connection Error</h2>
           <p className="text-red-300">{error}</p>
           <p className="text-sm text-red-400 mt-2">
@@ -227,12 +227,7 @@ export default function RealTimeDashboard() {
               : 'Backend service is not available'
             }
           </p>
-          <button 
-            onClick={fetchData}
-            className="mt-4 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-          >
-            Retry
-          </button>
+          <button onClick={fetchData} className="btn btn-danger mt-4">Retry</button>
         </div>
       </div>
     );
@@ -280,8 +275,8 @@ export default function RealTimeDashboard() {
   }));
 
   return (
-    <div className="max-w-6xl mx-auto mt-8 p-6">
-      <h1 className="text-3xl font-bold mb-6 text-center">Real-Time CereBro Dashboard</h1>
+    <div className="max-w-6xl mx-auto mt-4 p-4">
+      <h1 className="text-2xl font-semibold mb-4">Real-Time</h1>
       
       {/* Connection Status */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
@@ -327,29 +322,29 @@ export default function RealTimeDashboard() {
       </div>
       
       {/* Real-time Metrics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-6 shadow-lg">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+        <div className="card">
           <div className="text-center">
             <div className="text-4xl font-bold text-white">{data.focus_score}%</div>
             <div className="text-green-100">Focus Score</div>
           </div>
         </div>
         
-        <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-6 shadow-lg">
+        <div className="card">
           <div className="text-center">
             <div className="text-4xl font-bold text-white">{data.metrics_summary.app_switches}</div>
             <div className="text-blue-100">App Switches</div>
           </div>
         </div>
         
-        <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-6 shadow-lg">
+        <div className="card">
           <div className="text-center">
             <div className="text-4xl font-bold text-white">{data.metrics_summary.idle_events}</div>
             <div className="text-purple-100">Idle Events</div>
           </div>
         </div>
 
-        <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl p-6 shadow-lg">
+        <div className="card">
           <div className="text-center">
             <div className="text-4xl font-bold text-white">
               {realTimeMetrics.idleStatus?.is_idle ? 'Idle' : 'Active'}
@@ -360,10 +355,10 @@ export default function RealTimeDashboard() {
       </div>
 
       {/* Real-time Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
         {/* Input Activity Chart */}
-        <div className="bg-white bg-opacity-10 rounded-xl p-6 shadow-lg">
-          <h3 className="text-xl font-bold mb-4">Real-time Input Activity</h3>
+        <div className="card">
+          <h3 className="card-title">Real-time Input Activity</h3>
           <div className="h-64">
             {inputActivityData[0].data.length > 0 ? (
               <ResponsiveLine
@@ -407,7 +402,7 @@ export default function RealTimeDashboard() {
                     itemDirection: 'left-to-right',
                     itemWidth: 80,
                     itemHeight: 20,
-                    itemTextColor: '#999',
+                    itemTextColor: '#a3a3a3',
                     symbolSize: 12,
                     symbolShape: 'circle',
                     effects: [
@@ -422,7 +417,7 @@ export default function RealTimeDashboard() {
                 ]}
               />
             ) : (
-              <div className="h-full flex items-center justify-center text-gray-400">
+              <div className="h-full flex items-center justify-center muted">
                 <p>No input activity data available</p>
               </div>
             )}
@@ -430,8 +425,8 @@ export default function RealTimeDashboard() {
         </div>
 
         {/* App Usage Pie Chart */}
-        <div className="bg-white bg-opacity-10 rounded-xl p-6 shadow-lg">
-          <h3 className="text-xl font-bold mb-4">Recent App Usage</h3>
+        <div className="card">
+          <h3 className="card-title">Recent App Usage</h3>
           <div className="h-64">
             {appUsageData.length > 0 ? (
               <ResponsivePie
@@ -460,7 +455,7 @@ export default function RealTimeDashboard() {
                     itemsSpacing: 0,
                     itemWidth: 100,
                     itemHeight: 18,
-                    itemTextColor: '#999',
+                    itemTextColor: '#a3a3a3',
                     itemDirection: 'left-to-right',
                     itemOpacity: 1,
                     symbolSize: 18,
@@ -477,7 +472,7 @@ export default function RealTimeDashboard() {
                 ]}
               />
             ) : (
-              <div className="h-full flex items-center justify-center text-gray-400">
+              <div className="h-full flex items-center justify-center muted">
                 <p>No app usage data available</p>
               </div>
             )}
@@ -486,37 +481,37 @@ export default function RealTimeDashboard() {
       </div>
 
       {/* Real-time Activity Feed */}
-      <div className="bg-white bg-opacity-10 rounded-xl p-6 shadow-lg">
-        <h3 className="text-xl font-bold mb-4">Real-time Activity Feed</h3>
+      <div className="card">
+        <h3 className="card-title">Real-time Activity Feed</h3>
         <div className="space-y-2 max-h-64 overflow-y-auto">
           {realTimeMetrics.appUsage.slice(-10).reverse().map((usage, index) => (
-            <div key={index} className="flex justify-between items-center py-2 border-b border-gray-600">
+            <div key={index} className="flex justify-between items-center py-2 border-b border-white/10">
               <span className="text-sm">📱 {usage.app_name}</span>
-              <span className="text-xs text-gray-400">
+              <span className="text-xs muted">
                 {usage.duration}s • {new Date(usage.timestamp * 1000).toLocaleTimeString()}
               </span>
             </div>
           ))}
           {realTimeMetrics.inputActivity.slice(-5).reverse().map((activity, index) => (
-            <div key={`input-${index}`} className="flex justify-between items-center py-2 border-b border-gray-600">
+            <div key={`input-${index}`} className="flex justify-between items-center py-2 border-b border-white/10">
               <span className="text-sm">⌨️ Input Activity</span>
-              <span className="text-xs text-gray-400">
+              <span className="text-xs muted">
                 {activity.total_inputs} inputs • {new Date(activity.timestamp * 1000).toLocaleTimeString()}
               </span>
             </div>
           ))}
           {realTimeMetrics.focusSessions.slice(-3).reverse().map((session, index) => (
-            <div key={`focus-${index}`} className="flex justify-between items-center py-2 border-b border-gray-600">
+            <div key={`focus-${index}`} className="flex justify-between items-center py-2 border-b border-white/10">
               <span className="text-sm">🎯 Focus Session</span>
-              <span className="text-xs text-gray-400">
+              <span className="text-xs muted">
                 {session.duration}s • {session.was_interrupted ? 'Interrupted' : 'Completed'} • {new Date(session.timestamp * 1000).toLocaleTimeString()}
               </span>
             </div>
           ))}
           {realTimeMetrics.breaks.slice(-3).reverse().map((break_, index) => (
-            <div key={`break-${index}`} className="flex justify-between items-center py-2 border-b border-gray-600">
+            <div key={`break-${index}`} className="flex justify-between items-center py-2 border-b border-white/10">
               <span className="text-sm">☕ Break</span>
-              <span className="text-xs text-gray-400">
+              <span className="text-xs muted">
                 {break_.duration}s • {break_.break_type} • {new Date(break_.timestamp * 1000).toLocaleTimeString()}
               </span>
             </div>

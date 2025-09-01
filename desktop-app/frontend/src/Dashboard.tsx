@@ -25,6 +25,21 @@ interface MetricsData {
   };
 }
 
+interface InsightSuggestion {
+  id: string;
+  type: string;
+  severity: 'info' | 'warning' | 'error' | string;
+  message: string;
+  rule: string;
+  timestamp: number;
+}
+
+interface InsightsData {
+  suggestions: InsightSuggestion[];
+  meta?: any;
+  generated_at: number;
+}
+
 declare global {
   interface Window {
     __TAURI__: {
@@ -38,6 +53,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [backendConnected, setBackendConnected] = useState(false);
+  const [insights, setInsights] = useState<InsightsData | null>(null);
 
   const fetchData = async () => {
     try {
@@ -74,9 +90,25 @@ export default function Dashboard() {
     }
   };
 
+  const fetchInsights = async () => {
+    try {
+      const response = await fetch('http://localhost:5005/api/insights');
+      if (!response.ok) return;
+      const result = await response.json();
+      setInsights(result);
+    } catch (e) {
+      // Soft-fail insights fetch
+      console.debug('Insights fetch failed');
+    }
+  };
+
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 30000); // Refresh every 30 seconds
+    fetchInsights();
+    const interval = setInterval(() => {
+      fetchData();
+      fetchInsights();
+    }, 30000); // Refresh every 30 seconds
     return () => clearInterval(interval);
   }, []);
 
@@ -89,7 +121,8 @@ export default function Dashboard() {
     data.recent_usage.forEach((usage: any) => {
       const hour = new Date(usage[2] * 1000).getHours();
       const hourKey = `${hour}:00`;
-      hourlyData[hourKey] = (hourlyData[hourKey] || 0) + (usage[4] || 0);
+      // usage shape: [app_name, start_time, end_time, duration, category]
+      hourlyData[hourKey] = (hourlyData[hourKey] || 0) + (usage[3] || 0);
     });
 
     return [{
@@ -108,7 +141,8 @@ export default function Dashboard() {
     const appData: { [key: string]: number } = {};
     data.recent_usage.forEach((usage: any) => {
       const appName = usage[0] || 'Unknown';
-      appData[appName] = (appData[appName] || 0) + (usage[4] || 0);
+      // usage shape: [app_name, start_time, end_time, duration, category]
+      appData[appName] = (appData[appName] || 0) + (usage[3] || 0);
     });
 
     // Convert to pie chart format
@@ -172,13 +206,13 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="max-w-7xl mx-auto mt-8 p-6">
-        <div className="bg-gray-800 rounded-xl p-6 shadow-lg">
+      <div className="max-w-7xl mx-auto mt-4 p-4">
+        <div className="card">
           <div className="animate-pulse">
-            <div className="h-4 bg-gray-600 rounded w-1/4 mb-4"></div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="h-64 bg-gray-600 rounded"></div>
-              <div className="h-64 bg-gray-600 rounded"></div>
+            <div className="h-4 bg-neutral-700 rounded w-1/4 mb-4"></div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="h-64 bg-neutral-800 rounded"></div>
+              <div className="h-64 bg-neutral-800 rounded"></div>
             </div>
           </div>
         </div>
@@ -188,8 +222,8 @@ export default function Dashboard() {
 
   if (error) {
     return (
-      <div className="max-w-7xl mx-auto mt-8 p-6">
-        <div className="bg-red-500 bg-opacity-20 rounded-xl p-6 shadow-lg border border-red-500">
+      <div className="max-w-7xl mx-auto mt-4 p-4">
+        <div className="card border border-red-500/40">
           <h2 className="text-xl font-bold text-red-400 mb-2">Connection Error</h2>
           <p className="text-red-300">{error}</p>
           <p className="text-sm text-red-400 mt-2">
@@ -200,7 +234,7 @@ export default function Dashboard() {
           </p>
           <button 
             onClick={fetchData}
-            className="mt-4 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+            className="btn btn-danger mt-4"
           >
             Retry
           </button>
@@ -211,9 +245,9 @@ export default function Dashboard() {
 
   if (!data) {
     return (
-      <div className="max-w-7xl mx-auto mt-8 p-6">
-        <div className="bg-gray-800 rounded-xl p-6 shadow-lg">
-          <p className="text-center text-gray-400">No data available</p>
+      <div className="max-w-7xl mx-auto mt-4 p-4">
+        <div className="card">
+          <p className="text-center muted">No data available</p>
         </div>
       </div>
     );
@@ -225,57 +259,62 @@ export default function Dashboard() {
   const idleBreakData = prepareIdleBreakData();
 
   return (
-    <div className="max-w-7xl mx-auto mt-8 p-6">
-      <h1 className="text-3xl font-bold mb-6 text-center text-white">CereBro Dashboard</h1>
-      
-      {/* Connection Status */}
-      <div className={`mb-6 p-3 rounded-lg ${
-        backendConnected 
-          ? 'bg-green-500 bg-opacity-20 border border-green-500' 
-          : 'bg-yellow-500 bg-opacity-20 border border-yellow-500'
-      }`}>
-        <div className="flex items-center space-x-2">
-          <div className={`w-2 h-2 rounded-full ${
-            backendConnected ? 'bg-green-500' : 'bg-yellow-500'
-          }`} />
-          <span className="text-sm text-white">
-            {backendConnected 
-              ? 'Connected to backend via Tauri' 
-              : 'Connected via HTTP (Tauri unavailable)'
-            }
-          </span>
+    <div className="max-w-7xl mx-auto mt-4 p-4 space-y-4">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">Dashboard</h1>
+        <div className={`px-2 py-1 rounded text-xs ${
+          backendConnected ? 'bg-green-500/20 text-green-300 border border-green-500/40' : 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/40'
+        }`}>
+          {backendConnected ? 'Connected (Tauri)' : 'Connected via HTTP'}
         </div>
       </div>
       
-      {/* Focus Score Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-6 shadow-lg">
-          <div className="text-center">
-            <div className="text-3xl font-bold text-white">{data.focus_score}%</div>
-            <div className="text-green-100 text-sm">Focus Score</div>
-          </div>
+      {/* AI Insights */}
+      {insights?.suggestions && insights.suggestions.length > 0 && (
+        <div className="bg-blue-500 bg-opacity-20 rounded-xl p-6 shadow-lg border border-blue-500 mb-8">
+          <h3 className="text-xl font-bold text-blue-300 mb-3">🧠 AI Insights</h3>
+          <ul className="space-y-2">
+            {insights.suggestions.map((s) => (
+              <li key={s.id} className="flex items-start">
+                <span className={`mt-1 mr-3 w-2 h-2 rounded-full ${
+                  s.severity === 'warning' ? 'bg-yellow-400' : s.severity === 'error' ? 'bg-red-400' : 'bg-blue-400'
+                }`} />
+                <div>
+                  <div className="text-white text-sm">{s.message}</div>
+                  <div className="text-xs text-gray-400 mt-1 uppercase tracking-wider">{s.type.replace('_',' ')} • {new Date(s.timestamp * 1000).toLocaleTimeString()}</div>
+                </div>
+              </li>
+            ))}
+          </ul>
         </div>
-        
-        <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-6 shadow-lg">
-          <div className="text-center">
-            <div className="text-3xl font-bold text-white">{data.metrics_summary.app_switches}</div>
-            <div className="text-blue-100 text-sm">App Switches</div>
-          </div>
-        </div>
-        
-        <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-6 shadow-lg">
-          <div className="text-center">
-            <div className="text-3xl font-bold text-white">{data.metrics_summary.idle_events}</div>
-            <div className="text-purple-100 text-sm">Idle Events</div>
-          </div>
-        </div>
+      )}
 
-        <div className="bg-gradient-to-br from-pink-500 to-pink-600 rounded-xl p-6 shadow-lg">
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="card">
           <div className="text-center">
-            <div className="text-3xl font-bold text-white">
+            <div className="text-3xl font-bold text-brand-300">{data.focus_score}%</div>
+            <div className="muted text-sm">Focus Score</div>
+          </div>
+        </div>
+        <div className="card">
+          <div className="text-center">
+            <div className="text-3xl font-bold">{data.metrics_summary.app_switches}</div>
+            <div className="muted text-sm">App Switches</div>
+          </div>
+        </div>
+        <div className="card">
+          <div className="text-center">
+            <div className="text-3xl font-bold">{data.metrics_summary.idle_events}</div>
+            <div className="muted text-sm">Idle Events</div>
+          </div>
+        </div>
+        <div className="card">
+          <div className="text-center">
+            <div className="text-3xl font-bold">
               {Math.round((data.metrics_summary.total_app_time || 0) / 60)}
             </div>
-            <div className="text-pink-100 text-sm">Total Minutes</div>
+            <div className="muted text-sm">Total Minutes</div>
           </div>
         </div>
       </div>
@@ -296,10 +335,10 @@ export default function Dashboard() {
       )}
 
       {/* Charts Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Daily Screen Time Line Chart */}
-        <div className="bg-gray-800 rounded-xl p-6 shadow-lg">
-          <h3 className="text-xl font-bold mb-4 text-white">Daily Screen Time</h3>
+        <div className="card">
+          <h3 className="card-title">Daily Screen Time</h3>
           <div className="h-64">
             {screenTimeData[0].data.length > 0 ? (
               <ResponsiveLine
@@ -315,12 +354,7 @@ export default function Dashboard() {
                   tickRotation: 0,
                   legend: 'Minutes',
                   legendOffset: -40,
-                  legendPosition: 'middle',
-                  tickComponent: ({ value, ...props }) => (
-                    <text {...props} style={{ fill: '#9CA3AF', fontSize: '12px' }}>
-                      {value}
-                    </text>
-                  )
+                  legendPosition: 'middle'
                 }}
                 axisBottom={{
                   tickSize: 5,
@@ -328,14 +362,9 @@ export default function Dashboard() {
                   tickRotation: 0,
                   legend: 'Hour of Day',
                   legendOffset: 36,
-                  legendPosition: 'middle',
-                  tickComponent: ({ value, ...props }) => (
-                    <text {...props} style={{ fill: '#9CA3AF', fontSize: '12px' }}>
-                      {value}
-                    </text>
-                  )
+                  legendPosition: 'middle'
                 }}
-                colors={['#10B981']}
+                colors={['#22c55e']}
                 pointSize={6}
                 pointColor={{ theme: 'background' }}
                 pointBorderWidth={2}
@@ -343,16 +372,30 @@ export default function Dashboard() {
                 pointLabelYOffset={-12}
                 useMesh={true}
                 theme={{
+                  axis: {
+                    ticks: {
+                      text: {
+                        fill: '#a3a3a3',
+                        fontSize: 12
+                      }
+                    },
+                    legend: {
+                      text: {
+                        fill: '#a3a3a3',
+                        fontSize: 12
+                      }
+                    }
+                  },
                   grid: {
                     line: {
-                      stroke: '#374151',
+                      stroke: '#27272a',
                       strokeWidth: 1
                     }
                   }
                 }}
               />
             ) : (
-              <div className="h-full flex items-center justify-center text-gray-400">
+              <div className="h-full flex items-center justify-center muted">
                 <p>No screen time data available</p>
               </div>
             )}
@@ -360,8 +403,8 @@ export default function Dashboard() {
         </div>
 
         {/* App Usage Pie Chart */}
-        <div className="bg-gray-800 rounded-xl p-6 shadow-lg">
-          <h3 className="text-xl font-bold mb-4 text-white">App Usage Distribution</h3>
+        <div className="card">
+          <h3 className="card-title">App Usage Distribution</h3>
           <div className="h-64">
             {appUsageData.length > 0 ? (
               <ResponsivePie
@@ -375,7 +418,7 @@ export default function Dashboard() {
                 borderWidth={1}
                 borderColor={{ from: 'color', modifiers: [['darker', 0.2]] }}
                 arcLinkLabelsSkipAngle={10}
-                arcLinkLabelsTextColor="#9CA3AF"
+                arcLinkLabelsTextColor="#a3a3a3"
                 arcLinkLabelsThickness={2}
                 arcLinkLabelsColor={{ from: 'color' }}
                 arcLabelsSkipAngle={10}
@@ -390,7 +433,7 @@ export default function Dashboard() {
                     itemsSpacing: 0,
                     itemWidth: 100,
                     itemHeight: 18,
-                    itemTextColor: '#9CA3AF',
+                    itemTextColor: '#a3a3a3',
                     itemDirection: 'left-to-right',
                     itemOpacity: 1,
                     symbolSize: 18,
@@ -399,7 +442,7 @@ export default function Dashboard() {
                 ]}
               />
             ) : (
-              <div className="h-full flex items-center justify-center text-gray-400">
+              <div className="h-full flex items-center justify-center muted">
                 <p>No app usage data available</p>
               </div>
             )}
@@ -407,8 +450,8 @@ export default function Dashboard() {
         </div>
 
         {/* Focus vs Distraction Trend Line */}
-        <div className="bg-gray-800 rounded-xl p-6 shadow-lg">
-          <h3 className="text-xl font-bold mb-4 text-white">Focus vs Distraction Trend</h3>
+        <div className="card">
+          <h3 className="card-title">Focus vs Distraction Trend</h3>
           <div className="h-64">
             {focusDistractionData[0].data.length > 0 ? (
               <ResponsiveLine
@@ -424,12 +467,7 @@ export default function Dashboard() {
                   tickRotation: 0,
                   legend: 'Minutes',
                   legendOffset: -40,
-                  legendPosition: 'middle',
-                  tickComponent: ({ value, ...props }) => (
-                    <text {...props} style={{ fill: '#9CA3AF', fontSize: '12px' }}>
-                      {value}
-                    </text>
-                  )
+                  legendPosition: 'middle'
                 }}
                 axisBottom={{
                   tickSize: 5,
@@ -437,14 +475,9 @@ export default function Dashboard() {
                   tickRotation: 0,
                   legend: 'Hour of Day',
                   legendOffset: 36,
-                  legendPosition: 'middle',
-                  tickComponent: ({ value, ...props }) => (
-                    <text {...props} style={{ fill: '#9CA3AF', fontSize: '12px' }}>
-                      {value}
-                    </text>
-                  )
+                  legendPosition: 'middle'
                 }}
-                colors={['#10B981', '#EF4444']}
+                colors={['#22c55e', '#ef4444']}
                 pointSize={6}
                 pointColor={{ theme: 'background' }}
                 pointBorderWidth={2}
@@ -452,9 +485,23 @@ export default function Dashboard() {
                 pointLabelYOffset={-12}
                 useMesh={true}
                 theme={{
+                  axis: {
+                    ticks: {
+                      text: {
+                        fill: '#a3a3a3',
+                        fontSize: 12
+                      }
+                    },
+                    legend: {
+                      text: {
+                        fill: '#a3a3a3',
+                        fontSize: 12
+                      }
+                    }
+                  },
                   grid: {
                     line: {
-                      stroke: '#374151',
+                      stroke: '#27272a',
                       strokeWidth: 1
                     }
                   }
@@ -470,7 +517,7 @@ export default function Dashboard() {
                     itemDirection: 'left-to-right',
                     itemWidth: 80,
                     itemHeight: 20,
-                    itemTextColor: '#9CA3AF',
+                    itemTextColor: '#a3a3a3',
                     symbolSize: 12,
                     symbolShape: 'circle',
                     effects: [
@@ -485,7 +532,7 @@ export default function Dashboard() {
                 ]}
               />
             ) : (
-              <div className="h-full flex items-center justify-center text-gray-400">
+              <div className="h-full flex items-center justify-center muted">
                 <p>No focus/distraction data available</p>
               </div>
             )}
@@ -493,8 +540,8 @@ export default function Dashboard() {
         </div>
 
         {/* Idle/Break Frequency Bar Chart */}
-        <div className="bg-gray-800 rounded-xl p-6 shadow-lg">
-          <h3 className="text-xl font-bold mb-4 text-white">Idle & Break Frequency</h3>
+        <div className="card">
+          <h3 className="card-title">Idle & Break Frequency</h3>
           <div className="h-64">
             {idleBreakData.length > 0 ? (
               <ResponsiveBar
@@ -517,11 +564,6 @@ export default function Dashboard() {
                   legend: 'Hour of Day',
                   legendPosition: 'middle',
                   legendOffset: 32,
-                  tickComponent: ({ value, ...props }) => (
-                    <text {...props} style={{ fill: '#9CA3AF', fontSize: '12px' }}>
-                      {value}
-                    </text>
-                  )
                 }}
                 axisLeft={{
                   tickSize: 5,
@@ -529,20 +571,29 @@ export default function Dashboard() {
                   tickRotation: 0,
                   legend: 'Count',
                   legendPosition: 'middle',
-                  legendOffset: -40,
-                  tickComponent: ({ value, ...props }) => (
-                    <text {...props} style={{ fill: '#9CA3AF', fontSize: '12px' }}>
-                      {value}
-                    </text>
-                  )
+                  legendOffset: -40
                 }}
                 labelSkipWidth={12}
                 labelSkipHeight={12}
                 labelTextColor={{ from: 'color', modifiers: [['darker', 1.6]] }}
                 theme={{
+                  axis: {
+                    ticks: {
+                      text: {
+                        fill: '#a3a3a3',
+                        fontSize: 12
+                      }
+                    },
+                    legend: {
+                      text: {
+                        fill: '#a3a3a3',
+                        fontSize: 12
+                      }
+                    }
+                  },
                   grid: {
                     line: {
-                      stroke: '#374151',
+                      stroke: '#27272a',
                       strokeWidth: 1
                     }
                   }
@@ -573,7 +624,7 @@ export default function Dashboard() {
                 ]}
               />
             ) : (
-              <div className="h-full flex items-center justify-center text-gray-400">
+              <div className="h-full flex items-center justify-center muted">
                 <p>No idle/break data available</p>
               </div>
             )}
@@ -582,13 +633,13 @@ export default function Dashboard() {
       </div>
 
       {/* Recent Activity */}
-      <div className="bg-gray-800 rounded-xl p-6 shadow-lg">
-        <h3 className="text-xl font-bold mb-4 text-white">Recent Activity</h3>
+      <div className="card">
+        <h3 className="card-title">Recent Activity</h3>
         <div className="space-y-2 max-h-64 overflow-y-auto">
           {data.recent_usage?.slice(0, 10).map((usage: any, index: number) => (
-            <div key={index} className="flex justify-between items-center py-2 border-b border-gray-600">
-              <span className="text-sm text-gray-300">{usage[0]}</span>
-              <span className="text-xs text-gray-400">
+            <div key={index} className="flex justify-between items-center py-2 border-b border-white/10">
+              <span className="text-sm">{usage[0]}</span>
+              <span className="text-xs muted">
                 {new Date(usage[2] * 1000).toLocaleTimeString()}
               </span>
             </div>

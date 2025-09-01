@@ -35,10 +35,11 @@ yarn.lock
 # ==============================
 # Tauri & Rust
 # ==============================
-/src-tauri/target/
-/src-tauri/.cargo/
-/src-tauri/icons/
-/src-tauri/build/
+# Use unanchored patterns to cover nested frontend path desktop-app/frontend/src-tauri
+src-tauri/target/
+src-tauri/.cargo/
+src-tauri/icons/
+src-tauri/build/
 
 # ==============================
 # VSCode / Editor
@@ -78,6 +79,9 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-lock.yaml
+
+# Generic error logs
+*.err
 
 # Editor/IDE
 .spyproject/
