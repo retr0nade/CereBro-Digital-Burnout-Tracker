@@ -273,8 +273,9 @@ export default function Dashboard() {
   const idleBreakData = prepareIdleBreakData();
 
   return (
-    <div className="dashboard-content max-w-7xl mx-auto mt-4 p-4 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="dashboard-content max-w-7xl mx-auto mt-4 p-4">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-semibold">Dashboard</h1>
         <div className={`px-3 py-1.5 rounded text-dashboard-sm ${
           backendConnected ? 'bg-green-500/20 text-green-300 border border-green-500/40' : 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/40'
@@ -282,207 +283,228 @@ export default function Dashboard() {
           {backendConnected ? 'Connected (Tauri)' : 'Connected via HTTP'}
         </div>
       </div>
-      
-      {/* AI Insights */}
-      {insights?.suggestions && insights.suggestions.length > 0 && (
-        <InsightBanner
-          title="AI Insights"
-          insights={insights.suggestions}
-          status={getInsightStatus(insights.suggestions)}
-          defaultExpanded={false}
-          className="mb-8"
-        />
-      )}
 
-      {/* KPI Metrics */}
-      <SectionHeader
-        title="Key Performance Indicators"
-        subtitle="Real-time metrics showing your productivity and focus patterns"
-        tooltip="These metrics help track your mental burnout risk by monitoring focus levels, task switching behavior, and active time patterns."
-      />
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <MetricTile
-          icon={<BarChart3 />}
-          label="Focus Score"
-          value={`${data.focus_score}%`}
-          hint="Percentage of productive time vs total active time"
-          tone={getFocusScoreTone(data.focus_score)}
-          interactive
-        />
-        <MetricTile
-          icon={<MousePointer />}
-          label="App Switches"
-          value={data.metrics_summary.app_switches}
-          hint="Number of application context switches"
-          tone={getAppSwitchesTone(data.metrics_summary.app_switches)}
-          interactive
-        />
-        <MetricTile
-          icon={<Clock />}
-          label="Idle Events"
-          value={data.metrics_summary.idle_events}
-          hint="Times you stepped away from the computer"
-          tone="default"
-          interactive
-        />
-        <MetricTile
-          icon={<Timer />}
-          label="Total Minutes"
-          value={Math.round((data.metrics_summary.total_app_time || 0) / 60)}
-          hint="Total active screen time today"
-          tone="default"
-          interactive
-        />
-      </div>
-
-      {/* Burnout Signals */}
-      {data.burnout_signals && data.burnout_signals.length > 0 && (
-        <InsightBanner
-          title="Burnout Signals Detected"
-          insights={data.burnout_signals.map((signal, index) => ({
-            id: `burnout-${index}`,
-            type: 'burnout_signal',
-            severity: 'warning',
-            message: signal,
-            rule: 'burnout_detection',
-            timestamp: Date.now() / 1000,
-          }))}
-          status="warn"
-          defaultExpanded={true}
-          className="mb-8"
-        />
-      )}
-
-      {/* Charts Grid */}
-      <SectionHeader
-        title="Detailed Analytics"
-        subtitle="Deep dive into your usage patterns and productivity trends"
-        tooltip="These charts provide detailed insights into when and how you use your computer, helping identify patterns that may contribute to burnout."
-      />
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Daily Screen Time Line Chart */}
-        <GlassCard className="card-spacing">
-          <SectionHeader
-            title="Daily Screen Time"
-            subtitle="Hourly breakdown of active computer usage"
-            tooltip="Shows your screen time distribution throughout the day. Peak hours may indicate periods of high focus or potential overwork."
-            className="mb-4"
-          />
-          <div className="h-64">
-            {screenTimeData[0]?.data.length > 0 ? (
-              <div className="text-dashboard-sm text-text-muted">
-                Screen time chart will be implemented with hour-by-hour data
-              </div>
-            ) : (
-              <div className="h-full flex items-center justify-center">
-                <EmptyStateBox
-                  title="No Screen Time Data"
-                  description="We haven't collected enough data yet. Keep using your computer and check back in a few minutes for insights."
-                  icon="clock"
-                />
-              </div>
-            )}
+      {/* 12-Column Grid Layout */}
+      <div className="grid grid-cols-12 gap-3 md:gap-4 xl:gap-6">
+        
+        {/* Row 1: AI Insights Banner - Full Width */}
+        {insights?.suggestions && insights.suggestions.length > 0 && (
+          <div className="col-span-12">
+            <InsightBanner
+              title="AI Insights"
+              insights={insights.suggestions}
+              status={getInsightStatus(insights.suggestions)}
+              defaultExpanded={false}
+            />
           </div>
-        </GlassCard>
+        )}
 
-        {/* App Usage Pie Chart */}
-        <GlassCard className="card-spacing">
-          <SectionHeader
-            title="App Usage Distribution"
-            subtitle="Top applications by time spent"
-            tooltip="Visual breakdown of which applications consume most of your time. This helps identify productivity apps vs potential distractions."
-            className="mb-4"
-          />
-          <div className="h-64">
-            {appUsageData.length > 0 ? (
-              <DonutAppUsage data={appUsageData} height={320} />
-            ) : (
-              <div className="h-full flex items-center justify-center">
-                <EmptyStateBox
-                  title="No Application Data"
-                  description="Start using applications on your computer to see a breakdown of where you spend your time."
-                  icon="activity"
-                />
-              </div>
-            )}
+        {/* Burnout Signals Banner - Full Width */}
+        {data.burnout_signals && data.burnout_signals.length > 0 && (
+          <div className="col-span-12">
+            <InsightBanner
+              title="Burnout Signals Detected"
+              insights={data.burnout_signals.map((signal, index) => ({
+                id: `burnout-${index}`,
+                type: 'burnout_signal',
+                severity: 'warning',
+                message: signal,
+                rule: 'burnout_detection',
+                timestamp: Date.now() / 1000,
+              }))}
+              status="warn"
+              defaultExpanded={true}
+            />
           </div>
-        </GlassCard>
+        )}
 
-        {/* Focus vs Distraction Trend Line */}
-        <GlassCard className="card-spacing">
-          <SectionHeader
-            title="Focus vs Distraction Trend"
-            subtitle="Productive vs non-productive time throughout the day"
-            tooltip="Compares time spent in productive applications versus potentially distracting ones. Helps identify when you're most focused and when distractions peak."
-            className="mb-4"
+        {/* Row 2: KPI Metrics - Four Cards */}
+        <div className="col-span-12 sm:col-span-6 xl:col-span-3">
+          <MetricTile
+            icon={<BarChart3 />}
+            label="Focus Score"
+            value={`${data.focus_score}%`}
+            hint="Percentage of productive time vs total active time"
+            tone={getFocusScoreTone(data.focus_score)}
+            interactive
           />
-          <div className="h-64">
-            {focusDistractionData.length > 0 ? (
-              <FocusVsDistractionLine data={focusDistractionData} height={320} />
-            ) : (
-              <div className="h-full flex items-center justify-center">
-                <EmptyStateBox
-                  title="No Focus Data Available"
-                  description="We're learning about your productivity patterns. Use your computer normally and we'll start showing focus vs distraction trends."
-                  icon="trending"
-                />
-              </div>
-            )}
-          </div>
-        </GlassCard>
-
-        {/* Idle/Break Frequency Bar Chart */}
-        <GlassCard className="card-spacing">
-          <SectionHeader
-            title="Idle & Break Frequency"
-            subtitle="When you step away from your computer"
-            tooltip="Shows patterns of breaks and idle time. Regular breaks are healthy, but irregular patterns might indicate stress or distraction."
-            className="mb-4"
-          />
-          <div className="h-64">
-            {idleBreakData.length > 0 ? (
-              <IdleBreakBar data={idleBreakData} height={320} />
-            ) : (
-              <div className="h-full flex items-center justify-center">
-                <EmptyStateBox
-                  title="No Break Pattern Data"
-                  description="Take some breaks and step away from your computer! We'll track your break patterns to help optimize your work-rest balance."
-                  icon="clock"
-                />
-              </div>
-            )}
-          </div>
-        </GlassCard>
-      </div>
-
-      {/* Recent Activity */}
-      <SectionHeader
-        title="Recent Activity"
-        subtitle="Latest application usage events"
-        tooltip="Real-time feed of your recent computer activity. Useful for reviewing what you've been working on and identifying patterns."
-      />
-      <GlassCard className="card-spacing">
-        <div className="space-y-2 max-h-64 overflow-y-auto">
-          {throttledRecentUsage && throttledRecentUsage.length > 0 ? (
-            throttledRecentUsage.slice(0, 10).map((usage: any, index: number) => (
-              <div key={index} className="flex justify-between items-center py-2 border-b border-white/10">
-                <span className="text-sm">{usage[0]}</span>
-                <span className="text-dashboard-sm muted">
-                  {new Date(usage[2] * 1000).toLocaleTimeString()}
-                </span>
-              </div>
-            ))
-          ) : (
-            <div className="h-32 flex items-center justify-center">
-              <EmptyStateBox
-                title="No Recent Activity"
-                description="Your recent application usage will appear here once you start using your computer."
-                icon="database"
-              />
-            </div>
-          )}
         </div>
-      </GlassCard>
+        <div className="col-span-12 sm:col-span-6 xl:col-span-3">
+          <MetricTile
+            icon={<MousePointer />}
+            label="App Switches"
+            value={data.metrics_summary.app_switches}
+            hint="Number of application context switches"
+            tone={getAppSwitchesTone(data.metrics_summary.app_switches)}
+            interactive
+          />
+        </div>
+        <div className="col-span-12 sm:col-span-6 xl:col-span-3">
+          <MetricTile
+            icon={<Clock />}
+            label="Idle Events"
+            value={data.metrics_summary.idle_events}
+            hint="Times you stepped away from the computer"
+            tone="default"
+            interactive
+          />
+        </div>
+        <div className="col-span-12 sm:col-span-6 xl:col-span-3">
+          <MetricTile
+            icon={<Timer />}
+            label="Total Minutes"
+            value={Math.round((data.metrics_summary.total_app_time || 0) / 60)}
+            hint="Total active screen time today"
+            tone="default"
+            interactive
+          />
+        </div>
+
+        {/* Row 3: Daily Screen Time (7 cols) + App Usage Distribution (5 cols) */}
+        <div className="col-span-12 lg:col-span-7">
+          <GlassCard className="h-full">
+            <SectionHeader
+              title="Daily Screen Time"
+              subtitle="Hourly breakdown of active computer usage"
+              tooltip="Shows your screen time distribution throughout the day. Peak hours may indicate periods of high focus or potential overwork."
+              className="mb-4"
+            />
+            <div className="min-h-[280px]">
+              {screenTimeData[0]?.data.length > 0 ? (
+                <div className="text-dashboard-sm text-text-muted">
+                  Screen time chart will be implemented with hour-by-hour data
+                </div>
+              ) : (
+                <div className="h-full flex items-center justify-center">
+                  <EmptyStateBox
+                    title="No Screen Time Data"
+                    description="We haven't collected enough data yet. Keep using your computer and check back in a few minutes for insights."
+                    icon="clock"
+                  />
+                </div>
+              )}
+            </div>
+          </GlassCard>
+        </div>
+        
+        <div className="col-span-12 lg:col-span-5">
+          <GlassCard className="h-full">
+            <SectionHeader
+              title="App Usage Distribution"
+              subtitle="Top applications by time spent"
+              tooltip="Visual breakdown of which applications consume most of your time. This helps identify productivity apps vs potential distractions."
+              className="mb-4"
+            />
+            <div className="min-h-[280px]">
+              {appUsageData.length > 0 ? (
+                <DonutAppUsage data={appUsageData} height={280} />
+              ) : (
+                <div className="h-full flex items-center justify-center">
+                  <EmptyStateBox
+                    title="No Application Data"
+                    description="Start using applications on your computer to see a breakdown of where you spend your time."
+                    icon="activity"
+                  />
+                </div>
+              )}
+            </div>
+          </GlassCard>
+        </div>
+
+        {/* Row 4: Focus vs Distraction (7 cols) + Idle & Break Frequency (5 cols) */}
+        <div className="col-span-12 lg:col-span-7">
+          <GlassCard className="h-full">
+            <SectionHeader
+              title="Focus vs Distraction Trend"
+              subtitle="Productive vs non-productive time throughout the day"
+              tooltip="Compares time spent in productive applications versus potentially distracting ones. Helps identify when you're most focused and when distractions peak."
+              className="mb-4"
+            />
+            <div className="min-h-[280px]">
+              {focusDistractionData.length > 0 ? (
+                <FocusVsDistractionLine data={focusDistractionData} height={280} />
+              ) : (
+                <div className="h-full flex items-center justify-center">
+                  <EmptyStateBox
+                    title="No Focus Data Available"
+                    description="We're learning about your productivity patterns. Use your computer normally and we'll start showing focus vs distraction trends."
+                    icon="trending"
+                  />
+                </div>
+              )}
+            </div>
+          </GlassCard>
+        </div>
+        
+        <div className="col-span-12 lg:col-span-5">
+          <GlassCard className="h-full">
+            <SectionHeader
+              title="Idle & Break Frequency"
+              subtitle="When you step away from your computer"
+              tooltip="Shows patterns of breaks and idle time. Regular breaks are healthy, but irregular patterns might indicate stress or distraction."
+              className="mb-4"
+            />
+            <div className="min-h-[280px]">
+              {idleBreakData.length > 0 ? (
+                <IdleBreakBar data={idleBreakData} height={280} />
+              ) : (
+                <div className="h-full flex items-center justify-center">
+                  <EmptyStateBox
+                    title="No Break Pattern Data"
+                    description="Take some breaks and step away from your computer! We'll track your break patterns to help optimize your work-rest balance."
+                    icon="clock"
+                  />
+                </div>
+              )}
+            </div>
+          </GlassCard>
+        </div>
+
+        {/* Row 5: Recent Activity - Full Width with Virtualized List */}
+        <div className="col-span-12">
+          <GlassCard>
+            <SectionHeader
+              title="Recent Activity"
+              subtitle="Latest application usage events"
+              tooltip="Real-time feed of your recent computer activity. Useful for reviewing what you've been working on and identifying patterns."
+              className="mb-4"
+            />
+            <div className="min-h-[280px] max-h-96 overflow-y-auto">
+              {throttledRecentUsage && throttledRecentUsage.length > 0 ? (
+                <div className="space-y-1">
+                  {throttledRecentUsage.slice(0, 50).map((usage: any, index: number) => (
+                    <div 
+                      key={index} 
+                      className="flex justify-between items-center py-3 px-4 hover:bg-white/5 rounded-lg transition-colors border-b border-white/5"
+                    >
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div className="w-2 h-2 rounded-full bg-brand/60 flex-shrink-0" />
+                        <span className="text-sm text-text truncate">{usage[0]}</span>
+                      </div>
+                      <div className="flex items-center gap-4 flex-shrink-0">
+                        <span className="text-dashboard-sm text-text-muted">
+                          {Math.round(usage[3] / 60)}m
+                        </span>
+                        <span className="text-dashboard-sm text-text-muted">
+                          {new Date(usage[2] * 1000).toLocaleTimeString()}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="h-full flex items-center justify-center">
+                  <EmptyStateBox
+                    title="No Recent Activity"
+                    description="Your recent application usage will appear here once you start using your computer."
+                    icon="database"
+                  />
+                </div>
+              )}
+            </div>
+          </GlassCard>
+        </div>
+      </div>
     </div>
   );
 }
