@@ -6,6 +6,7 @@ import GlassCard from './ui/GlassCard';
 import SectionHeader from './ui/SectionHeader';
 import { EmptyStateBox } from './ui/InfoBox';
 import { FocusVsDistractionLine, IdleBreakBar, DonutAppUsage } from './charts';
+import { useThrottledValue } from './utils/smoothNumber';
 
 interface MetricsData {
   recent_usage: any[];
@@ -138,13 +139,17 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, []);
 
+  // Throttle data updates for charts to prevent excessive re-renders
+  const throttledRecentUsage = useThrottledValue(data?.recent_usage || [], 250);
+  const throttledRecentIdle = useThrottledValue(data?.recent_idle || [], 250);
+
   // Prepare chart data
   const prepareScreenTimeData = () => {
-    if (!data?.recent_usage) return [];
+    if (!throttledRecentUsage || throttledRecentUsage.length === 0) return [];
     
     // Group usage by hour
     const hourlyData: { [key: string]: number } = {};
-    data.recent_usage.forEach((usage: any) => {
+    throttledRecentUsage.forEach((usage: any) => {
       const hour = new Date(usage[2] * 1000).getHours();
       const hourKey = `${hour}:00`;
       // usage shape: [app_name, start_time, end_time, duration, category]
@@ -161,11 +166,11 @@ export default function Dashboard() {
   };
 
   const prepareAppUsageData = () => {
-    if (!data?.recent_usage) return [];
+    if (!throttledRecentUsage || throttledRecentUsage.length === 0) return [];
     
     // Group by app name
     const appData: { [key: string]: number } = {};
-    data.recent_usage.forEach((usage: any) => {
+    throttledRecentUsage.forEach((usage: any) => {
       const appName = usage[0] || 'Unknown';
       // usage shape: [app_name, start_time, end_time, duration, category]
       appData[appName] = (appData[appName] || 0) + (usage[3] || 0);
@@ -182,7 +187,7 @@ export default function Dashboard() {
   };
 
   const prepareFocusDistractionData = () => {
-    if (!data?.recent_usage) return [];
+    if (!throttledRecentUsage || throttledRecentUsage.length === 0) return [];
     
     // Simulate focus vs distraction data (in real implementation, this would come from backend)
     const hours = Array.from({ length: 24 }, (_, i) => i);
@@ -194,11 +199,11 @@ export default function Dashboard() {
   };
 
   const prepareIdleBreakData = () => {
-    if (!data?.recent_idle) return [];
+    if (!throttledRecentIdle || throttledRecentIdle.length === 0) return [];
     
     // Group idle periods by hour and convert to minutes
     const hourlyIdle: { [key: number]: number } = {};
-    data.recent_idle.forEach((idle: any) => {
+    throttledRecentIdle.forEach((idle: any) => {
       const hour = new Date(idle[1] * 1000).getHours();
       // Convert idle count to estimated minutes (assuming each idle event = ~5 minutes)
       hourlyIdle[hour] = (hourlyIdle[hour] || 0) + 5;
@@ -458,8 +463,8 @@ export default function Dashboard() {
       />
       <GlassCard className="card-spacing">
         <div className="space-y-2 max-h-64 overflow-y-auto">
-          {data.recent_usage && data.recent_usage.length > 0 ? (
-            data.recent_usage.slice(0, 10).map((usage: any, index: number) => (
+          {throttledRecentUsage && throttledRecentUsage.length > 0 ? (
+            throttledRecentUsage.slice(0, 10).map((usage: any, index: number) => (
               <div key={index} className="flex justify-between items-center py-2 border-b border-white/10">
                 <span className="text-sm">{usage[0]}</span>
                 <span className="text-dashboard-sm muted">

@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { ResponsiveLine } from '@nivo/line';
 import { ResponsivePie } from '@nivo/pie';
 import webSocketService, { WebSocketEvent, WebSocketStatus } from './WebSocketService';
+import { useSmoothedNumber, useThrottledValue } from './utils/smoothNumber';
 
 interface RealTimeMetrics {
   appUsage: Array<{
@@ -243,32 +244,41 @@ export default function RealTimeDashboard() {
     );
   }
 
+  // Apply smoothing to rapid-changing metrics to reduce jitter
+  const smoothedFocusScore = useSmoothedNumber(data?.focus_score || 0, 120, 18);
+  const smoothedAppSwitches = useSmoothedNumber(data?.metrics_summary?.app_switches || 0, 120, 18);
+  const smoothedIdleEvents = useSmoothedNumber(data?.metrics_summary?.idle_events || 0, 120, 18);
+
+  // Throttle chart data updates to prevent excessive re-renders
+  const throttledInputActivity = useThrottledValue(realTimeMetrics.inputActivity, 250);
+  const throttledAppUsage = useThrottledValue(realTimeMetrics.appUsage, 250);
+
   // Prepare real-time chart data
   const inputActivityData = [
     {
       id: 'Total Inputs',
-      data: realTimeMetrics.inputActivity.map((activity, i) => ({
+      data: throttledInputActivity.map((activity, i) => ({
         x: new Date(activity.timestamp * 1000).toLocaleTimeString(),
         y: activity.total_inputs
       }))
     },
     {
       id: 'Keypresses',
-      data: realTimeMetrics.inputActivity.map((activity, i) => ({
+      data: throttledInputActivity.map((activity, i) => ({
         x: new Date(activity.timestamp * 1000).toLocaleTimeString(),
         y: activity.keypress_count
       }))
     },
     {
       id: 'Mouse Clicks',
-      data: realTimeMetrics.inputActivity.map((activity, i) => ({
+      data: throttledInputActivity.map((activity, i) => ({
         x: new Date(activity.timestamp * 1000).toLocaleTimeString(),
         y: activity.mouse_click_count
       }))
     }
   ];
 
-  const appUsageData = realTimeMetrics.appUsage.map(usage => ({
+  const appUsageData = throttledAppUsage.map(usage => ({
     id: usage.app_name,
     label: usage.app_name,
     value: usage.duration
@@ -325,21 +335,21 @@ export default function RealTimeDashboard() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
         <div className="card">
           <div className="text-center">
-            <div className="text-4xl font-bold text-white">{data.focus_score}%</div>
+            <div className="text-4xl font-bold text-white">{smoothedFocusScore}%</div>
             <div className="text-green-100">Focus Score</div>
           </div>
         </div>
         
         <div className="card">
           <div className="text-center">
-            <div className="text-4xl font-bold text-white">{data.metrics_summary.app_switches}</div>
+            <div className="text-4xl font-bold text-white">{smoothedAppSwitches}</div>
             <div className="text-blue-100">App Switches</div>
           </div>
         </div>
         
         <div className="card">
           <div className="text-center">
-            <div className="text-4xl font-bold text-white">{data.metrics_summary.idle_events}</div>
+            <div className="text-4xl font-bold text-white">{smoothedIdleEvents}</div>
             <div className="text-purple-100">Idle Events</div>
           </div>
         </div>

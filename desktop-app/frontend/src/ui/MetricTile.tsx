@@ -1,7 +1,8 @@
 import React from 'react';
-import { motion, useSpring, useTransform } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { clsx } from 'clsx';
 import GlassCard from './GlassCard';
+import { useSmoothedNumber } from '../utils/smoothNumber';
 
 interface MetricTileProps {
   icon: React.ReactNode;
@@ -47,20 +48,15 @@ export default function MetricTile({
 }: MetricTileProps) {
   const styles = toneStyles[tone];
   
-  // Animated value with spring physics
-  const displayValue = typeof value === 'number' ? value : parseFloat(value.toString()) || 0;
-  const springValue = useSpring(displayValue, {
-    stiffness: 300,
-    damping: 30,
-    mass: 0.8,
-  });
+  // Extract numeric value for smoothing
+  const numericValue = typeof value === 'number' ? value : parseFloat(value.toString()) || 0;
+  const isNumeric = typeof value === 'number' || !isNaN(parseFloat(value.toString()));
   
-  const animatedValue = useTransform(springValue, (latest) => {
-    if (typeof value === 'string' && isNaN(parseFloat(value))) {
-      return value; // Return original string if not numeric
-    }
-    return Math.round(latest).toLocaleString();
-  });
+  // Use smooth animation for numeric values to reduce jitter
+  const smoothedValue = useSmoothedNumber(numericValue, 120, 18);
+  
+  // Determine display value
+  const displayValue = isNumeric ? smoothedValue.toLocaleString() : value;
 
   return (
     <GlassCard 
@@ -106,11 +102,7 @@ export default function MetricTile({
               )}
               style={{ fontVariantNumeric: 'tabular-nums' }}
             >
-              {typeof value === 'string' && isNaN(parseFloat(value)) ? (
-                value
-              ) : (
-                <motion.span>{animatedValue}</motion.span>
-              )}
+              {displayValue}
             </motion.div>
             
             {/* Unit or suffix */}
