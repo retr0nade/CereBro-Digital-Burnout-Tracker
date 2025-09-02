@@ -1,8 +1,9 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { ResponsiveLine } from '@nivo/line';
 import { ResponsivePie } from '@nivo/pie';
 import webSocketService, { WebSocketEvent, WebSocketStatus } from './WebSocketService';
 import { useSmoothedNumber, useThrottledValue } from './utils/smoothNumber';
+import ActivityTimeline from './components/ActivityTimeline';
 
 interface RealTimeMetrics {
   appUsage: Array<{
@@ -253,6 +254,61 @@ export default function RealTimeDashboard() {
   const throttledInputActivity = useThrottledValue(realTimeMetrics.inputActivity, 250);
   const throttledAppUsage = useThrottledValue(realTimeMetrics.appUsage, 250);
 
+  // Convert real-time data to ActivityTimeline format
+  const timelineEvents = useMemo(() => {
+    const events: any[] = [];
+    
+    // Add app usage events
+    throttledAppUsage.forEach((usage, index) => {
+      events.push({
+        id: `rt-usage-${index}`,
+        appName: usage.app_name,
+        action: 'Used application',
+        timestamp: usage.timestamp * 1000,
+        duration: usage.duration,
+        type: 'app_usage' as const
+      });
+    });
+
+    // Add input activity events
+    throttledInputActivity.forEach((activity, index) => {
+      events.push({
+        id: `rt-input-${index}`,
+        appName: 'System',
+        action: `Input activity (${activity.total_inputs} inputs)`,
+        timestamp: activity.timestamp * 1000,
+        type: 'input' as const
+      });
+    });
+
+    // Add focus sessions
+    realTimeMetrics.focusSessions.forEach((session, index) => {
+      events.push({
+        id: `rt-focus-${index}`,
+        appName: 'Focus Session',
+        action: session.was_interrupted ? 'Interrupted' : 'Completed',
+        timestamp: session.timestamp * 1000,
+        duration: session.duration,
+        type: 'focus' as const
+      });
+    });
+
+    // Add breaks
+    realTimeMetrics.breaks.forEach((break_, index) => {
+      events.push({
+        id: `rt-break-${index}`,
+        appName: 'Break',
+        action: break_.break_type,
+        timestamp: break_.timestamp * 1000,
+        duration: break_.duration,
+        type: 'break' as const
+      });
+    });
+
+    // Sort by timestamp (newest first)
+    return events.sort((a, b) => b.timestamp - a.timestamp);
+  }, [throttledAppUsage, throttledInputActivity, realTimeMetrics.focusSessions, realTimeMetrics.breaks]);
+
   // Prepare real-time chart data
   const inputActivityData = [
     {
@@ -490,43 +546,13 @@ export default function RealTimeDashboard() {
         </div>
       </div>
 
-      {/* Real-time Activity Feed */}
+      {/* Real-time Activity Timeline */}
       <div className="card">
-        <h3 className="card-title">Real-time Activity Feed</h3>
-        <div className="space-y-2 max-h-64 overflow-y-auto">
-          {realTimeMetrics.appUsage.slice(-10).reverse().map((usage, index) => (
-            <div key={index} className="flex justify-between items-center py-2 border-b border-white/10">
-              <span className="text-sm">📱 {usage.app_name}</span>
-              <span className="text-xs muted">
-                {usage.duration}s • {new Date(usage.timestamp * 1000).toLocaleTimeString()}
-              </span>
-            </div>
-          ))}
-          {realTimeMetrics.inputActivity.slice(-5).reverse().map((activity, index) => (
-            <div key={`input-${index}`} className="flex justify-between items-center py-2 border-b border-white/10">
-              <span className="text-sm">⌨️ Input Activity</span>
-              <span className="text-xs muted">
-                {activity.total_inputs} inputs • {new Date(activity.timestamp * 1000).toLocaleTimeString()}
-              </span>
-            </div>
-          ))}
-          {realTimeMetrics.focusSessions.slice(-3).reverse().map((session, index) => (
-            <div key={`focus-${index}`} className="flex justify-between items-center py-2 border-b border-white/10">
-              <span className="text-sm">🎯 Focus Session</span>
-              <span className="text-xs muted">
-                {session.duration}s • {session.was_interrupted ? 'Interrupted' : 'Completed'} • {new Date(session.timestamp * 1000).toLocaleTimeString()}
-              </span>
-            </div>
-          ))}
-          {realTimeMetrics.breaks.slice(-3).reverse().map((break_, index) => (
-            <div key={`break-${index}`} className="flex justify-between items-center py-2 border-b border-white/10">
-              <span className="text-sm">☕ Break</span>
-              <span className="text-xs muted">
-                {break_.duration}s • {break_.break_type} • {new Date(break_.timestamp * 1000).toLocaleTimeString()}
-              </span>
-            </div>
-          ))}
-        </div>
+        <h3 className="card-title">Real-time Activity Timeline</h3>
+        <ActivityTimeline 
+          events={timelineEvents}
+          maxHeight={400}
+        />
       </div>
     </div>
   );

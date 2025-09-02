@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { BarChart3, MousePointer, Clock, Timer } from 'lucide-react';
 import MetricTile from './ui/MetricTile';
 import InsightBanner from './ui/InsightBanner';
@@ -7,6 +7,7 @@ import SectionHeader from './ui/SectionHeader';
 import { EmptyStateBox } from './ui/InfoBox';
 import { FocusVsDistractionLine, IdleBreakBar, DonutAppUsage } from './charts';
 import { useThrottledValue } from './utils/smoothNumber';
+import ActivityTimeline from './components/ActivityTimeline';
 
 interface MetricsData {
   recent_usage: any[];
@@ -142,6 +143,37 @@ export default function Dashboard() {
   // Throttle data updates for charts to prevent excessive re-renders
   const throttledRecentUsage = useThrottledValue(data?.recent_usage || [], 250);
   const throttledRecentIdle = useThrottledValue(data?.recent_idle || [], 250);
+
+  // Convert usage data to ActivityTimeline format
+  const timelineEvents = useMemo(() => {
+    const events: any[] = [];
+    
+    // Add app usage events
+    throttledRecentUsage.forEach((usage: any, index: number) => {
+      events.push({
+        id: `usage-${index}`,
+        appName: usage[0] || 'Unknown App',
+        action: 'Used application',
+        timestamp: usage[2] * 1000, // Convert to milliseconds
+        duration: usage[3],
+        type: 'app_usage' as const
+      });
+    });
+
+    // Add idle events
+    throttledRecentIdle.forEach((idle: any, index: number) => {
+      events.push({
+        id: `idle-${index}`,
+        appName: 'System',
+        action: 'Went idle',
+        timestamp: idle[1] * 1000, // Convert to milliseconds
+        type: 'idle' as const
+      });
+    });
+
+    // Sort by timestamp (newest first)
+    return events.sort((a, b) => b.timestamp - a.timestamp);
+  }, [throttledRecentUsage, throttledRecentIdle]);
 
   // Prepare chart data
   const prepareScreenTimeData = () => {
@@ -460,7 +492,7 @@ export default function Dashboard() {
           </GlassCard>
         </div>
 
-        {/* Row 5: Recent Activity - Full Width with Virtualized List */}
+        {/* Row 5: Recent Activity - Full Width with Virtualized Timeline */}
         <div className="col-span-12">
           <GlassCard>
             <SectionHeader
@@ -469,39 +501,10 @@ export default function Dashboard() {
               tooltip="Real-time feed of your recent computer activity. Useful for reviewing what you've been working on and identifying patterns."
               className="mb-4"
             />
-            <div className="min-h-[280px] max-h-96 overflow-y-auto">
-              {throttledRecentUsage && throttledRecentUsage.length > 0 ? (
-                <div className="space-y-1">
-                  {throttledRecentUsage.slice(0, 50).map((usage: any, index: number) => (
-                    <div 
-                      key={index} 
-                      className="flex justify-between items-center py-3 px-4 hover:bg-white/5 rounded-lg transition-colors border-b border-white/5"
-                    >
-                      <div className="flex items-center gap-3 min-w-0 flex-1">
-                        <div className="w-2 h-2 rounded-full bg-brand/60 flex-shrink-0" />
-                        <span className="text-sm text-text truncate">{usage[0]}</span>
-                      </div>
-                      <div className="flex items-center gap-4 flex-shrink-0">
-                        <span className="text-dashboard-sm text-text-muted">
-                          {Math.round(usage[3] / 60)}m
-                        </span>
-                        <span className="text-dashboard-sm text-text-muted">
-                          {new Date(usage[2] * 1000).toLocaleTimeString()}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="h-full flex items-center justify-center">
-                  <EmptyStateBox
-                    title="No Recent Activity"
-                    description="Your recent application usage will appear here once you start using your computer."
-                    icon="database"
-                  />
-                </div>
-              )}
-            </div>
+            <ActivityTimeline 
+              events={timelineEvents}
+              maxHeight={400}
+            />
           </GlassCard>
         </div>
       </div>
