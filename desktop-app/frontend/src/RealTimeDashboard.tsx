@@ -83,6 +83,72 @@ export default function RealTimeDashboard() {
   const [backendConnected, setBackendConnected] = useState(false);
   const [wsStatus, setWsStatus] = useState<WebSocketStatus>({ connected: false, connecting: false });
 
+  // Apply smoothing to rapid-changing metrics to reduce jitter
+  const smoothedFocusScore = useSmoothedNumber(data?.focus_score || 0, 120, 18);
+  const smoothedAppSwitches = useSmoothedNumber(data?.metrics_summary?.app_switches || 0, 120, 18);
+  const smoothedIdleEvents = useSmoothedNumber(data?.metrics_summary?.idle_events || 0, 120, 18);
+
+  // Throttle chart data updates to prevent excessive re-renders
+  const throttledInputActivity = useThrottledValue(realTimeMetrics.inputActivity, 250);
+  const throttledAppUsage = useThrottledValue(realTimeMetrics.appUsage, 250);
+
+  // Convert real-time data to ActivityTimeline format
+  const timelineEvents = useMemo(() => {
+    const events: any[] = [];
+    
+    // Add app usage events
+    throttledAppUsage.forEach((usage, index) => {
+      events.push({
+        id: `rt-usage-${index}`,
+        appName: usage.app_name,
+        action: 'Used application',
+        timestamp: usage.timestamp * 1000,
+        duration: usage.duration,
+        type: 'app_usage' as const
+      });
+    });
+
+    // Add input activity events
+    throttledInputActivity.forEach((activity, index) => {
+      events.push({
+        id: `rt-input-${index}`,
+        appName: 'System',
+        action: `Input activity (${activity.total_inputs} inputs)`,
+        timestamp: activity.timestamp * 1000,
+        type: 'input' as const
+      });
+    });
+
+    // Add focus session events
+    realTimeMetrics.focusSessions.forEach((session, index) => {
+      events.push({
+        id: `rt-focus-${index}`,
+        appName: 'Focus Timer',
+        action: session.was_interrupted ? 'Focus session interrupted' : 'Focus session completed',
+        timestamp: session.timestamp * 1000,
+        duration: session.duration,
+        type: 'focus' as const
+      });
+    });
+
+    // Add break events
+    realTimeMetrics.breaks.forEach((breakEvent, index) => {
+      events.push({
+        id: `rt-break-${index}`,
+        appName: 'Break Monitor',
+        action: `${breakEvent.break_type} break`,
+        timestamp: breakEvent.timestamp * 1000,
+        duration: breakEvent.duration,
+        type: 'break' as const
+      });
+    });
+
+    // Sort by timestamp (newest first) and limit to last 50 events
+    return events
+      .sort((a, b) => b.timestamp - a.timestamp)
+      .slice(0, 50);
+  }, [throttledAppUsage, throttledInputActivity, realTimeMetrics.focusSessions, realTimeMetrics.breaks]);
+
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -265,69 +331,7 @@ export default function RealTimeDashboard() {
     );
   }
 
-  // Apply smoothing to rapid-changing metrics to reduce jitter
-  const smoothedFocusScore = useSmoothedNumber(data?.focus_score || 0, 120, 18);
-  const smoothedAppSwitches = useSmoothedNumber(data?.metrics_summary?.app_switches || 0, 120, 18);
-  const smoothedIdleEvents = useSmoothedNumber(data?.metrics_summary?.idle_events || 0, 120, 18);
-
-  // Throttle chart data updates to prevent excessive re-renders
-  const throttledInputActivity = useThrottledValue(realTimeMetrics.inputActivity, 250);
-  const throttledAppUsage = useThrottledValue(realTimeMetrics.appUsage, 250);
-
-  // Convert real-time data to ActivityTimeline format
-  const timelineEvents = useMemo(() => {
-    const events: any[] = [];
-    
-    // Add app usage events
-    throttledAppUsage.forEach((usage, index) => {
-      events.push({
-        id: `rt-usage-${index}`,
-        appName: usage.app_name,
-        action: 'Used application',
-        timestamp: usage.timestamp * 1000,
-        duration: usage.duration,
-        type: 'app_usage' as const
-      });
-    });
-
-    // Add input activity events
-    throttledInputActivity.forEach((activity, index) => {
-      events.push({
-        id: `rt-input-${index}`,
-        appName: 'System',
-        action: `Input activity (${activity.total_inputs} inputs)`,
-        timestamp: activity.timestamp * 1000,
-        type: 'input' as const
-      });
-    });
-
-    // Add focus sessions
-    realTimeMetrics.focusSessions.forEach((session, index) => {
-      events.push({
-        id: `rt-focus-${index}`,
-        appName: 'Focus Session',
-        action: session.was_interrupted ? 'Interrupted' : 'Completed',
-        timestamp: session.timestamp * 1000,
-        duration: session.duration,
-        type: 'focus' as const
-      });
-    });
-
-    // Add breaks
-    realTimeMetrics.breaks.forEach((break_, index) => {
-      events.push({
-        id: `rt-break-${index}`,
-        appName: 'Break',
-        action: break_.break_type,
-        timestamp: break_.timestamp * 1000,
-        duration: break_.duration,
-        type: 'break' as const
-      });
-    });
-
-    // Sort by timestamp (newest first)
-    return events.sort((a, b) => b.timestamp - a.timestamp);
-  }, [throttledAppUsage, throttledInputActivity, realTimeMetrics.focusSessions, realTimeMetrics.breaks]);
+  // Prepare real-time chart data
 
   // Prepare real-time chart data
   const inputActivityData = [
