@@ -1,39 +1,68 @@
 import React, { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
+import { 
+  Save, 
+  RotateCcw
+} from 'lucide-react';
+import { Switch } from './ui/Switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/Select';
+import { Slider } from './ui/Slider';
+import GlassCard from './ui/GlassCard';
+import SectionHeader from './ui/SectionHeader';
+import LivePreview from './components/LivePreview';
+import { toast } from './services/eventHandlers';
 
 interface Settings {
-  idle_timeout: number;
-  focus_session_length: number;
-  break_reminders: {
-    enabled: boolean;
-    interval_minutes: number;
-    duration_minutes: number;
-  };
-  export_frequency: {
-    enabled: boolean;
-    interval_hours: number;
-    format: 'csv' | 'json';
-  };
+  // Theme & UI
+  theme: 'dark' | 'light';
+  reduceMotion: boolean;
+  
+  // Data Retention
+  dataRetentionDays: number;
+  autoExportEnabled: boolean;
+  exportFormat: 'csv' | 'json';
+  exportFrequency: number; // hours
+  
+  // Notifications
+  notificationsEnabled: boolean;
+  breakReminders: boolean;
+  focusSessionAlerts: boolean;
+  idleNotifications: boolean;
+  
+  // Performance
+  idleTimeout: number; // minutes
+  focusSessionLength: number; // minutes
+  breakDuration: number; // minutes
+  breakInterval: number; // minutes
 }
 
 const Settings: React.FC = () => {
   const [settings, setSettings] = useState<Settings>({
-    idle_timeout: 300,
-    focus_session_length: 25,
-    break_reminders: {
-      enabled: true,
-      interval_minutes: 60,
-      duration_minutes: 5
-    },
-    export_frequency: {
-      enabled: false,
-      interval_hours: 24,
-      format: 'csv'
-    }
+    // Theme & UI
+    theme: 'dark',
+    reduceMotion: false,
+    
+    // Data Retention
+    dataRetentionDays: 30,
+    autoExportEnabled: false,
+    exportFormat: 'csv',
+    exportFrequency: 24,
+    
+    // Notifications
+    notificationsEnabled: true,
+    breakReminders: true,
+    focusSessionAlerts: true,
+    idleNotifications: false,
+    
+    // Performance
+    idleTimeout: 5,
+    focusSessionLength: 25,
+    breakDuration: 5,
+    breakInterval: 60
   });
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   useEffect(() => {
     loadSettings();
@@ -46,26 +75,20 @@ const Settings: React.FC = () => {
         const config = await response.json();
         
         // Map backend config to frontend settings
-        setSettings({
-          idle_timeout: config.services?.idle_monitor?.timeout_seconds / 60 || 5, // Convert seconds to minutes
-          focus_session_length: config.services?.focus_timer?.default_session_length / 60 || 25, // Convert seconds to minutes
-          break_reminders: {
-            enabled: config.services?.break_monitor?.enabled || true,
-            interval_minutes: config.services?.break_monitor?.min_break_duration / 60 || 60, // Convert seconds to minutes
-            duration_minutes: config.services?.break_monitor?.max_break_duration / 60 || 15 // Convert seconds to minutes
-          },
-          export_frequency: {
-            enabled: false, // This would be a new setting
-            interval_hours: 24,
-            format: 'csv'
-          }
-        });
+        setSettings(prev => ({
+          ...prev,
+          idleTimeout: config.services?.idle_monitor?.timeout_seconds / 60 || 5,
+          focusSessionLength: config.services?.focus_timer?.default_session_length / 60 || 25,
+          breakReminders: config.services?.break_monitor?.enabled || true,
+          breakInterval: config.services?.break_monitor?.min_break_duration / 60 || 60,
+          breakDuration: config.services?.break_monitor?.max_break_duration / 60 || 15
+        }));
       } else {
         throw new Error('Failed to load settings');
       }
     } catch (error) {
       console.error('Error loading settings:', error);
-      setMessage({ type: 'error', text: 'Failed to load settings' });
+      toast.notify('error', 'Failed to load settings');
     } finally {
       setLoading(false);
     }
@@ -73,22 +96,21 @@ const Settings: React.FC = () => {
 
   const saveSettings = async () => {
     setSaving(true);
-    setMessage(null);
 
     try {
       // Convert frontend settings to backend config format
       const configUpdates = {
         services: {
           idle_monitor: {
-            timeout_seconds: settings.idle_timeout * 60 // Convert minutes to seconds
+            timeout_seconds: settings.idleTimeout * 60
           },
           focus_timer: {
-            default_session_length: settings.focus_session_length * 60 // Convert minutes to seconds
+            default_session_length: settings.focusSessionLength * 60
           },
           break_monitor: {
-            enabled: settings.break_reminders.enabled,
-            min_break_duration: settings.break_reminders.interval_minutes * 60, // Convert minutes to seconds
-            max_break_duration: settings.break_reminders.duration_minutes * 60 // Convert minutes to seconds
+            enabled: settings.breakReminders,
+            min_break_duration: settings.breakInterval * 60,
+            max_break_duration: settings.breakDuration * 60
           }
         }
       };
@@ -102,14 +124,14 @@ const Settings: React.FC = () => {
       });
 
       if (response.ok) {
-        setMessage({ type: 'success', text: 'Settings saved successfully!' });
+        toast.notify('success', 'Settings saved successfully!');
       } else {
         const error = await response.json();
         throw new Error(error.error || 'Failed to save settings');
       }
     } catch (error) {
       console.error('Error saving settings:', error);
-      setMessage({ type: 'error', text: `Failed to save settings: ${error instanceof Error ? error.message : 'Unknown error'}` });
+      toast.notify('error', `Failed to save settings: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setSaving(false);
     }
@@ -132,224 +154,331 @@ const Settings: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="w-full max-w-4xl mx-auto p-6">
-        <div className="bg-gray-800 rounded-lg shadow-lg p-6">
-          <div className="flex items-center justify-center">
-            <svg className="animate-spin h-8 w-8 text-pink-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            <span className="ml-3 text-gray-300">Loading settings...</span>
+      <div className="max-w-7xl mx-auto mt-4 p-4">
+        <GlassCard>
+          <div className="flex items-center justify-center p-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand"></div>
+            <span className="ml-3 text-text-muted">Loading settings...</span>
           </div>
-        </div>
+        </GlassCard>
       </div>
     );
   }
 
   return (
-    <div className="w-full max-w-4xl mx-auto p-6">
-      <div className="bg-gray-800 rounded-lg shadow-lg p-6">
-        <h2 className="text-2xl font-bold text-pink-400 mb-6">Settings</h2>
-        
-        {/* Message Display */}
-        {message && (
-          <div className={`mb-6 p-4 rounded-lg ${
-            message.type === 'success' 
-              ? 'bg-green-600 text-white' 
-              : 'bg-red-600 text-white'
-          }`}>
-            {message.text}
-          </div>
-        )}
+    <div className="max-w-7xl mx-auto mt-4 p-4">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-semibold">Settings</h1>
+          <p className="text-text-muted mt-1">
+            Customize your experience and preferences
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={loadSettings}
+            disabled={saving}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-neutral-600/20 text-text-muted hover:bg-neutral-600/30 border border-neutral-600/40 transition-colors"
+          >
+            <RotateCcw className="w-4 h-4" />
+            <span className="text-sm font-medium">Reset</span>
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={saveSettings}
+            disabled={saving}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-brand/20 text-brand hover:bg-brand/30 border border-brand/40 transition-colors"
+          >
+            {saving ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-brand"></div>
+                <span className="text-sm font-medium">Saving...</span>
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4" />
+                <span className="text-sm font-medium">Save Settings</span>
+              </>
+            )}
+          </motion.button>
+        </div>
+      </div>
 
-        <div className="space-y-8">
-          {/* Idle Timeout Settings */}
-          <div className="bg-gray-700 rounded-lg p-6">
-            <h3 className="text-lg font-medium text-white mb-4">Idle Detection</h3>
+      {/* Settings Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left Column - Settings */}
+        <div className="lg:col-span-2 space-y-6">
+          
+                     {/* Theme Section */}
+           <GlassCard>
+             <SectionHeader
+               title="Theme & Appearance"
+               subtitle="Customize the visual appearance"
+               tooltip="Configure theme, animations, and visual preferences"
+               className="mb-4"
+             />
             <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Idle Timeout (minutes)
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  max="60"
-                  value={settings.idle_timeout}
-                  onChange={(e) => handleInputChange('idle_timeout', parseInt(e.target.value) || 5)}
-                  className="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-pink-500"
-                />
-                <p className="text-sm text-gray-400 mt-1">
-                  Time before the system considers you idle (1-60 minutes)
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Focus Session Settings */}
-          <div className="bg-gray-700 rounded-lg p-6">
-            <h3 className="text-lg font-medium text-white mb-4">Focus Sessions</h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Default Session Length (minutes)
-                </label>
-                <input
-                  type="number"
-                  min="5"
-                  max="120"
-                  value={settings.focus_session_length}
-                  onChange={(e) => handleInputChange('focus_session_length', parseInt(e.target.value) || 25)}
-                  className="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-pink-500"
-                />
-                <p className="text-sm text-gray-400 mt-1">
-                  Default duration for focus sessions (5-120 minutes)
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Break Reminder Settings */}
-          <div className="bg-gray-700 rounded-lg p-6">
-            <h3 className="text-lg font-medium text-white mb-4">Break Reminders</h3>
-            <div className="space-y-4">
-              <div className="flex items-center">
-                <input
-                  type="checkbox"
-                  id="break_reminders_enabled"
-                  checked={settings.break_reminders.enabled}
-                  onChange={(e) => handleInputChange('break_reminders.enabled', e.target.checked)}
-                  className="h-4 w-4 text-pink-600 focus:ring-pink-500 border-gray-300 rounded"
-                />
-                <label htmlFor="break_reminders_enabled" className="ml-2 text-sm text-gray-300">
-                  Enable break reminders
-                </label>
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="text-sm font-medium text-text">Theme</label>
+                  <p className="text-xs text-text-muted">Choose your preferred color scheme</p>
+                </div>
+                <Select value={settings.theme} onValueChange={(value) => handleInputChange('theme', value)}>
+                  <SelectTrigger className="w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="dark">Dark</SelectItem>
+                    <SelectItem value="light">Light</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               
-              {settings.break_reminders.enabled && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="text-sm font-medium text-text">Reduce Motion</label>
+                  <p className="text-xs text-text-muted">Disable animations for accessibility</p>
+                </div>
+                <Switch
+                  checked={settings.reduceMotion}
+                  onCheckedChange={(checked) => handleInputChange('reduceMotion', checked)}
+                />
+              </div>
+            </div>
+          </GlassCard>
+
+                     {/* Data Retention Section */}
+           <GlassCard>
+             <SectionHeader
+               title="Data Retention"
+               subtitle="Manage data storage and exports"
+               tooltip="Configure how long data is kept and automatic export settings"
+               className="mb-4"
+             />
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium text-text">Data Retention Period</label>
+                <p className="text-xs text-text-muted mb-2">How long to keep your activity data</p>
+                <Slider
+                  value={[settings.dataRetentionDays]}
+                  onValueChange={([value]) => handleInputChange('dataRetentionDays', value)}
+                  max={365}
+                  min={7}
+                  step={1}
+                  className="w-full"
+                />
+                <div className="flex justify-between text-xs text-text-muted mt-1">
+                  <span>7 days</span>
+                  <span className="font-medium">{settings.dataRetentionDays} days</span>
+                  <span>1 year</span>
+                </div>
+              </div>
+              
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="text-sm font-medium text-text">Auto Export</label>
+                  <p className="text-xs text-text-muted">Automatically export data periodically</p>
+                </div>
+                <Switch
+                  checked={settings.autoExportEnabled}
+                  onCheckedChange={(checked) => handleInputChange('autoExportEnabled', checked)}
+                />
+              </div>
+              
+              {settings.autoExportEnabled && (
+                <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Reminder Interval (minutes)
-                    </label>
-                    <input
-                      type="number"
-                      min="15"
-                      max="240"
-                      value={settings.break_reminders.interval_minutes}
-                      onChange={(e) => handleInputChange('break_reminders.interval_minutes', parseInt(e.target.value) || 60)}
-                      className="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-pink-500"
-                    />
-                    <p className="text-sm text-gray-400 mt-1">
-                      How often to remind you to take breaks (15-240 minutes)
-                    </p>
+                    <label className="text-sm font-medium text-text">Export Format</label>
+                    <Select value={settings.exportFormat} onValueChange={(value) => handleInputChange('exportFormat', value)}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="csv">CSV</SelectItem>
+                        <SelectItem value="json">JSON</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                  
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Break Duration (minutes)
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="60"
-                      value={settings.break_reminders.duration_minutes}
-                      onChange={(e) => handleInputChange('break_reminders.duration_minutes', parseInt(e.target.value) || 5)}
-                      className="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-pink-500"
+                    <label className="text-sm font-medium text-text">Frequency (hours)</label>
+                    <Slider
+                      value={[settings.exportFrequency]}
+                      onValueChange={([value]) => handleInputChange('exportFrequency', value)}
+                      max={168}
+                      min={1}
+                      step={1}
+                      className="w-full"
                     />
-                    <p className="text-sm text-gray-400 mt-1">
-                      Recommended break duration (1-60 minutes)
-                    </p>
+                    <div className="text-xs text-text-muted mt-1 text-center">
+                      {settings.exportFrequency} hours
+                    </div>
                   </div>
                 </div>
               )}
             </div>
-          </div>
+          </GlassCard>
 
-          {/* Export Frequency Settings */}
-          <div className="bg-gray-700 rounded-lg p-6">
-            <h3 className="text-lg font-medium text-white mb-4">Automatic Data Export</h3>
+                     {/* Notifications Section */}
+           <GlassCard>
+             <SectionHeader
+               title="Notifications"
+               subtitle="Configure alert preferences"
+               tooltip="Manage when and how you receive notifications"
+               className="mb-4"
+             />
             <div className="space-y-4">
-              <div className="flex items-center">
-                <input
-                  type="checkbox"
-                  id="export_frequency_enabled"
-                  checked={settings.export_frequency.enabled}
-                  onChange={(e) => handleInputChange('export_frequency.enabled', e.target.checked)}
-                  className="h-4 w-4 text-pink-600 focus:ring-pink-500 border-gray-300 rounded"
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="text-sm font-medium text-text">Enable Notifications</label>
+                  <p className="text-xs text-text-muted">Receive system notifications</p>
+                </div>
+                <Switch
+                  checked={settings.notificationsEnabled}
+                  onCheckedChange={(checked) => handleInputChange('notificationsEnabled', checked)}
                 />
-                <label htmlFor="export_frequency_enabled" className="ml-2 text-sm text-gray-300">
-                  Enable automatic data export
-                </label>
               </div>
               
-              {settings.export_frequency.enabled && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Export Interval (hours)
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="168"
-                      value={settings.export_frequency.interval_hours}
-                      onChange={(e) => handleInputChange('export_frequency.interval_hours', parseInt(e.target.value) || 24)}
-                      className="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-pink-500"
+              {settings.notificationsEnabled && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <label className="text-sm font-medium text-text">Break Reminders</label>
+                      <p className="text-xs text-text-muted">Get reminded to take breaks</p>
+                    </div>
+                    <Switch
+                      checked={settings.breakReminders}
+                      onCheckedChange={(checked) => handleInputChange('breakReminders', checked)}
                     />
-                    <p className="text-sm text-gray-400 mt-1">
-                      How often to automatically export data (1-168 hours)
-                    </p>
                   </div>
                   
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Export Format
-                    </label>
-                    <select
-                      value={settings.export_frequency.format}
-                      onChange={(e) => handleInputChange('export_frequency.format', e.target.value as 'csv' | 'json')}
-                      className="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-pink-500"
-                    >
-                      <option value="csv">CSV</option>
-                      <option value="json">JSON</option>
-                    </select>
-                    <p className="text-sm text-gray-400 mt-1">
-                      Format for automatic exports
-                    </p>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <label className="text-sm font-medium text-text">Focus Session Alerts</label>
+                      <p className="text-xs text-text-muted">Notifications when focus sessions end</p>
+                    </div>
+                    <Switch
+                      checked={settings.focusSessionAlerts}
+                      onCheckedChange={(checked) => handleInputChange('focusSessionAlerts', checked)}
+                    />
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <label className="text-sm font-medium text-text">Idle Notifications</label>
+                      <p className="text-xs text-text-muted">Alert when you've been idle too long</p>
+                    </div>
+                    <Switch
+                      checked={settings.idleNotifications}
+                      onCheckedChange={(checked) => handleInputChange('idleNotifications', checked)}
+                    />
                   </div>
                 </div>
               )}
             </div>
-          </div>
+          </GlassCard>
 
-          {/* Save Button */}
-          <div className="flex justify-end space-x-4">
-            <button
-              onClick={loadSettings}
-              disabled={saving}
-              className="px-6 py-3 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
-            >
-              Reset to Defaults
-            </button>
-            <button
-              onClick={saveSettings}
-              disabled={saving}
-              className="px-6 py-3 bg-pink-600 hover:bg-pink-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 flex items-center"
-            >
-              {saving ? (
+                     {/* Performance Section */}
+           <GlassCard>
+             <SectionHeader
+               title="Performance & Timing"
+               subtitle="Configure tracking behavior"
+               tooltip="Adjust timing settings for idle detection, focus sessions, and breaks"
+               className="mb-4"
+             />
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium text-text">Idle Timeout</label>
+                <p className="text-xs text-text-muted mb-2">Time before considering you idle</p>
+                <Slider
+                  value={[settings.idleTimeout]}
+                  onValueChange={([value]) => handleInputChange('idleTimeout', value)}
+                  max={30}
+                  min={1}
+                  step={1}
+                  className="w-full"
+                />
+                <div className="flex justify-between text-xs text-text-muted mt-1">
+                  <span>1 min</span>
+                  <span className="font-medium">{settings.idleTimeout} min</span>
+                  <span>30 min</span>
+                </div>
+              </div>
+              
+              <div>
+                <label className="text-sm font-medium text-text">Focus Session Length</label>
+                <p className="text-xs text-text-muted mb-2">Default duration for focus sessions</p>
+                <Slider
+                  value={[settings.focusSessionLength]}
+                  onValueChange={([value]) => handleInputChange('focusSessionLength', value)}
+                  max={120}
+                  min={5}
+                  step={5}
+                  className="w-full"
+                />
+                <div className="flex justify-between text-xs text-text-muted mt-1">
+                  <span>5 min</span>
+                  <span className="font-medium">{settings.focusSessionLength} min</span>
+                  <span>2 hours</span>
+                </div>
+              </div>
+              
+              {settings.breakReminders && (
                 <>
-                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Saving...
+                  <div>
+                    <label className="text-sm font-medium text-text">Break Interval</label>
+                    <p className="text-xs text-text-muted mb-2">How often to remind you to take breaks</p>
+                    <Slider
+                      value={[settings.breakInterval]}
+                      onValueChange={([value]) => handleInputChange('breakInterval', value)}
+                      max={240}
+                      min={15}
+                      step={15}
+                      className="w-full"
+                    />
+                    <div className="flex justify-between text-xs text-text-muted mt-1">
+                      <span>15 min</span>
+                      <span className="font-medium">{settings.breakInterval} min</span>
+                      <span>4 hours</span>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="text-sm font-medium text-text">Break Duration</label>
+                    <p className="text-xs text-text-muted mb-2">Recommended break length</p>
+                    <Slider
+                      value={[settings.breakDuration]}
+                      onValueChange={([value]) => handleInputChange('breakDuration', value)}
+                      max={60}
+                      min={1}
+                      step={1}
+                      className="w-full"
+                    />
+                    <div className="flex justify-between text-xs text-text-muted mt-1">
+                      <span>1 min</span>
+                      <span className="font-medium">{settings.breakDuration} min</span>
+                      <span>1 hour</span>
+                    </div>
+                  </div>
                 </>
-              ) : (
-                'Save Settings'
               )}
-            </button>
-          </div>
+            </div>
+          </GlassCard>
+        </div>
+
+        {/* Right Column - Live Preview */}
+        <div className="lg:col-span-1">
+          <LivePreview
+            theme={settings.theme}
+            reduceMotion={settings.reduceMotion}
+            idleTimeout={settings.idleTimeout}
+            focusSessionLength={settings.focusSessionLength}
+            breakRemindersEnabled={settings.breakReminders}
+            notificationsEnabled={settings.notificationsEnabled}
+          />
         </div>
       </div>
     </div>
