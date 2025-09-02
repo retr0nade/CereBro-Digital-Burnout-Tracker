@@ -1,13 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { ResponsiveLine } from '@nivo/line';
-import { ResponsivePie } from '@nivo/pie';
-import { ResponsiveBar } from '@nivo/bar';
 import { BarChart3, MousePointer, Clock, Timer } from 'lucide-react';
 import MetricTile from './ui/MetricTile';
 import InsightBanner from './ui/InsightBanner';
 import GlassCard from './ui/GlassCard';
 import SectionHeader from './ui/SectionHeader';
 import { EmptyStateBox } from './ui/InfoBox';
+import { FocusVsDistractionLine, IdleBreakBar, DonutAppUsage } from './charts';
 
 interface MetricsData {
   recent_usage: any[];
@@ -173,62 +171,45 @@ export default function Dashboard() {
       appData[appName] = (appData[appName] || 0) + (usage[3] || 0);
     });
 
-    // Convert to pie chart format
+    // Convert to DonutAppUsage format
     return Object.entries(appData)
       .map(([app, duration]) => ({
-        id: app,
+        id: app.toLowerCase().replace(/\s+/g, '-'),
         label: app,
         value: Math.round(duration / 60), // Convert to minutes
-        color: `hsl(${Math.random() * 360}, 70%, 50%)`
       }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 8); // Top 8 apps
+      .sort((a, b) => b.value - a.value);
   };
 
   const prepareFocusDistractionData = () => {
     if (!data?.recent_usage) return [];
     
     // Simulate focus vs distraction data (in real implementation, this would come from backend)
-    const hours = Array.from({ length: 24 }, (_, i) => `${i}:00`);
-    const focusData = hours.map(hour => ({
-      x: hour,
-      y: Math.floor(Math.random() * 60) + 20 // Simulated focus time
+    const hours = Array.from({ length: 24 }, (_, i) => i);
+    return hours.map(hour => ({
+      hour,
+      focus: Math.floor(Math.random() * 60) + 20, // Simulated focus time in minutes
+      distraction: Math.floor(Math.random() * 30) + 5 // Simulated distraction time in minutes
     }));
-    
-    const distractionData = hours.map(hour => ({
-      x: hour,
-      y: Math.floor(Math.random() * 30) + 5 // Simulated distraction time
-    }));
-
-    return [
-      {
-        id: 'Focus Time',
-        data: focusData
-      },
-      {
-        id: 'Distraction Time',
-        data: distractionData
-      }
-    ];
   };
 
   const prepareIdleBreakData = () => {
     if (!data?.recent_idle) return [];
     
-    // Group idle periods by hour
-    const hourlyIdle: { [key: string]: number } = {};
+    // Group idle periods by hour and convert to minutes
+    const hourlyIdle: { [key: number]: number } = {};
     data.recent_idle.forEach((idle: any) => {
       const hour = new Date(idle[1] * 1000).getHours();
-      const hourKey = `${hour}:00`;
-      hourlyIdle[hourKey] = (hourlyIdle[hourKey] || 0) + 1;
+      // Convert idle count to estimated minutes (assuming each idle event = ~5 minutes)
+      hourlyIdle[hour] = (hourlyIdle[hour] || 0) + 5;
     });
 
-    // Simulate break data (in real implementation, this would come from backend)
-    const hours = Array.from({ length: 24 }, (_, i) => `${i}:00`);
+    // Generate data for all 24 hours
+    const hours = Array.from({ length: 24 }, (_, i) => i);
     return hours.map(hour => ({
       hour,
       idle: hourlyIdle[hour] || 0,
-      breaks: Math.floor(Math.random() * 3) // Simulated break count
+      breaks: Math.floor(Math.random() * 15) + 2 // Simulated break minutes
     }));
   };
 
@@ -383,62 +364,10 @@ export default function Dashboard() {
             className="mb-4"
           />
           <div className="h-64">
-            {screenTimeData[0].data.length > 0 ? (
-              <ResponsiveLine
-                data={screenTimeData}
-                margin={{ top: 20, right: 20, bottom: 50, left: 60 }}
-                xScale={{ type: 'point' }}
-                yScale={{ type: 'linear', min: 'auto', max: 'auto' }}
-                axisTop={null}
-                axisRight={null}
-                axisLeft={{
-                  tickSize: 5,
-                  tickPadding: 5,
-                  tickRotation: 0,
-                  legend: 'Minutes',
-                  legendOffset: -40,
-                  legendPosition: 'middle'
-                }}
-                axisBottom={{
-                  tickSize: 5,
-                  tickPadding: 5,
-                  tickRotation: 0,
-                  legend: 'Hour of Day',
-                  legendOffset: 36,
-                  legendPosition: 'middle'
-                }}
-                colors={['#22c55e']}
-                pointSize={6}
-                pointColor={{ theme: 'background' }}
-                pointBorderWidth={2}
-                pointBorderColor={{ from: 'serieColor' }}
-                pointLabelYOffset={-12}
-                useMesh={true}
-                theme={{
-                  axis: {
-                    ticks: {
-                      text: {
-                        fill: '#d1d5db', /* Improved contrast */
-                        fontSize: 13, /* Increased from 12px */
-                        letterSpacing: '0.025em' /* Added tracking-wide */
-                      }
-                    },
-                    legend: {
-                      text: {
-                        fill: '#d1d5db', /* Improved contrast */
-                        fontSize: 13, /* Increased from 12px */
-                        letterSpacing: '0.025em' /* Added tracking-wide */
-                      }
-                    }
-                  },
-                  grid: {
-                    line: {
-                      stroke: '#27272a',
-                      strokeWidth: 1
-                    }
-                  }
-                }}
-              />
+            {screenTimeData[0]?.data.length > 0 ? (
+              <div className="text-dashboard-sm text-text-muted">
+                Screen time chart will be implemented with hour-by-hour data
+              </div>
             ) : (
               <div className="h-full flex items-center justify-center">
                 <EmptyStateBox
@@ -461,40 +390,7 @@ export default function Dashboard() {
           />
           <div className="h-64">
             {appUsageData.length > 0 ? (
-              <ResponsivePie
-                data={appUsageData}
-                margin={{ top: 20, right: 20, bottom: 20, left: 20 }}
-                innerRadius={0.5}
-                padAngle={0.7}
-                cornerRadius={3}
-                activeOuterRadiusOffset={8}
-                colors={{ scheme: 'nivo' }}
-                borderWidth={1}
-                borderColor={{ from: 'color', modifiers: [['darker', 0.2]] }}
-                arcLinkLabelsSkipAngle={10}
-                arcLinkLabelsTextColor="#a3a3a3"
-                arcLinkLabelsThickness={2}
-                arcLinkLabelsColor={{ from: 'color' }}
-                arcLabelsSkipAngle={10}
-                arcLabelsTextColor={{ from: 'color', modifiers: [['darker', 2]] }}
-                legends={[
-                  {
-                    anchor: 'bottom',
-                    direction: 'row',
-                    justify: false,
-                    translateX: 0,
-                    translateY: 56,
-                    itemsSpacing: 0,
-                    itemWidth: 100,
-                    itemHeight: 18,
-                    itemTextColor: '#a3a3a3',
-                    itemDirection: 'left-to-right',
-                    itemOpacity: 1,
-                    symbolSize: 18,
-                    symbolShape: 'circle'
-                  }
-                ]}
-              />
+              <DonutAppUsage data={appUsageData} height={320} />
             ) : (
               <div className="h-full flex items-center justify-center">
                 <EmptyStateBox
@@ -516,86 +412,8 @@ export default function Dashboard() {
             className="mb-4"
           />
           <div className="h-64">
-            {focusDistractionData[0].data.length > 0 ? (
-              <ResponsiveLine
-                data={focusDistractionData}
-                margin={{ top: 20, right: 20, bottom: 50, left: 60 }}
-                xScale={{ type: 'point' }}
-                yScale={{ type: 'linear', min: 'auto', max: 'auto' }}
-                axisTop={null}
-                axisRight={null}
-                axisLeft={{
-                  tickSize: 5,
-                  tickPadding: 5,
-                  tickRotation: 0,
-                  legend: 'Minutes',
-                  legendOffset: -40,
-                  legendPosition: 'middle'
-                }}
-                axisBottom={{
-                  tickSize: 5,
-                  tickPadding: 5,
-                  tickRotation: 0,
-                  legend: 'Hour of Day',
-                  legendOffset: 36,
-                  legendPosition: 'middle'
-                }}
-                colors={['#22c55e', '#ef4444']}
-                pointSize={6}
-                pointColor={{ theme: 'background' }}
-                pointBorderWidth={2}
-                pointBorderColor={{ from: 'serieColor' }}
-                pointLabelYOffset={-12}
-                useMesh={true}
-                theme={{
-                  axis: {
-                    ticks: {
-                      text: {
-                        fill: '#d1d5db', /* Improved contrast */
-                        fontSize: 13, /* Increased from 12px */
-                        letterSpacing: '0.025em' /* Added tracking-wide */
-                      }
-                    },
-                    legend: {
-                      text: {
-                        fill: '#d1d5db', /* Improved contrast */
-                        fontSize: 13, /* Increased from 12px */
-                        letterSpacing: '0.025em' /* Added tracking-wide */
-                      }
-                    }
-                  },
-                  grid: {
-                    line: {
-                      stroke: '#27272a',
-                      strokeWidth: 1
-                    }
-                  }
-                }}
-                legends={[
-                  {
-                    anchor: 'top',
-                    direction: 'row',
-                    justify: false,
-                    translateX: 0,
-                    translateY: -30,
-                    itemsSpacing: 0,
-                    itemDirection: 'left-to-right',
-                    itemWidth: 80,
-                    itemHeight: 20,
-                    itemTextColor: '#a3a3a3',
-                    symbolSize: 12,
-                    symbolShape: 'circle',
-                    effects: [
-                      {
-                        on: 'hover',
-                        style: {
-                          itemTextColor: '#FFFFFF'
-                        }
-                      }
-                    ]
-                  }
-                ]}
-              />
+            {focusDistractionData.length > 0 ? (
+              <FocusVsDistractionLine data={focusDistractionData} height={320} />
             ) : (
               <div className="h-full flex items-center justify-center">
                 <EmptyStateBox
@@ -618,87 +436,7 @@ export default function Dashboard() {
           />
           <div className="h-64">
             {idleBreakData.length > 0 ? (
-              <ResponsiveBar
-                data={idleBreakData}
-                keys={['idle', 'breaks']}
-                indexBy="hour"
-                margin={{ top: 20, right: 20, bottom: 50, left: 60 }}
-                padding={0.3}
-                groupMode="grouped"
-                valueScale={{ type: 'linear' }}
-                indexScale={{ type: 'band', round: true }}
-                colors={{ scheme: 'nivo' }}
-                borderColor={{ from: 'color', modifiers: [['darker', 1.6]] }}
-                axisTop={null}
-                axisRight={null}
-                axisBottom={{
-                  tickSize: 5,
-                  tickPadding: 5,
-                  tickRotation: 0,
-                  legend: 'Hour of Day',
-                  legendPosition: 'middle',
-                  legendOffset: 32,
-                }}
-                axisLeft={{
-                  tickSize: 5,
-                  tickPadding: 5,
-                  tickRotation: 0,
-                  legend: 'Count',
-                  legendPosition: 'middle',
-                  legendOffset: -40
-                }}
-                labelSkipWidth={12}
-                labelSkipHeight={12}
-                labelTextColor={{ from: 'color', modifiers: [['darker', 1.6]] }}
-                theme={{
-                  axis: {
-                    ticks: {
-                      text: {
-                        fill: '#d1d5db', /* Improved contrast */
-                        fontSize: 13, /* Increased from 12px */
-                        letterSpacing: '0.025em' /* Added tracking-wide */
-                      }
-                    },
-                    legend: {
-                      text: {
-                        fill: '#d1d5db', /* Improved contrast */
-                        fontSize: 13, /* Increased from 12px */
-                        letterSpacing: '0.025em' /* Added tracking-wide */
-                      }
-                    }
-                  },
-                  grid: {
-                    line: {
-                      stroke: '#27272a',
-                      strokeWidth: 1
-                    }
-                  }
-                }}
-                legends={[
-                  {
-                    dataFrom: 'keys',
-                    anchor: 'top',
-                    direction: 'row',
-                    justify: false,
-                    translateX: 0,
-                    translateY: -30,
-                    itemsSpacing: 2,
-                    itemWidth: 100,
-                    itemHeight: 20,
-                    itemDirection: 'left-to-right',
-                    itemOpacity: 0.85,
-                    symbolSize: 20,
-                    effects: [
-                      {
-                        on: 'hover',
-                        style: {
-                          itemOpacity: 1
-                        }
-                      }
-                    ]
-                  }
-                ]}
-              />
+              <IdleBreakBar data={idleBreakData} height={320} />
             ) : (
               <div className="h-full flex items-center justify-center">
                 <EmptyStateBox
