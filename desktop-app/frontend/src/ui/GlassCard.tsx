@@ -14,14 +14,18 @@ export default function GlassCard({
   ...props 
 }: React.PropsWithChildren<GlassCardProps>) {
   const baseClasses = clsx(
-    // Core glass styling
-    "rounded-2xl border border-white/[0.08] backdrop-blur-md",
-    "bg-surface/40 shadow-soft",
+    // Core glass styling with enhanced borders and shadows
+    "rounded-2xl border border-white/10 backdrop-blur-md",
+    "bg-surface/40 shadow-[0_1px_0_rgba(255,255,255,0.06)_inset,0_8px_24px_rgba(0,0,0,0.35)]",
     "transition-all duration-300 ease-out",
     
-    // Interactive states
-    interactive && "cursor-pointer hover:shadow-lift hover:bg-surface/50",
-    interactive && "hover:border-white/[0.12] hover:-translate-y-0.5",
+    // Interactive states with enhanced hover effects
+    interactive && "cursor-pointer hover:shadow-[0_1px_0_rgba(255,255,255,0.08)_inset,0_12px_32px_rgba(0,0,0,0.4)] hover:bg-surface/50",
+    interactive && "hover:border-white/15 hover:-translate-y-0.5",
+    
+    // Focus states
+    "focus-visible:outline-2 focus-visible:outline-focus focus-visible:outline-offset-2",
+    "focus-visible:shadow-[0_1px_0_rgba(255,255,255,0.08)_inset,0_12px_32px_rgba(0,0,0,0.4),0_0_0_4px_rgba(59,130,246,0.1)]",
     
     // Custom classes
     className
@@ -29,12 +33,10 @@ export default function GlassCard({
 
   const motionProps = interactive ? {
     whileHover: { 
-      scale: 1.02,
       y: -2,
       transition: { type: "spring", stiffness: 400, damping: 25 }
     },
     whileTap: { 
-      scale: 0.98,
       y: 0,
       transition: { type: "spring", stiffness: 600, damping: 25 }
     },

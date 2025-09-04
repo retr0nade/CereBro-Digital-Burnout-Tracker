@@ -63,7 +63,7 @@ export default function MetricTile({
       className={clsx(
         "p-6 relative overflow-hidden",
         styles.bg,
-        styles.border,
+        "border-white/10",
         className
       )}
       interactive={interactive}
@@ -82,8 +82,7 @@ export default function MetricTile({
             className={clsx(
               "inline-flex items-center justify-center w-10 h-10 rounded-xl mb-4",
               styles.bg,
-              "border",
-              styles.border
+              "border border-white/10"
             )}
             whileHover={{ scale: 1.1, rotate: 5 }}
             transition={{ type: "spring", stiffness: 400, damping: 15 }}

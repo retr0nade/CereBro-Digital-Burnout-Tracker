@@ -76,7 +76,7 @@ export default function InsightBanner({
       className={clsx(
         "relative overflow-hidden",
         config.bgColor,
-        config.borderColor,
+        "border-white/10",
         className
       )}
     >
@@ -85,7 +85,7 @@ export default function InsightBanner({
       
       {/* Header */}
       <motion.div
-        className="p-6 cursor-pointer"
+        className="p-6 cursor-pointer focus-ring"
         onClick={() => setIsExpanded(!isExpanded)}
         whileHover={{ backgroundColor: 'rgba(255, 255, 255, 0.02)' }}
         whileTap={{ scale: 0.995 }}
@@ -97,8 +97,7 @@ export default function InsightBanner({
               className={clsx(
                 "flex items-center justify-center w-10 h-10 rounded-xl",
                 config.bgColor,
-                "border",
-                config.borderColor
+                "border border-white/10"
               )}
               whileHover={{ scale: 1.05, rotate: 2 }}
               transition={{ type: "spring", stiffness: 400, damping: 15 }}

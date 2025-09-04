@@ -89,10 +89,13 @@ export default function InfoBox({
   return (
     <motion.div
       className={clsx(
-        "flex items-start gap-3 p-4 rounded-xl border",
+        "flex items-start gap-3 p-4 rounded-xl border border-white/10",
         styles.bg,
-        styles.border,
         "transition-all duration-200",
+        "shadow-[0_1px_0_rgba(255,255,255,0.06)_inset,0_8px_24px_rgba(0,0,0,0.35)]",
+        "hover:shadow-[0_1px_0_rgba(255,255,255,0.08)_inset,0_12px_32px_rgba(0,0,0,0.4)]",
+        "hover:border-white/15",
+        "focus-visible:outline-2 focus-visible:outline-focus focus-visible:outline-offset-2",
         className
       )}
       initial={{ opacity: 0, scale: 0.95 }}

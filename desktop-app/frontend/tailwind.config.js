@@ -52,6 +52,8 @@ module.exports = {
         lift: 'var(--shadow-lift)',
         pop: 'var(--shadow-pop)',
         glow: 'var(--shadow-glow)',
+        card: 'var(--shadow-card)',
+        'card-hover': 'var(--shadow-card-hover)',
       },
       backdropBlur: {
         xs: '2px',

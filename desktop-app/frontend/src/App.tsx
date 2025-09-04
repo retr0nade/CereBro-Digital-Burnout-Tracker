@@ -7,6 +7,7 @@ import ServiceManager from "./ServiceManager";
 import DataExport from "./DataExport";
 import AppShell from "./layout/AppShell";
 import { toast } from './services/eventHandlers';
+import { useCursorTracking } from './hooks/useCursorTracking';
 
 interface BackendStatusType {
   running: boolean;
@@ -29,6 +30,9 @@ export default function App() {
     port: 5005,
     error: undefined
   });
+
+  // Initialize cursor tracking for animated background
+  useCursorTracking();
 
   useEffect(() => {
     // Check backend status on mount

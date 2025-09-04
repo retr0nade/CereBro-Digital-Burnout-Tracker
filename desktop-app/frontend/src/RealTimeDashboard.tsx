@@ -315,7 +315,14 @@ export default function RealTimeDashboard() {
               : 'Backend service is not available'
             }
           </p>
-          <button onClick={fetchData} className="btn btn-danger mt-4">Retry</button>
+                          <motion.button 
+                  onClick={fetchData} 
+                  className="btn btn-danger mt-4 focus-ring"
+                  whileHover={{ y: -2 }}
+                  whileTap={{ y: 0 }}
+                >
+                  Retry
+                </motion.button>
         </div>
       </div>
     );

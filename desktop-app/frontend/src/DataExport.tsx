@@ -267,13 +267,13 @@ const DataExport: React.FC = () => {
                 <motion.button
                   key={preset.id}
                   onClick={() => setSelectedPreset(preset.id)}
-                  className={`w-full p-4 rounded-xl border transition-all duration-200 text-left ${
+                  className={`w-full p-4 rounded-xl border transition-all duration-200 text-left focus-ring ${
                     selectedPreset === preset.id
                       ? 'bg-brand/10 border-brand/30 text-brand'
-                      : 'bg-surface/50 border-border hover:bg-surface/70 hover:border-brand/20'
+                      : 'bg-surface/50 border-white/10 hover:bg-surface/70 hover:border-white/15'
                   }`}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
+                  whileHover={{ y: -2 }}
+                  whileTap={{ y: 0 }}
                 >
                   <div className="flex items-center justify-between">
                     <div>
@@ -376,14 +376,16 @@ const DataExport: React.FC = () => {
 
             {/* Export Buttons */}
             <div className="space-y-3">
-              <button
+              <motion.button
                 onClick={() => handleExport('csv')}
                 disabled={exporting || !summary.dateRange}
-                className={`w-full px-6 py-4 rounded-xl font-medium transition-all duration-200 flex items-center justify-center gap-3 ${
+                className={`w-full px-6 py-4 rounded-xl font-medium transition-all duration-200 flex items-center justify-center gap-3 focus-ring ${
                   exporting && exportType === 'csv'
                     ? 'bg-surface/50 text-text-muted cursor-not-allowed'
-                    : 'bg-brand hover:bg-brand/90 text-white hover:shadow-lg transform hover:scale-105'
+                    : 'bg-brand hover:bg-brand/90 text-white hover:shadow-lg'
                 }`}
+                whileHover={{ y: -2 }}
+                whileTap={{ y: 0 }}
               >
                 {exporting && exportType === 'csv' ? (
                   <>
@@ -396,16 +398,18 @@ const DataExport: React.FC = () => {
                     Export as CSV
                   </>
                 )}
-              </button>
+              </motion.button>
 
-              <button
+              <motion.button
                 onClick={() => handleExport('pdf')}
                 disabled={exporting || !summary.dateRange}
-                className={`w-full px-6 py-4 rounded-xl font-medium transition-all duration-200 flex items-center justify-center gap-3 ${
+                className={`w-full px-6 py-4 rounded-xl font-medium transition-all duration-200 flex items-center justify-center gap-3 focus-ring ${
                   exporting && exportType === 'pdf'
                     ? 'bg-surface/50 text-text-muted cursor-not-allowed'
-                    : 'bg-surface/50 hover:bg-surface/70 text-text border border-border hover:border-brand/30 hover:shadow-lg transform hover:scale-105'
+                    : 'bg-surface/50 hover:bg-surface/70 text-text border border-white/10 hover:border-white/15 hover:shadow-lg'
                 }`}
+                whileHover={{ y: -2 }}
+                whileTap={{ y: 0 }}
               >
                 {exporting && exportType === 'pdf' ? (
                   <>
@@ -418,7 +422,7 @@ const DataExport: React.FC = () => {
                     Export as PDF
                   </>
                 )}
-              </button>
+              </motion.button>
             </div>
 
             {/* Data Tables Info */}

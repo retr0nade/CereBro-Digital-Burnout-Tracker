@@ -44,9 +44,9 @@ export default function SectionHeader({
                   <motion.button
                     className={clsx(
                       "inline-flex items-center justify-center w-5 h-5",
-                      "rounded-full bg-surface-alt border border-border",
+                      "rounded-full bg-surface-alt border border-white/10",
                       "text-text-muted hover:text-text transition-colors",
-                      "focus:outline-none focus:ring-2 focus:ring-focus focus:ring-offset-1"
+                      "focus-ring"
                     )}
                     whileHover={{ scale: 1.1 }}
                     whileTap={{ scale: 0.9 }}
@@ -60,7 +60,7 @@ export default function SectionHeader({
                   <Tooltip.Content
                     className={clsx(
                       "z-50 px-3 py-2 text-sm font-medium text-text",
-                      "bg-surface border border-border rounded-lg shadow-pop",
+                      "bg-surface border border-white/10 rounded-lg shadow-[0_1px_0_rgba(255,255,255,0.06)_inset,0_8px_24px_rgba(0,0,0,0.35)]",
                       "max-w-xs break-words leading-relaxed",
                       "animate-in fade-in-0 zoom-in-95"
                     )}
@@ -68,7 +68,7 @@ export default function SectionHeader({
                     side="top"
                   >
                     {tooltip}
-                    <Tooltip.Arrow className="fill-surface border-border" />
+                    <Tooltip.Arrow className="fill-surface border-white/10" />
                   </Tooltip.Content>
                 </Tooltip.Portal>
               </Tooltip.Root>
