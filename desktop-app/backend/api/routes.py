@@ -406,73 +406,208 @@ def websocket_status():
             })
         else:
             return jsonify({"status": "unavailable"}), 503
+    @api.route('/export/pdf', methods=['GET'])
+def export_pdf():
+    """Export data from cerebro.db as PDF with date range filtering"""
+    try:
+        # Get query parameters
+        start_date = request.args.get('startDate')
+        end_date = request.args.get('endDate')
+        tables = request.args.get('tables', 'all')
+        
+        # Parse dates if provided
+        start_timestamp = None
+        end_timestamp = None
+        
+        if start_date:
+            start_timestamp = int(datetime.fromisoformat(start_date.replace('Z', '+00:00')).timestamp())
+        if end_date:
+            end_timestamp = int(datetime.fromisoformat(end_date.replace('Z', '+00:00')).timestamp())
+        
+        # For now, we'll create a simple text-based PDF
+        # In a production environment, you might want to use a proper PDF library like reportlab
+        from reportlab.lib.pagesizes import letter
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import inch
+        from reportlab.lib import colors
+        import io
+        
+        # Create PDF buffer
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=letter)
+        styles = getSampleStyleSheet()
+        story = []
+        
+        # Title
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=16,
+            spaceAfter=30,
+            alignment=1  # Center
+        )
+        story.append(Paragraph("CereBro Data Export Report", title_style))
+        story.append(Spacer(1, 12))
+        
+        # Export info
+        info_style = styles['Normal']
+        story.append(Paragraph(f"Export Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", info_style))
+        if start_date and end_date:
+            story.append(Paragraph(f"Date Range: {start_date} to {end_date}", info_style))
+        story.append(Spacer(1, 20))
+        
+        # Add data tables
+        if tables == 'all' or 'app_usage' in tables:
+            story.append(Paragraph("Application Usage", styles['Heading2']))
+            app_usage = cerebro_db.get_app_usage(start_time=start_timestamp, end_time=end_timestamp)
+            if app_usage:
+                data = [['App Name', 'Duration', 'Start Time', 'End Time']]
+                for row in app_usage[:20]:  # Limit to first 20 rows for PDF
+                    data.append([
+                        row['app_name'],
+                        f"{row['duration']}s",
+                        datetime.fromtimestamp(row['start_time']).strftime('%Y-%m-%d %H:%M'),
+                        datetime.fromtimestamp(row['end_time']).strftime('%Y-%m-%d %H:%M')
+                    ])
+                table = Table(data)
+                table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 0), (-1, 0), 14),
+                    ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                    ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                    ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                ]))
+                story.append(table)
+                story.append(Spacer(1, 12))
+        
+        if tables == 'all' or 'focus_sessions' in tables:
+            story.append(Paragraph("Focus Sessions", styles['Heading2']))
+            focus_sessions = cerebro_db.get_focus_sessions(start_time=start_timestamp, end_time=end_timestamp)
+            if focus_sessions:
+                data = [['Start Time', 'End Time', 'Duration', 'Interrupted']]
+                for row in focus_sessions[:20]:
+                    data.append([
+                        datetime.fromtimestamp(row['start_time']).strftime('%Y-%m-%d %H:%M'),
+                        datetime.fromtimestamp(row['end_time']).strftime('%Y-%m-%d %H:%M'),
+                        f"{row['duration']}s",
+                        'Yes' if row['was_interrupted'] else 'No'
+                    ])
+                table = Table(data)
+                table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 0), (-1, 0), 14),
+                    ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                    ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                    ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                ]))
+                story.append(table)
+                story.append(Spacer(1, 12))
+        
+        # Build PDF
+        doc.build(story)
+        buffer.seek(0)
+        
+        return Response(
+            buffer.getvalue(),
+            mimetype='application/pdf',
+            headers={'Content-Disposition': f'attachment; filename=cerebro_export_{datetime.now().strftime("%Y%m%d_%H%M%S")}.pdf'}
+        )
+        
+    except ImportError:
+        # Fallback to CSV if reportlab is not available
+        return export_csv()
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 @api.route('/export/csv', methods=['GET'])
 def export_csv():
-    """Export all data from cerebro.db as CSV"""
+    """Export data from cerebro.db as CSV with date range filtering"""
     try:
         # Get query parameters
-        table = request.args.get('table', 'all')
-        limit = request.args.get('limit', 1000, type=int)
+        format_type = request.args.get('format', 'csv')
+        start_date = request.args.get('startDate')
+        end_date = request.args.get('endDate')
+        tables = request.args.get('tables', 'all')
+        
+        # Parse dates if provided
+        start_timestamp = None
+        end_timestamp = None
+        
+        if start_date:
+            start_timestamp = int(datetime.fromisoformat(start_date.replace('Z', '+00:00')).timestamp())
+        if end_date:
+            end_timestamp = int(datetime.fromisoformat(end_date.replace('Z', '+00:00')).timestamp())
         
         # Create CSV data
         output = io.StringIO()
         writer = csv.writer(output)
         
-        if table == 'all' or table == 'app_usage':
+        # Add export metadata
+        writer.writerow(['CereBro Data Export'])
+        writer.writerow(['Export Date:', datetime.now().strftime('%Y-%m-%d %H:%M:%S')])
+        if start_date and end_date:
+            writer.writerow(['Date Range:', f'{start_date} to {end_date}'])
+        writer.writerow([])
+        
+        if tables == 'all' or 'app_usage' in tables:
             writer.writerow(['Table: app_usage'])
             writer.writerow(['id', 'app_name', 'start_time', 'end_time', 'duration', 'created_at'])
-            app_usage = cerebro_db.get_app_usage(limit=limit)
+            app_usage = cerebro_db.get_app_usage(start_time=start_timestamp, end_time=end_timestamp)
             for row in app_usage:
                 writer.writerow([row['id'], row['app_name'], row['start_time'], row['end_time'], row['duration'], row['created_at']])
             writer.writerow([])
         
-        if table == 'all' or table == 'idle_periods':
+        if tables == 'all' or 'idle_periods' in tables:
             writer.writerow(['Table: idle_periods'])
             writer.writerow(['id', 'start_time', 'end_time', 'duration', 'created_at'])
-            idle_periods = cerebro_db.get_idle_periods(limit=limit)
+            idle_periods = cerebro_db.get_idle_periods(start_time=start_timestamp, end_time=end_timestamp)
             for row in idle_periods:
                 writer.writerow([row['id'], row['start_time'], row['end_time'], row['duration'], row['created_at']])
             writer.writerow([])
         
-        if table == 'all' or table == 'input_activity':
+        if tables == 'all' or 'input_activity' in tables:
             writer.writerow(['Table: input_activity'])
             writer.writerow(['id', 'timestamp', 'keypress_count', 'mouse_click_count', 'created_at'])
-            input_activity = cerebro_db.get_input_activity(limit=limit)
+            input_activity = cerebro_db.get_input_activity(start_time=start_timestamp, end_time=end_timestamp)
             for row in input_activity:
                 writer.writerow([row['id'], row['timestamp'], row['keypress_count'], row['mouse_click_count'], row['created_at']])
             writer.writerow([])
         
-        if table == 'all' or table == 'focus_sessions':
+        if tables == 'all' or 'focus_sessions' in tables:
             writer.writerow(['Table: focus_sessions'])
             writer.writerow(['id', 'start_time', 'end_time', 'was_interrupted', 'duration', 'created_at'])
-            focus_sessions = cerebro_db.get_focus_sessions(limit=limit)
+            focus_sessions = cerebro_db.get_focus_sessions(start_time=start_timestamp, end_time=end_timestamp)
             for row in focus_sessions:
                 writer.writerow([row['id'], row['start_time'], row['end_time'], row['was_interrupted'], row['duration'], row['created_at']])
             writer.writerow([])
         
-        if table == 'all' or table == 'breaks':
+        if tables == 'all' or 'breaks' in tables:
             writer.writerow(['Table: breaks'])
             writer.writerow(['id', 'start_time', 'end_time', 'type', 'created_at'])
-            breaks = cerebro_db.get_breaks(limit=limit)
+            breaks = cerebro_db.get_breaks(start_time=start_timestamp, end_time=end_timestamp)
             for row in breaks:
                 writer.writerow([row['id'], row['start_time'], row['end_time'], row['type'], row['created_at']])
             writer.writerow([])
         
-        if table == 'all' or table == 'browser_activity':
+        if tables == 'all' or 'browser_activity' in tables:
             writer.writerow(['Table: browser_activity'])
             writer.writerow(['id', 'domain', 'url', 'start_time', 'end_time', 'duration', 'created_at'])
-            browser_activity = cerebro_db.get_browser_activity(limit=limit)
+            browser_activity = cerebro_db.get_browser_activity(start_time=start_timestamp, end_time=end_timestamp)
             for row in browser_activity:
                 writer.writerow([row['id'], row['domain'], row['url'], row['start_time'], row['end_time'], row['duration'], row['created_at']])
             writer.writerow([])
         
-        if table == 'all' or table == 'system_metrics':
+        if tables == 'all' or 'system_metrics' in tables:
             writer.writerow(['Table: system_metrics'])
             writer.writerow(['id', 'timestamp', 'cpu_usage', 'ram_usage', 'created_at'])
-            system_metrics = cerebro_db.get_system_metrics(limit=limit)
+            system_metrics = cerebro_db.get_system_metrics(start_time=start_timestamp, end_time=end_timestamp)
             for row in system_metrics:
                 writer.writerow([row['id'], row['timestamp'], row['cpu_usage'], row['ram_usage'], row['created_at']])
             writer.writerow([])
@@ -492,39 +627,54 @@ def export_csv():
 
 @api.route('/export/json', methods=['GET'])
 def export_json():
-    """Export all data from cerebro.db as JSON"""
+    """Export data from cerebro.db as JSON with date range filtering"""
     try:
         # Get query parameters
-        table = request.args.get('table', 'all')
-        limit = request.args.get('limit', 1000, type=int)
+        format_type = request.args.get('format', 'json')
+        start_date = request.args.get('startDate')
+        end_date = request.args.get('endDate')
+        tables = request.args.get('tables', 'all')
+        
+        # Parse dates if provided
+        start_timestamp = None
+        end_timestamp = None
+        
+        if start_date:
+            start_timestamp = int(datetime.fromisoformat(start_date.replace('Z', '+00:00')).timestamp())
+        if end_date:
+            end_timestamp = int(datetime.fromisoformat(end_date.replace('Z', '+00:00')).timestamp())
         
         # Prepare export data
         export_data = {
             'export_timestamp': datetime.now().isoformat(),
             'database': 'cerebro.db',
+            'date_range': {
+                'start_date': start_date,
+                'end_date': end_date
+            } if start_date and end_date else None,
             'tables': {}
         }
         
-        if table == 'all' or table == 'app_usage':
-            export_data['tables']['app_usage'] = cerebro_db.get_app_usage(limit=limit)
+        if tables == 'all' or 'app_usage' in tables:
+            export_data['tables']['app_usage'] = cerebro_db.get_app_usage(start_time=start_timestamp, end_time=end_timestamp)
         
-        if table == 'all' or table == 'idle_periods':
-            export_data['tables']['idle_periods'] = cerebro_db.get_idle_periods(limit=limit)
+        if tables == 'all' or 'idle_periods' in tables:
+            export_data['tables']['idle_periods'] = cerebro_db.get_idle_periods(start_time=start_timestamp, end_time=end_timestamp)
         
-        if table == 'all' or table == 'input_activity':
-            export_data['tables']['input_activity'] = cerebro_db.get_input_activity(limit=limit)
+        if tables == 'all' or 'input_activity' in tables:
+            export_data['tables']['input_activity'] = cerebro_db.get_input_activity(start_time=start_timestamp, end_time=end_timestamp)
         
-        if table == 'all' or table == 'focus_sessions':
-            export_data['tables']['focus_sessions'] = cerebro_db.get_focus_sessions(limit=limit)
+        if tables == 'all' or 'focus_sessions' in tables:
+            export_data['tables']['focus_sessions'] = cerebro_db.get_focus_sessions(start_time=start_timestamp, end_time=end_timestamp)
         
-        if table == 'all' or table == 'breaks':
-            export_data['tables']['breaks'] = cerebro_db.get_breaks(limit=limit)
+        if tables == 'all' or 'breaks' in tables:
+            export_data['tables']['breaks'] = cerebro_db.get_breaks(start_time=start_timestamp, end_time=end_timestamp)
         
-        if table == 'all' or table == 'browser_activity':
-            export_data['tables']['browser_activity'] = cerebro_db.get_browser_activity(limit=limit)
+        if tables == 'all' or 'browser_activity' in tables:
+            export_data['tables']['browser_activity'] = cerebro_db.get_browser_activity(start_time=start_timestamp, end_time=end_timestamp)
         
-        if table == 'all' or table == 'system_metrics':
-            export_data['tables']['system_metrics'] = cerebro_db.get_system_metrics(limit=limit)
+        if tables == 'all' or 'system_metrics' in tables:
+            export_data['tables']['system_metrics'] = cerebro_db.get_system_metrics(start_time=start_timestamp, end_time=end_timestamp)
         
         # Create response
         json_data = json.dumps(export_data, indent=2, default=str)
@@ -534,6 +684,87 @@ def export_json():
             mimetype='application/json',
             headers={'Content-Disposition': f'attachment; filename=cerebro_export_{datetime.now().strftime("%Y%m%d_%H%M%S")}.json'}
         )
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@api.route('/export/summary', methods=['GET'])
+def export_summary():
+    """Get export summary data for preview"""
+    try:
+        # Get query parameters
+        start_date = request.args.get('startDate')
+        end_date = request.args.get('endDate')
+        tables = request.args.get('tables', 'all')
+        
+        # Parse dates if provided
+        start_timestamp = None
+        end_timestamp = None
+        
+        if start_date:
+            start_timestamp = int(datetime.fromisoformat(start_date.replace('Z', '+00:00')).timestamp())
+        if end_date:
+            end_timestamp = int(datetime.fromisoformat(end_date.replace('Z', '+00:00')).timestamp())
+        
+        # Calculate summary data
+        total_rows = 0
+        table_counts = {}
+        
+        if tables == 'all' or 'app_usage' in tables:
+            app_usage = cerebro_db.get_app_usage(start_time=start_timestamp, end_time=end_timestamp)
+            table_counts['app_usage'] = len(app_usage)
+            total_rows += len(app_usage)
+        
+        if tables == 'all' or 'idle_periods' in tables:
+            idle_periods = cerebro_db.get_idle_periods(start_time=start_timestamp, end_time=end_timestamp)
+            table_counts['idle_periods'] = len(idle_periods)
+            total_rows += len(idle_periods)
+        
+        if tables == 'all' or 'input_activity' in tables:
+            input_activity = cerebro_db.get_input_activity(start_time=start_timestamp, end_time=end_timestamp)
+            table_counts['input_activity'] = len(input_activity)
+            total_rows += len(input_activity)
+        
+        if tables == 'all' or 'focus_sessions' in tables:
+            focus_sessions = cerebro_db.get_focus_sessions(start_time=start_timestamp, end_time=end_timestamp)
+            table_counts['focus_sessions'] = len(focus_sessions)
+            total_rows += len(focus_sessions)
+        
+        if tables == 'all' or 'breaks' in tables:
+            breaks = cerebro_db.get_breaks(start_time=start_timestamp, end_time=end_timestamp)
+            table_counts['breaks'] = len(breaks)
+            total_rows += len(breaks)
+        
+        if tables == 'all' or 'browser_activity' in tables:
+            browser_activity = cerebro_db.get_browser_activity(start_time=start_timestamp, end_time=end_timestamp)
+            table_counts['browser_activity'] = len(browser_activity)
+            total_rows += len(browser_activity)
+        
+        if tables == 'all' or 'system_metrics' in tables:
+            system_metrics = cerebro_db.get_system_metrics(start_time=start_timestamp, end_time=end_timestamp)
+            table_counts['system_metrics'] = len(system_metrics)
+            total_rows += len(system_metrics)
+        
+        # Estimate file size (rough calculation)
+        estimated_size_kb = total_rows * 0.5  # Rough estimate: 0.5KB per row
+        
+        # Format date range
+        date_range = ""
+        if start_date and end_date:
+            start_dt = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+            end_dt = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+            date_range = f"{start_dt.strftime('%b %d, %Y')} - {end_dt.strftime('%b %d, %Y')}"
+        
+        return jsonify({
+            "status": "success",
+            "summary": {
+                "rows": total_rows,
+                "dateRange": date_range,
+                "estimatedSize": f"{estimated_size_kb:.0f} KB",
+                "tables": list(table_counts.keys())
+            },
+            "tableCounts": table_counts
+        })
         
     except Exception as e:
         return jsonify({"error": str(e)}), 500

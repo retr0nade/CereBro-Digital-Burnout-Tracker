@@ -6,3 +6,4 @@ pywin32>=307
 python-xlib>=0.33
 pyobjc-framework-Quartz>=10.0
 pynput>=1.7.6
+reportlab>=4.0.0
