@@ -184,6 +184,7 @@ export default function FocusVsDistractionLine({
             tickCount={tickCount}
             minTickGap={20}
             interval="preserveStartEnd"
+            aria-label="Time of day"
           />
           
           <YAxis
@@ -198,6 +199,7 @@ export default function FocusVsDistractionLine({
             tickLine={{ stroke: 'var(--color-border)' }}
             width={60}
             tickCount={6}
+            aria-label="Duration in minutes"
           />
           
           <Tooltip 

@@ -302,23 +302,25 @@ const DataExport: React.FC = () => {
                     <label className="block text-sm font-medium text-text-muted mb-1">
                       Start Date
                     </label>
-                    <input
-                      type="date"
-                      value={customStartDate}
-                      onChange={(e) => setCustomStartDate(e.target.value)}
-                      className="w-full px-3 py-2 bg-surface/50 border border-border rounded-lg text-text focus:outline-none focus:ring-2 focus:ring-brand/50"
-                    />
+                                         <input
+                       type="date"
+                       value={customStartDate}
+                       onChange={(e) => setCustomStartDate(e.target.value)}
+                       className="w-full px-3 py-2 bg-surface/50 border border-border rounded-lg text-text focus:outline-none focus:ring-2 focus:ring-brand/50"
+                       aria-label="Start date for custom export range"
+                     />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-text-muted mb-1">
                       End Date
                     </label>
-                    <input
-                      type="date"
-                      value={customEndDate}
-                      onChange={(e) => setCustomEndDate(e.target.value)}
-                      className="w-full px-3 py-2 bg-surface/50 border border-border rounded-lg text-text focus:outline-none focus:ring-2 focus:ring-brand/50"
-                    />
+                                         <input
+                       type="date"
+                       value={customEndDate}
+                       onChange={(e) => setCustomEndDate(e.target.value)}
+                       className="w-full px-3 py-2 bg-surface/50 border border-border rounded-lg text-text focus:outline-none focus:ring-2 focus:ring-brand/50"
+                       aria-label="End date for custom export range"
+                     />
                   </div>
                 </div>
               </motion.div>
@@ -376,17 +378,19 @@ const DataExport: React.FC = () => {
 
             {/* Export Buttons */}
             <div className="space-y-3">
-              <motion.button
-                onClick={() => handleExport('csv')}
-                disabled={exporting || !summary.dateRange}
-                className={`w-full px-6 py-4 rounded-xl font-medium transition-all duration-200 flex items-center justify-center gap-3 focus-ring ${
-                  exporting && exportType === 'csv'
-                    ? 'bg-surface/50 text-text-muted cursor-not-allowed'
-                    : 'bg-brand hover:bg-brand/90 text-white hover:shadow-lg'
-                }`}
-                whileHover={{ y: -2 }}
-                whileTap={{ y: 0 }}
-              >
+                             <motion.button
+                 onClick={() => handleExport('csv')}
+                 disabled={exporting || !summary.dateRange}
+                 className={`w-full px-6 py-4 rounded-xl font-medium transition-all duration-200 flex items-center justify-center gap-3 focus-ring ${
+                   exporting && exportType === 'csv'
+                     ? 'bg-surface/50 text-text-muted cursor-not-allowed'
+                     : 'bg-brand hover:bg-brand/90 text-white hover:shadow-lg'
+                 }`}
+                 whileHover={{ y: -2 }}
+                 whileTap={{ y: 0 }}
+                 aria-label="Export data as CSV file"
+                 aria-describedby={exporting && exportType === 'csv' ? 'export-status' : undefined}
+               >
                 {exporting && exportType === 'csv' ? (
                   <>
                     <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
@@ -400,17 +404,19 @@ const DataExport: React.FC = () => {
                 )}
               </motion.button>
 
-              <motion.button
-                onClick={() => handleExport('pdf')}
-                disabled={exporting || !summary.dateRange}
-                className={`w-full px-6 py-4 rounded-xl font-medium transition-all duration-200 flex items-center justify-center gap-3 focus-ring ${
-                  exporting && exportType === 'pdf'
-                    ? 'bg-surface/50 text-text-muted cursor-not-allowed'
-                    : 'bg-surface/50 hover:bg-surface/70 text-text border border-white/10 hover:border-white/15 hover:shadow-lg'
-                }`}
-                whileHover={{ y: -2 }}
-                whileTap={{ y: 0 }}
-              >
+                             <motion.button
+                 onClick={() => handleExport('pdf')}
+                 disabled={exporting || !summary.dateRange}
+                 className={`w-full px-6 py-4 rounded-xl font-medium transition-all duration-200 flex items-center justify-center gap-3 focus-ring ${
+                   exporting && exportType === 'pdf'
+                     ? 'bg-surface/50 text-text-muted cursor-not-allowed'
+                     : 'bg-surface/50 hover:bg-surface/70 text-text border border-white/10 hover:border-white/15 hover:shadow-lg'
+                 }`}
+                 whileHover={{ y: -2 }}
+                 whileTap={{ y: 0 }}
+                 aria-label="Export data as PDF file"
+                 aria-describedby={exporting && exportType === 'pdf' ? 'export-status' : undefined}
+               >
                 {exporting && exportType === 'pdf' ? (
                   <>
                     <div className="w-5 h-5 border-2 border-text-muted/30 border-t-text-muted rounded-full animate-spin"></div>
@@ -423,9 +429,19 @@ const DataExport: React.FC = () => {
                   </>
                 )}
               </motion.button>
-            </div>
+                         </div>
 
-            {/* Data Tables Info */}
+             {/* Export Status */}
+             {exporting && (
+               <div id="export-status" className="mt-4 p-3 bg-surface/30 rounded-lg border border-border" role="status" aria-live="polite">
+                 <div className="flex items-center gap-2 text-sm text-text-muted">
+                   <div className="w-4 h-4 border-2 border-text-muted/30 border-t-text-muted rounded-full animate-spin"></div>
+                   <span>Exporting {exportType?.toUpperCase()} file...</span>
+                 </div>
+               </div>
+             )}
+
+             {/* Data Tables Info */}
             {summary.tables.length > 0 && (
               <div className="mt-6 p-4 bg-surface/20 rounded-lg border border-border">
                 <h4 className="font-medium text-text mb-2">Included Data Tables</h4>

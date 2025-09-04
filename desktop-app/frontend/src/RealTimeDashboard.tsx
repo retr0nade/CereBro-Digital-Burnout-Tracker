@@ -447,7 +447,9 @@ export default function RealTimeDashboard() {
                     tickRotation: 0,
                     legend: 'Inputs',
                     legendOffset: -40,
-                    legendPosition: 'middle'
+                    legendPosition: 'middle',
+                    tickValues: 'every 2',
+                    minTickGap: 30
                   }}
                   axisBottom={{
                     tickSize: 5,
@@ -455,7 +457,9 @@ export default function RealTimeDashboard() {
                     tickRotation: 0,
                     legend: 'Time',
                     legendOffset: 36,
-                    legendPosition: 'middle'
+                    legendPosition: 'middle',
+                    tickValues: window.innerWidth < 900 ? 'every 2' : 'every 1',
+                    minTickGap: 40
                   }}
                   colors={['#12ffe0', '#ff6b6b', '#4ecdc4']}
                   pointSize={6}
@@ -464,6 +468,26 @@ export default function RealTimeDashboard() {
                   pointBorderColor={{ from: 'serieColor' }}
                   pointLabelYOffset={-12}
                   useMesh={true}
+                  enableSlices="x"
+                  sliceTooltip={({ slice }) => (
+                    <div className="bg-surface border border-border rounded-lg p-3 shadow-pop">
+                      <div className="text-sm font-medium text-text mb-2">
+                        {slice.points[0]?.data.x}
+                      </div>
+                      {slice.points.map((point) => (
+                        <div key={point.id} className="flex items-center justify-between gap-3 mb-1">
+                          <div className="flex items-center gap-2">
+                            <div 
+                              className="w-3 h-3 rounded-full" 
+                              style={{ backgroundColor: point.color }}
+                            />
+                            <span className="text-sm text-text-muted">{point.serieId}</span>
+                          </div>
+                          <span className="text-sm font-medium text-text">{point.data.y}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   legends={[
                     {
                       anchor: 'top',
@@ -528,6 +552,16 @@ export default function RealTimeDashboard() {
                   arcLinkLabelsColor={{ from: 'color' }}
                   arcLabelsSkipAngle={10}
                   arcLabelsTextColor={{ from: 'color', modifiers: [['darker', 2]] }}
+                  tooltip={({ datum }) => (
+                    <div className="bg-surface border border-border rounded-lg p-3 shadow-pop">
+                      <div className="text-sm font-medium text-text mb-1">
+                        {datum.label}
+                      </div>
+                      <div className="text-sm text-text-muted">
+                        {Math.round(datum.value)} seconds ({Math.round(datum.percent)}%)
+                      </div>
+                    </div>
+                  )}
                   legends={[
                     {
                       anchor: 'bottom',

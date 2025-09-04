@@ -66,6 +66,7 @@ export default function Topbar({
         <div className="flex items-center gap-3">
           {/* Connection Status Chip */}
           <motion.div
+            id="backend-status"
             className={clsx(
               "flex items-center gap-2 px-3 py-1.5 rounded-full text-dashboard-sm font-medium",
               "border transition-all duration-200",
@@ -75,6 +76,8 @@ export default function Topbar({
             )}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
+            role="status"
+            aria-live="polite"
           >
             <motion.div
               className={clsx(
@@ -109,15 +112,17 @@ export default function Topbar({
             )}
             whileHover={{ scale: 1.02, y: -1 }}
             whileTap={{ scale: 0.98 }}
+            aria-label={backendStatus.running ? 'Stop backend service' : 'Start backend service'}
+            aria-describedby="backend-status"
           >
             {backendStatus.running ? (
               <>
-                <Square className="w-4 h-4" />
+                <Square className="w-4 h-4" aria-hidden="true" />
                 <span className="hidden sm:inline">Stop</span>
               </>
             ) : (
               <>
-                <Play className="w-4 h-4" />
+                <Play className="w-4 h-4" aria-hidden="true" />
                 <span className="hidden sm:inline">Start</span>
               </>
             )}
@@ -133,7 +138,8 @@ export default function Topbar({
             )}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
+            aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
+            aria-pressed={theme === 'dark'}
           >
             <motion.div
               initial={false}
@@ -141,9 +147,9 @@ export default function Topbar({
               transition={{ type: "spring", stiffness: 200, damping: 10 }}
             >
               {theme === 'dark' ? (
-                <Sun className="w-4 h-4 text-text-muted" />
+                <Sun className="w-4 h-4 text-text-muted" aria-hidden="true" />
               ) : (
-                <Moon className="w-4 h-4 text-text-muted" />
+                <Moon className="w-4 h-4 text-text-muted" aria-hidden="true" />
               )}
             </motion.div>
           </motion.button>

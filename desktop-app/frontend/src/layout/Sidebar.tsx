@@ -101,18 +101,19 @@ export default function Sidebar({ currentView, onViewChange, collapsed = false, 
             "hover:bg-surface-alt focus:outline-none focus:ring-2 focus:ring-focus",
             collapsed && "mx-auto"
           )}
-          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          aria-expanded={!collapsed}
         >
           {collapsed ? (
-            <Menu className="w-4 h-4 text-text-muted" />
+            <Menu className="w-4 h-4 text-text-muted" aria-hidden="true" />
           ) : (
-            <X className="w-4 h-4 text-text-muted" />
+            <X className="w-4 h-4 text-text-muted" aria-hidden="true" />
           )}
         </button>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-3 space-y-1">
+      <nav className="flex-1 p-3 space-y-1" role="menu" aria-label="Main navigation">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = currentView === item.key;
@@ -133,13 +134,15 @@ export default function Sidebar({ currentView, onViewChange, collapsed = false, 
                     : "text-text-muted hover:text-text hover:bg-surface-alt",
                   collapsed && "justify-center px-2"
                 )}
-                title={collapsed ? `${item.label} (${item.shortcut ? `Cmd+${item.shortcut}` : ''})` : undefined}
+                aria-label={collapsed ? `${item.label} (${item.shortcut ? `Cmd+${item.shortcut}` : ''})` : item.label}
+                aria-current={isActive ? 'page' : undefined}
+                role="menuitem"
               >
                 <Icon className={clsx(
                   "w-5 h-5 transition-transform duration-200",
                   isActive ? "text-brand" : "text-text-muted group-hover:text-text",
                   (isHovered || isActive) && "scale-110"
-                )} />
+                )} aria-hidden="true" />
                 
                 <AnimatePresence mode="wait">
                   {!collapsed && (

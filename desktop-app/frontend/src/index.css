@@ -320,6 +320,13 @@ body::before {
   @apply focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-focus;
 }
 
+/* Ensure focus outlines are always visible for keyboard navigation */
+.focus-visible {
+  outline: 2px solid var(--color-focus) !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1) !important;
+}
+
 /* Scrollbar styling */
 ::-webkit-scrollbar {
   width: 8px;

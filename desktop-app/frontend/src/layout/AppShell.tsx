@@ -129,6 +129,15 @@ export default function AppShell({
         e.preventDefault();
         onThemeToggle();
       }
+
+      // Close tooltips/popovers with Escape
+      if (e.key === 'Escape') {
+        // This will close any open tooltips or popovers
+        const activeElement = document.activeElement as HTMLElement;
+        if (activeElement && activeElement.blur) {
+          activeElement.blur();
+        }
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
@@ -144,6 +153,14 @@ export default function AppShell({
       "app-shell min-h-screen",
       "selection:bg-brand/30 selection:text-white"
     )}>
+      {/* Skip to main content link for screen readers */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 z-50 bg-brand text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-focus"
+      >
+        Skip to main content
+      </a>
+      
       <div className="flex min-h-screen relative">
         {/* Sidebar */}
         <motion.div
@@ -171,19 +188,21 @@ export default function AppShell({
           />
 
           {/* Main content */}
-          <MainArea sidebarCollapsed={sidebarCollapsed}>
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={currentView}
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.2, ease: "easeOut" }}
-              >
-                {children}
-              </motion.div>
-            </AnimatePresence>
-          </MainArea>
+          <main id="main-content" className="flex-1">
+            <MainArea sidebarCollapsed={sidebarCollapsed}>
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={currentView}
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.2, ease: "easeOut" }}
+                >
+                  {children}
+                </motion.div>
+              </AnimatePresence>
+            </MainArea>
+          </main>
         </div>
       </div>
 
