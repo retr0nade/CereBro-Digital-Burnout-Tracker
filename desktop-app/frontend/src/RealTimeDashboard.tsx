@@ -10,6 +10,7 @@ import MetricTile from './ui/MetricTile';
 import GlassCard from './ui/GlassCard';
 import { BarChart3, MousePointer, Clock, Timer, Activity } from 'lucide-react';
 import { createRollingWindow, useRAFBatching, useRenderTracker } from './utils/performance';
+import { useScreenshotMode, getScreenshotSeedData } from './utils/screenshotMode';
 
 interface RealTimeMetrics {
   appUsage: Array<{
@@ -88,6 +89,10 @@ export default function RealTimeDashboard() {
   const rafBatcher = useRAFBatching();
   const renderCount = useRenderTracker('RealTimeDashboard');
   
+  // Screenshot mode
+  const screenshotMode = useScreenshotMode();
+  const seedData = getScreenshotSeedData();
+  
   // Create rolling window functions for different data types
   const rollingWindow72 = createRollingWindow(72); // 72 points for 6 hours at 5-min intervals
   const rollingWindow48 = createRollingWindow(48); // 48 points for 4 hours at 5-min intervals
@@ -103,6 +108,10 @@ export default function RealTimeDashboard() {
 
   // Convert real-time data to ActivityTimeline format
   const timelineEvents = useMemo(() => {
+    if (screenshotMode.useSeedData) {
+      return seedData.activityTimelineEvents;
+    }
+    
     const events: any[] = [];
     
     // Add app usage events
@@ -156,7 +165,7 @@ export default function RealTimeDashboard() {
     return events
       .sort((a, b) => b.timestamp - a.timestamp)
       .slice(0, 50);
-  }, [throttledAppUsage, throttledInputActivity, realTimeMetrics.focusSessions, realTimeMetrics.breaks]);
+  }, [throttledAppUsage, throttledInputActivity, realTimeMetrics.focusSessions, realTimeMetrics.breaks, screenshotMode.useSeedData, seedData.activityTimelineEvents]);
 
   const fetchData = async () => {
     try {
@@ -376,9 +385,7 @@ export default function RealTimeDashboard() {
   }
 
   // Prepare real-time chart data
-
-  // Prepare real-time chart data
-  const inputActivityData = [
+  const inputActivityData = screenshotMode.useSeedData ? seedData.inputActivityData : [
     {
       id: 'Total Inputs',
       data: throttledInputActivity.map((activity, i) => ({
@@ -402,7 +409,7 @@ export default function RealTimeDashboard() {
     }
   ];
 
-  const appUsageData = throttledAppUsage.map(usage => ({
+  const appUsageData = screenshotMode.useSeedData ? seedData.realtimeAppUsageData : throttledAppUsage.map(usage => ({
     id: usage.app_name,
     label: usage.app_name,
     value: usage.duration

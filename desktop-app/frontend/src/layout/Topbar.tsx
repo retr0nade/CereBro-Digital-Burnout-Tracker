@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Github, Play, Square } from 'lucide-react';
 import { clsx } from 'clsx';
 import SegmentedControl from '../ui/SegmentedControl';
+import { ScreenshotModeWrapper } from '../utils/screenshotMode';
 
 interface BackendStatusType {
   running: boolean;
@@ -66,95 +67,103 @@ export default function Topbar({
         {/* Right side - Controls */}
         <div className="flex items-center gap-3">
           {/* Connection Status Chip */}
-          <motion.div
-            id="backend-status"
-            className={clsx(
-              "flex items-center gap-2 px-3 py-1.5 rounded-full text-dashboard-sm font-medium",
-              "border transition-all duration-200",
-              backendStatus.running
-                ? "bg-ok-muted/20 border-ok/30 text-ok"
-                : "bg-danger-muted/20 border-danger/30 text-danger"
-            )}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            role="status"
-            aria-live="polite"
-          >
+          <ScreenshotModeWrapper hideInScreenshot={true}>
             <motion.div
+              id="backend-status"
               className={clsx(
-                "w-2 h-2 rounded-full",
-                backendStatus.running ? "bg-ok" : "bg-danger"
+                "flex items-center gap-2 px-3 py-1.5 rounded-full text-dashboard-sm font-medium",
+                "border transition-all duration-200",
+                backendStatus.running
+                  ? "bg-ok-muted/20 border-ok/30 text-ok"
+                  : "bg-danger-muted/20 border-danger/30 text-danger"
               )}
-              animate={{
-                scale: backendStatus.running ? [1, 1.2, 1] : 1,
-                opacity: backendStatus.running ? [1, 0.7, 1] : 0.8
-              }}
-              transition={{
-                duration: 2,
-                repeat: backendStatus.running ? Infinity : 0,
-                ease: "easeInOut"
-              }}
-            />
-            <span className="hidden sm:inline">
-              {backendStatus.running ? 'Connected' : 'Disconnected'}
-            </span>
-          </motion.div>
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              role="status"
+              aria-live="polite"
+            >
+              <motion.div
+                className={clsx(
+                  "w-2 h-2 rounded-full",
+                  backendStatus.running ? "bg-ok" : "bg-danger"
+                )}
+                animate={{
+                  scale: backendStatus.running ? [1, 1.2, 1] : 1,
+                  opacity: backendStatus.running ? [1, 0.7, 1] : 0.8
+                }}
+                transition={{
+                  duration: 2,
+                  repeat: backendStatus.running ? Infinity : 0,
+                  ease: "easeInOut"
+                }}
+              />
+              <span className="hidden sm:inline">
+                {backendStatus.running ? 'Connected' : 'Disconnected'}
+              </span>
+            </motion.div>
+          </ScreenshotModeWrapper>
 
           {/* Start/Stop Button */}
-          <motion.button
-            onClick={backendStatus.running ? onStopBackend : onStartBackend}
-            className={clsx(
-              "flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm",
-              "transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-focus",
-              "shadow-soft hover:shadow-lift",
-              backendStatus.running
-                ? "bg-danger hover:bg-red-600 text-white"
-                : "bg-brand hover:bg-brand-hover text-white"
-            )}
-            whileHover={{ scale: 1.02, y: -1 }}
-            whileTap={{ scale: 0.98 }}
-            aria-label={backendStatus.running ? 'Stop backend service' : 'Start backend service'}
-            aria-describedby="backend-status"
-          >
-            {backendStatus.running ? (
-              <>
-                <Square className="w-4 h-4" aria-hidden="true" />
-                <span className="hidden sm:inline">Stop</span>
-              </>
-            ) : (
-              <>
-                <Play className="w-4 h-4" aria-hidden="true" />
-                <span className="hidden sm:inline">Start</span>
-              </>
-            )}
-          </motion.button>
+          <ScreenshotModeWrapper hideInScreenshot={true}>
+            <motion.button
+              onClick={backendStatus.running ? onStopBackend : onStartBackend}
+              className={clsx(
+                "flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm",
+                "transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-focus",
+                "shadow-soft hover:shadow-lift",
+                backendStatus.running
+                  ? "bg-danger hover:bg-red-600 text-white"
+                  : "bg-brand hover:bg-brand-hover text-white"
+              )}
+              whileHover={{ scale: 1.02, y: -1 }}
+              whileTap={{ scale: 0.98 }}
+              aria-label={backendStatus.running ? 'Stop backend service' : 'Start backend service'}
+              aria-describedby="backend-status"
+            >
+              {backendStatus.running ? (
+                <>
+                  <Square className="w-4 h-4" aria-hidden="true" />
+                  <span className="hidden sm:inline">Stop</span>
+                </>
+              ) : (
+                <>
+                  <Play className="w-4 h-4" aria-hidden="true" />
+                  <span className="hidden sm:inline">Start</span>
+                </>
+              )}
+            </motion.button>
+          </ScreenshotModeWrapper>
 
           {/* Theme Toggle */}
-          <SegmentedControl
-            value={theme}
-            onChange={onThemeToggle}
-            className="shadow-soft"
-          />
+          <ScreenshotModeWrapper hideInScreenshot={true}>
+            <SegmentedControl
+              value={theme}
+              onChange={onThemeToggle}
+              className="shadow-soft"
+            />
+          </ScreenshotModeWrapper>
 
           {/* GitHub Link */}
-          <motion.a
-            href="https://github.com/retr0nade/CereBro-Mental-Burnout-Tracker"
-            target="_blank"
-            rel="noopener noreferrer"
-            className={clsx(
-              "flex items-center gap-2 px-3 py-2 rounded-lg",
-              "text-text-muted hover:text-text transition-all duration-200",
-              "hover:bg-surface-alt focus:outline-none focus:ring-2 focus:ring-focus",
-              "border border-border hover:border-border-hover"
-            )}
-            whileHover={{ scale: 1.02, y: -1 }}
-            whileTap={{ scale: 0.98 }}
-          >
-            <Github className="w-4 h-4" />
-            <span className="hidden lg:inline text-dashboard-sm font-medium uppercase tracking-wider">
-              GitHub
-            </span>
-          </motion.a>
+          <ScreenshotModeWrapper hideInScreenshot={true}>
+            <motion.a
+              href="https://github.com/retr0nade/CereBro-Mental-Burnout-Tracker"
+              target="_blank"
+              rel="noopener noreferrer"
+              className={clsx(
+                "flex items-center gap-2 px-3 py-2 rounded-lg",
+                "text-text-muted hover:text-text transition-all duration-200",
+                "hover:bg-surface-alt focus:outline-none focus:ring-2 focus:ring-focus",
+                "border border-border hover:border-border-hover"
+              )}
+              whileHover={{ scale: 1.02, y: -1 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              <Github className="w-4 h-4" />
+              <span className="hidden lg:inline text-dashboard-sm font-medium uppercase tracking-wider">
+                GitHub
+              </span>
+            </motion.a>
+          </ScreenshotModeWrapper>
         </div>
       </div>
     </motion.header>

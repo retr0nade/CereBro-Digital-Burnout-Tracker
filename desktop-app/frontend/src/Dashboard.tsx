@@ -8,6 +8,7 @@ import { EmptyStateBox } from './ui/InfoBox';
 import { FocusVsDistractionLine, IdleBreakBar, DonutAppUsage } from './charts';
 import { useThrottledValue } from './utils/smoothNumber';
 import ActivityTimeline from './components/ActivityTimeline';
+import { useScreenshotMode, useScreenshotData, getScreenshotSeedData } from './utils/screenshotMode';
 
 interface MetricsData {
   recent_usage: any[];
@@ -82,6 +83,10 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [backendConnected, setBackendConnected] = useState(false);
   const [insights, setInsights] = useState<InsightsData | null>(null);
+  
+  // Screenshot mode
+  const screenshotMode = useScreenshotMode();
+  const seedData = getScreenshotSeedData();
 
   const fetchData = async () => {
     try {
@@ -317,10 +322,10 @@ export default function Dashboard() {
     );
   }
 
-  const screenTimeData = prepareScreenTimeData();
-  const appUsageData = prepareAppUsageData();
-  const focusDistractionData = prepareFocusDistractionData();
-  const idleBreakData = prepareIdleBreakData();
+  const screenTimeData = screenshotMode.useSeedData ? seedData.screenTimeData : prepareScreenTimeData();
+  const appUsageData = screenshotMode.useSeedData ? seedData.appUsageData : prepareAppUsageData();
+  const focusDistractionData = screenshotMode.useSeedData ? seedData.focusDistractionData : prepareFocusDistractionData();
+  const idleBreakData = screenshotMode.useSeedData ? seedData.idleBreakData : prepareIdleBreakData();
 
   return (
     <div className="dashboard-content max-w-7xl mx-auto mt-4 p-4">

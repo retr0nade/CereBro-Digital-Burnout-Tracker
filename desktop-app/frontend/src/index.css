@@ -360,3 +360,46 @@ body::before {
   background-color: var(--color-brand);
   color: white;
 }
+
+/* Screenshot mode styles */
+.screenshot-mode {
+  /* Force high contrast for screenshots */
+  --color-text: #000000;
+  --color-text-muted: #333333;
+  --color-surface: #ffffff;
+  --color-surface-alt: #f8f9fa;
+  --color-border: #e9ecef;
+  --color-border-hover: #dee2e6;
+  --color-bg: #ffffff;
+}
+
+.screenshot-mode.dark {
+  --color-text: #ffffff;
+  --color-text-muted: #e9ecef;
+  --color-surface: #1a1a1a;
+  --color-surface-alt: #2d2d2d;
+  --color-border: #404040;
+  --color-border-hover: #525252;
+  --color-bg: #0a0a0a;
+}
+
+/* Hide distracting elements in screenshot mode */
+.screenshot-mode .debug-panel,
+.screenshot-mode [data-screenshot-hide],
+.screenshot-mode .toast-notifications,
+.screenshot-mode .floating-elements {
+  display: none !important;
+}
+
+/* Ensure consistent chart colors in screenshot mode */
+.screenshot-mode .recharts-wrapper {
+  filter: none !important;
+}
+
+/* Remove animations in screenshot mode for consistency */
+.screenshot-mode * {
+  animation-duration: 0s !important;
+  animation-delay: 0s !important;
+  transition-duration: 0s !important;
+  transition-delay: 0s !important;
+}
