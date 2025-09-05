@@ -21,7 +21,7 @@ interface AppUsageDataPoint {
 }
 
 interface DonutAppUsageProps {
-  data: AppUsageDataPoint[];
+  data?: AppUsageDataPoint[];
   height?: number;
   className?: string;
   maxItems?: number;

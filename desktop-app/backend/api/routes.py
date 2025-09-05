@@ -406,7 +406,10 @@ def websocket_status():
             })
         else:
             return jsonify({"status": "unavailable"}), 503
-    @api.route('/export/pdf', methods=['GET'])
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@api.route('/export/pdf', methods=['GET'])
 def export_pdf():
     """Export data from cerebro.db as PDF with date range filtering"""
     try:

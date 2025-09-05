@@ -22,7 +22,7 @@ interface FocusDataPoint {
 }
 
 interface FocusVsDistractionLineProps {
-  data: FocusDataPoint[];
+  data?: FocusDataPoint[];
   height?: number;
   className?: string;
 }

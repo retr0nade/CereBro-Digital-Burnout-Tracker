@@ -22,7 +22,7 @@ interface IdleBreakDataPoint {
 }
 
 interface IdleBreakBarProps {
-  data: IdleBreakDataPoint[];
+  data?: IdleBreakDataPoint[];
   height?: number;
   className?: string;
 }

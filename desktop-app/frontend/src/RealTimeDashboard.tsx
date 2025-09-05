@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { ResponsiveLine } from '@nivo/line';
 import { ResponsivePie } from '@nivo/pie';
+import { motion } from 'framer-motion';
 import webSocketService, { WebSocketEvent, WebSocketStatus } from './WebSocketService';
 import { useSmoothedNumber, useThrottledValue } from './utils/smoothNumber';
 import ActivityTimeline from './components/ActivityTimeline';
@@ -115,7 +116,7 @@ export default function RealTimeDashboard() {
     const events: any[] = [];
     
     // Add app usage events
-    throttledAppUsage.forEach((usage, index) => {
+    throttledAppUsage.forEach((usage: any, index) => {
       events.push({
         id: `rt-usage-${index}`,
         appName: usage.app_name,
@@ -127,7 +128,7 @@ export default function RealTimeDashboard() {
     });
 
     // Add input activity events
-    throttledInputActivity.forEach((activity, index) => {
+    throttledInputActivity.forEach((activity: any, index) => {
       events.push({
         id: `rt-input-${index}`,
         appName: 'System',
@@ -388,28 +389,28 @@ export default function RealTimeDashboard() {
   const inputActivityData = screenshotMode.useSeedData ? seedData.inputActivityData : [
     {
       id: 'Total Inputs',
-      data: throttledInputActivity.map((activity, i) => ({
+      data: throttledInputActivity.map((activity: any, i) => ({
         x: new Date(activity.timestamp * 1000).toLocaleTimeString(),
         y: activity.total_inputs
       }))
     },
     {
       id: 'Keypresses',
-      data: throttledInputActivity.map((activity, i) => ({
+      data: throttledInputActivity.map((activity: any, i) => ({
         x: new Date(activity.timestamp * 1000).toLocaleTimeString(),
         y: activity.keypress_count
       }))
     },
     {
       id: 'Mouse Clicks',
-      data: throttledInputActivity.map((activity, i) => ({
+      data: throttledInputActivity.map((activity: any, i) => ({
         x: new Date(activity.timestamp * 1000).toLocaleTimeString(),
         y: activity.mouse_click_count
       }))
     }
   ];
 
-  const appUsageData = screenshotMode.useSeedData ? seedData.realtimeAppUsageData : throttledAppUsage.map(usage => ({
+  const appUsageData = screenshotMode.useSeedData ? seedData.realtimeAppUsageData : throttledAppUsage.map((usage: any) => ({
     id: usage.app_name,
     label: usage.app_name,
     value: usage.duration
@@ -492,8 +493,7 @@ export default function RealTimeDashboard() {
                     legend: 'Inputs',
                     legendOffset: -40,
                     legendPosition: 'middle',
-                    tickValues: 'every 2',
-                    minTickGap: 30
+                    tickValues: 'every 2'
                   }}
                   axisBottom={{
                     tickSize: 5,
@@ -502,8 +502,7 @@ export default function RealTimeDashboard() {
                     legend: 'Time',
                     legendOffset: 36,
                     legendPosition: 'middle',
-                    tickValues: window.innerWidth < 900 ? 'every 2' : 'every 1',
-                    minTickGap: 40
+                    tickValues: window.innerWidth < 900 ? 'every 2' : 'every 1'
                   }}
                   colors={['#12ffe0', '#ff6b6b', '#4ecdc4']}
                   pointSize={6}

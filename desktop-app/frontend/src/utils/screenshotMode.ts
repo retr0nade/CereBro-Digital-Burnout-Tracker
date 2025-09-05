@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
 /**
  * Screenshot mode utility for producing clean, consistent screenshots
@@ -281,7 +281,7 @@ export function ScreenshotModeWrapper({
   children, 
   hideInScreenshot = false 
 }: { 
-  children: React.ReactNode; 
+  children?: React.ReactNode; 
   hideInScreenshot?: boolean;
 }) {
   const { isActive } = useScreenshotMode();
@@ -290,7 +290,7 @@ export function ScreenshotModeWrapper({
     return null;
   }
   
-  return <>{children}</>;
+  return children as React.ReactElement;
 }
 
 /**

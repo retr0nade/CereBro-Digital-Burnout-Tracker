@@ -5,9 +5,19 @@ import React from 'react';
  * Compares data length and last point to minimize unnecessary re-renders
  */
 export function shallowCompareChartData<T extends { [key: string]: any }>(
-  prevProps: { data: T[]; [key: string]: any },
-  nextProps: { data: T[]; [key: string]: any }
+  prevProps: { data?: T[]; [key: string]: any },
+  nextProps: { data?: T[]; [key: string]: any }
 ): boolean {
+  // Handle undefined/null data
+  if (!prevProps.data || !nextProps.data) {
+    return prevProps.data === nextProps.data;
+  }
+
+  // Additional safety check for data arrays
+  if (!Array.isArray(prevProps.data) || !Array.isArray(nextProps.data)) {
+    return prevProps.data === nextProps.data;
+  }
+
   // Compare data length first (fastest check)
   if (prevProps.data.length !== nextProps.data.length) {
     return false;

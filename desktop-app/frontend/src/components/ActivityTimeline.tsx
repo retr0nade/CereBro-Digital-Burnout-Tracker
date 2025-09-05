@@ -19,7 +19,7 @@ interface ActivityGroup {
 }
 
 interface ActivityTimelineProps {
-  events: ActivityEvent[];
+  events?: ActivityEvent[];
   maxHeight?: number;
   className?: string;
 }
@@ -131,7 +131,7 @@ function ActivityTimelineComponent({
 
   // Group events by 5-minute buckets
   const groupedEvents = useMemo(() => {
-    if (!events.length) return [];
+    if (!events || !events.length) return [];
 
     const groups: { [key: number]: ActivityEvent[] } = {};
     
@@ -210,7 +210,7 @@ function ActivityTimelineComponent({
     </motion.div>
   ), []);
 
-  if (!events.length) {
+  if (!events || !events.length) {
     return (
       <div className={`flex items-center justify-center ${className}`} style={{ height: maxHeight }}>
         <div className="text-center space-y-3">
