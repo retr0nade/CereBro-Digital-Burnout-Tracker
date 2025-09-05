@@ -292,8 +292,26 @@ export default function Dashboard() {
   if (!data) {
     return (
       <div className="max-w-7xl mx-auto mt-4 p-4">
-        <div className="card">
-          <p className="text-center muted">No data available</p>
+        <div className="card text-center">
+          <div className="flex flex-col items-center gap-4 py-8">
+            <div className="w-16 h-16 rounded-full bg-brand/10 flex items-center justify-center">
+              <svg className="w-8 h-8 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-lg font-semibold text-text">Welcome to your dashboard!</h3>
+              <p className="text-text-muted max-w-md">
+                We're setting up your personalized analytics. Make sure the backend service is running and keep the tracker active. 
+                Your insights will appear here once we start collecting data.
+              </p>
+              <div className="flex items-center justify-center gap-4 pt-2">
+                <a href="#" className="text-sm text-brand hover:text-brand-hover transition-colors">
+                  Learn more about getting started →
+                </a>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -408,11 +426,22 @@ export default function Dashboard() {
                 </div>
               ) : (
                 <div className="h-full flex items-center justify-center">
-                  <EmptyStateBox
-                    title="No Screen Time Data"
-                    description="We haven't collected enough data yet. Keep using your computer and check back in a few minutes for insights."
-                    icon="clock"
-                  />
+                  <div className="text-center space-y-3">
+                    <div className="w-12 h-12 rounded-full bg-brand/10 flex items-center justify-center mx-auto">
+                      <svg className="w-6 h-6 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <div className="space-y-1">
+                      <h4 className="font-medium text-text">Building your screen time profile</h4>
+                      <p className="text-sm text-text-muted">
+                        Keep the backend running and tracker active to see your daily usage patterns.
+                      </p>
+                      <a href="#" className="text-xs text-brand hover:text-brand-hover transition-colors">
+                        Learn more →
+                      </a>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -432,11 +461,22 @@ export default function Dashboard() {
                 <DonutAppUsage data={appUsageData} height={280} />
               ) : (
                 <div className="h-full flex items-center justify-center">
-                  <EmptyStateBox
-                    title="No Application Data"
-                    description="Start using applications on your computer to see a breakdown of where you spend your time."
-                    icon="activity"
-                  />
+                  <div className="text-center space-y-3">
+                    <div className="w-12 h-12 rounded-full bg-brand/10 flex items-center justify-center mx-auto">
+                      <svg className="w-6 h-6 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                      </svg>
+                    </div>
+                    <div className="space-y-1">
+                      <h4 className="font-medium text-text">Desktop tracking in progress</h4>
+                      <p className="text-sm text-text-muted">
+                        This chart populates automatically as you use different applications throughout the day.
+                      </p>
+                      <a href="#" className="text-xs text-brand hover:text-brand-hover transition-colors">
+                        Learn more →
+                      </a>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -457,11 +497,22 @@ export default function Dashboard() {
                 <FocusVsDistractionLine data={focusDistractionData} height={280} />
               ) : (
                 <div className="h-full flex items-center justify-center">
-                  <EmptyStateBox
-                    title="No Focus Data Available"
-                    description="We're learning about your productivity patterns. Use your computer normally and we'll start showing focus vs distraction trends."
-                    icon="trending"
-                  />
+                  <div className="text-center space-y-3">
+                    <div className="w-12 h-12 rounded-full bg-brand/10 flex items-center justify-center mx-auto">
+                      <svg className="w-6 h-6 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                      </svg>
+                    </div>
+                    <div className="space-y-1">
+                      <h4 className="font-medium text-text">Analyzing your focus patterns</h4>
+                      <p className="text-sm text-text-muted">
+                        We're learning about your productivity patterns. Use your computer normally and we'll start showing focus vs distraction trends.
+                      </p>
+                      <a href="#" className="text-xs text-brand hover:text-brand-hover transition-colors">
+                        Learn more →
+                      </a>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -481,11 +532,22 @@ export default function Dashboard() {
                 <IdleBreakBar data={idleBreakData} height={280} />
               ) : (
                 <div className="h-full flex items-center justify-center">
-                  <EmptyStateBox
-                    title="No Break Pattern Data"
-                    description="Take some breaks and step away from your computer! We'll track your break patterns to help optimize your work-rest balance."
-                    icon="clock"
-                  />
+                  <div className="text-center space-y-3">
+                    <div className="w-12 h-12 rounded-full bg-brand/10 flex items-center justify-center mx-auto">
+                      <svg className="w-6 h-6 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <div className="space-y-1">
+                      <h4 className="font-medium text-text">Ready to track your breaks</h4>
+                      <p className="text-sm text-text-muted">
+                        Take some breaks and step away from your computer! We'll track your break patterns to help optimize your work-rest balance.
+                      </p>
+                      <a href="#" className="text-xs text-brand hover:text-brand-hover transition-colors">
+                        Learn more →
+                      </a>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>

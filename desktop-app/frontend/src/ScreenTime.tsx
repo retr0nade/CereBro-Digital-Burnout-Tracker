@@ -80,8 +80,26 @@ export default function ScreenTime() {
   if (!data) {
     return (
       <div className="max-w-6xl mx-auto mt-8 p-6">
-        <div className="bg-white bg-opacity-10 rounded-xl p-6 shadow-lg">
-          <p className="text-center text-gray-400">No screen time data available</p>
+        <div className="card text-center">
+          <div className="flex flex-col items-center gap-4 py-8">
+            <div className="w-16 h-16 rounded-full bg-brand/10 flex items-center justify-center">
+              <svg className="w-8 h-8 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-lg font-semibold text-text">Ready to track your screen time?</h3>
+              <p className="text-text-muted max-w-md">
+                To start collecting screen time data, make sure the backend service is running and keep the tracker active. 
+                Your daily usage patterns will appear here once we have enough data.
+              </p>
+              <div className="flex items-center justify-center gap-4 pt-2">
+                <a href="#" className="text-sm text-brand hover:text-brand-hover transition-colors">
+                  Learn more about screen time tracking →
+                </a>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     );

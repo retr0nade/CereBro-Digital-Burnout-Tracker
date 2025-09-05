@@ -213,9 +213,19 @@ function ActivityTimelineComponent({
   if (!events.length) {
     return (
       <div className={`flex items-center justify-center ${className}`} style={{ height: maxHeight }}>
-        <div className="text-center">
-          <Clock className="w-12 h-12 text-text-muted mx-auto mb-3 opacity-50" />
-          <div className="text-text-muted text-dashboard-sm">No activity data available</div>
+        <div className="text-center space-y-3">
+          <div className="w-12 h-12 rounded-full bg-brand/10 flex items-center justify-center mx-auto">
+            <Clock className="w-6 h-6 text-brand" />
+          </div>
+          <div className="space-y-1">
+            <h4 className="font-medium text-text">Activity timeline starting up</h4>
+            <p className="text-sm text-text-muted">
+              Your real-time activity feed will appear here as you use applications and interact with your computer.
+            </p>
+            <a href="#" className="text-xs text-brand hover:text-brand-hover transition-colors">
+              Learn more →
+            </a>
+          </div>
         </div>
       </div>
     );

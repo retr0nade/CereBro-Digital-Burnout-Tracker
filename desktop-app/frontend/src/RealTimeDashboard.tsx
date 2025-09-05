@@ -350,8 +350,26 @@ export default function RealTimeDashboard() {
   if (!data) {
     return (
       <div className="max-w-4xl mx-auto mt-8 p-6">
-        <div className="bg-white bg-opacity-10 rounded-xl p-6 shadow-lg">
-          <p className="text-center text-gray-400">No data available</p>
+        <div className="card text-center">
+          <div className="flex flex-col items-center gap-4 py-8">
+            <div className="w-16 h-16 rounded-full bg-brand/10 flex items-center justify-center">
+              <svg className="w-8 h-8 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-lg font-semibold text-text">Real-time tracking starting up</h3>
+              <p className="text-text-muted max-w-md">
+                We're initializing your live analytics dashboard. Make sure the backend service is running and keep the tracker active. 
+                Your real-time insights will appear here shortly.
+              </p>
+              <div className="flex items-center justify-center gap-4 pt-2">
+                <a href="#" className="text-sm text-brand hover:text-brand-hover transition-colors">
+                  Learn more about real-time tracking →
+                </a>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -534,11 +552,22 @@ export default function RealTimeDashboard() {
                 />
               ) : (
                 <div className="h-full flex items-center justify-center">
-                  <EmptyStateBox
-                    title="No Input Activity Data"
-                    description="Start typing and moving your mouse to see real-time input activity patterns."
-                    icon="activity"
-                  />
+                  <div className="text-center space-y-3">
+                    <div className="w-12 h-12 rounded-full bg-brand/10 flex items-center justify-center mx-auto">
+                      <svg className="w-6 h-6 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 011-1h1a2 2 0 100-4H7a1 1 0 01-1-1V7a1 1 0 011-1h3a1 1 0 001-1V4z" />
+                      </svg>
+                    </div>
+                    <div className="space-y-1">
+                      <h4 className="font-medium text-text">Start interacting to see spikes</h4>
+                      <p className="text-sm text-text-muted">
+                        Type on your keyboard and move your mouse to see real-time input activity patterns appear here.
+                      </p>
+                      <a href="#" className="text-xs text-brand hover:text-brand-hover transition-colors">
+                        Learn more →
+                      </a>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -609,11 +638,22 @@ export default function RealTimeDashboard() {
                 />
               ) : (
                 <div className="h-full flex items-center justify-center">
-                  <EmptyStateBox
-                    title="No App Usage Data"
-                    description="Start using applications to see a breakdown of where you spend your time."
-                    icon="activity"
-                  />
+                  <div className="text-center space-y-3">
+                    <div className="w-12 h-12 rounded-full bg-brand/10 flex items-center justify-center mx-auto">
+                      <svg className="w-6 h-6 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                      </svg>
+                    </div>
+                    <div className="space-y-1">
+                      <h4 className="font-medium text-text">Desktop tracking in progress</h4>
+                      <p className="text-sm text-text-muted">
+                        This chart populates automatically as you use different applications throughout the day.
+                      </p>
+                      <a href="#" className="text-xs text-brand hover:text-brand-hover transition-colors">
+                        Learn more →
+                      </a>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>

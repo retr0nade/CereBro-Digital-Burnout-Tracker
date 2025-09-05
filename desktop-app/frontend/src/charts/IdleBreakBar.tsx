@@ -131,7 +131,22 @@ function IdleBreakBarComponent({
   if (processedData.length === 0) {
     return (
       <div className={`flex items-center justify-center ${className}`} style={{ height }}>
-        <div className="text-text-muted text-dashboard-sm">No idle/break data available</div>
+        <div className="text-center space-y-3">
+          <div className="w-12 h-12 rounded-full bg-brand/10 flex items-center justify-center mx-auto">
+            <svg className="w-6 h-6 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <div className="space-y-1">
+            <h4 className="font-medium text-text">Ready to track your breaks</h4>
+            <p className="text-sm text-text-muted">
+              Take some breaks and step away from your computer! We'll track your break patterns to help optimize your work-rest balance.
+            </p>
+            <a href="#" className="text-xs text-brand hover:text-brand-hover transition-colors">
+              Learn more →
+            </a>
+          </div>
+        </div>
       </div>
     );
   }

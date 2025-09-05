@@ -150,7 +150,22 @@ function FocusVsDistractionLineComponent({
   if (processedData.length === 0) {
     return (
       <div className={`flex items-center justify-center ${className}`} style={{ height }}>
-        <div className="text-text-muted text-dashboard-sm">No focus data available</div>
+        <div className="text-center space-y-3">
+          <div className="w-12 h-12 rounded-full bg-brand/10 flex items-center justify-center mx-auto">
+            <svg className="w-6 h-6 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+            </svg>
+          </div>
+          <div className="space-y-1">
+            <h4 className="font-medium text-text">Analyzing your focus patterns</h4>
+            <p className="text-sm text-text-muted">
+              We're learning about your productivity patterns. Use your computer normally and we'll start showing focus vs distraction trends.
+            </p>
+            <a href="#" className="text-xs text-brand hover:text-brand-hover transition-colors">
+              Learn more →
+            </a>
+          </div>
+        </div>
       </div>
     );
   }

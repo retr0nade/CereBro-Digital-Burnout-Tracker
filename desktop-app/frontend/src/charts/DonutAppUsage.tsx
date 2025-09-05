@@ -200,9 +200,19 @@ function DonutAppUsageComponent({
   if (processedData.length === 0) {
     return (
       <div className={`flex items-center justify-center ${className}`} style={{ height }}>
-        <div className="text-center">
-          <Monitor className="w-12 h-12 text-text-muted mx-auto mb-3 opacity-50" />
-          <div className="text-text-muted text-dashboard-sm">No app usage data available</div>
+        <div className="text-center space-y-3">
+          <div className="w-12 h-12 rounded-full bg-brand/10 flex items-center justify-center mx-auto">
+            <Monitor className="w-6 h-6 text-brand" />
+          </div>
+          <div className="space-y-1">
+            <h4 className="font-medium text-text">Desktop tracking in progress</h4>
+            <p className="text-sm text-text-muted">
+              This chart populates automatically as you use different applications throughout the day.
+            </p>
+            <a href="#" className="text-xs text-brand hover:text-brand-hover transition-colors">
+              Learn more →
+            </a>
+          </div>
         </div>
       </div>
     );
