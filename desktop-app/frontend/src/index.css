@@ -94,6 +94,8 @@ body {
   -moz-osx-font-smoothing: grayscale;
   position: relative;
   overflow-x: hidden;
+  /* Theme transition */
+  transition: background-color 220ms ease, color 220ms ease, filter 220ms ease;
 }
 
 /* Animated background with cursor tracking */
@@ -126,6 +128,11 @@ body::before {
     rgba(59, 130, 246, 0.004) 50%,
     transparent 70%
   );
+}
+
+/* Global theme transitions */
+* {
+  transition: background-color 220ms ease, color 220ms ease, border-color 220ms ease, box-shadow 220ms ease;
 }
 
 /* Reduced motion support */
@@ -205,6 +212,8 @@ body::before {
     var(--color-bg);
   color: var(--color-text);
   position: relative;
+  /* Theme transition */
+  transition: background-color 220ms ease, color 220ms ease, filter 220ms ease;
 }
 
 /* Subtle noise overlay */

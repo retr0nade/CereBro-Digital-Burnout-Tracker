@@ -7,6 +7,7 @@ import ServiceManager from "./ServiceManager";
 import DataExport from "./DataExport";
 import AppShell from "./layout/AppShell";
 import DebugPanel from "./components/DebugPanel";
+import ParticleEffect from "./components/ParticleEffect";
 import { toast } from './services/eventHandlers';
 import { useCursorTracking } from './hooks/useCursorTracking';
 
@@ -84,6 +85,7 @@ export default function App() {
 
 
   const [theme, setTheme] = useState<'dark' | 'light'>(() => 'dark');
+  const [particleTrigger, setParticleTrigger] = useState(false);
   
   // Theme effect
   useEffect(() => {
@@ -97,9 +99,10 @@ export default function App() {
     }
   }, [theme]);
 
-  // Theme toggle handler
+  // Theme toggle handler with particle effect
   const handleThemeToggle = () => {
     setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+    setParticleTrigger(true);
   };
 
   // Toast state
@@ -160,6 +163,12 @@ export default function App() {
 
       {/* Debug Panel - Development Only */}
       <DebugPanel />
+
+      {/* Particle Effect for Theme Switch */}
+      <ParticleEffect 
+        trigger={particleTrigger} 
+        onComplete={() => setParticleTrigger(false)}
+      />
     </>
   );
 }

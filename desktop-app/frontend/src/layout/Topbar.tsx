@@ -1,7 +1,8 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Github, Sun, Moon, Play, Square } from 'lucide-react';
+import { Github, Play, Square } from 'lucide-react';
 import { clsx } from 'clsx';
+import SegmentedControl from '../ui/SegmentedControl';
 
 interface BackendStatusType {
   running: boolean;
@@ -129,30 +130,11 @@ export default function Topbar({
           </motion.button>
 
           {/* Theme Toggle */}
-          <motion.button
-            onClick={onThemeToggle}
-            className={clsx(
-              "p-2.5 rounded-lg transition-all duration-200",
-              "hover:bg-surface-alt focus:outline-none focus:ring-2 focus:ring-focus",
-              "border border-border hover:border-border-hover"
-            )}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
-            aria-pressed={theme === 'dark'}
-          >
-            <motion.div
-              initial={false}
-              animate={{ rotate: theme === 'dark' ? 0 : 180 }}
-              transition={{ type: "spring", stiffness: 200, damping: 10 }}
-            >
-              {theme === 'dark' ? (
-                <Sun className="w-4 h-4 text-text-muted" aria-hidden="true" />
-              ) : (
-                <Moon className="w-4 h-4 text-text-muted" aria-hidden="true" />
-              )}
-            </motion.div>
-          </motion.button>
+          <SegmentedControl
+            value={theme}
+            onChange={onThemeToggle}
+            className="shadow-soft"
+          />
 
           {/* GitHub Link */}
           <motion.a
