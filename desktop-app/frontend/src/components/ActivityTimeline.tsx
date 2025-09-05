@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Clock } from 'lucide-react';
+import { shallowCompareChartData, useRenderTracker } from '../utils/performance';
 
 interface ActivityEvent {
   id: string;
@@ -117,13 +118,16 @@ const useVirtualizer = (
   };
 };
 
-export default function ActivityTimeline({ 
+function ActivityTimelineComponent({ 
   events, 
   maxHeight = 400, 
   className = '' 
 }: ActivityTimelineProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [prevEventsLength, setPrevEventsLength] = useState(0);
+  
+  // Track render performance in development
+  const renderCount = useRenderTracker('ActivityTimeline');
 
   // Group events by 5-minute buckets
   const groupedEvents = useMemo(() => {
@@ -258,3 +262,8 @@ export default function ActivityTimeline({
     </div>
   );
 }
+
+// Memoized component with shallow comparison
+const ActivityTimeline = React.memo(ActivityTimelineComponent, shallowCompareChartData);
+
+export default ActivityTimeline;

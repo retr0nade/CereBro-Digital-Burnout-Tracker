@@ -6,6 +6,7 @@ import Settings from "./Settings";
 import ServiceManager from "./ServiceManager";
 import DataExport from "./DataExport";
 import AppShell from "./layout/AppShell";
+import DebugPanel from "./components/DebugPanel";
 import { toast } from './services/eventHandlers';
 import { useCursorTracking } from './hooks/useCursorTracking';
 
@@ -156,6 +157,9 @@ export default function App() {
           </div>
         ))}
       </div>
+
+      {/* Debug Panel - Development Only */}
+      <DebugPanel />
     </>
   );
 }

@@ -9,6 +9,7 @@ import { EmptyStateBox } from './ui/InfoBox';
 import MetricTile from './ui/MetricTile';
 import GlassCard from './ui/GlassCard';
 import { BarChart3, MousePointer, Clock, Timer, Activity } from 'lucide-react';
+import { createRollingWindow, useRAFBatching, useRenderTracker } from './utils/performance';
 
 interface RealTimeMetrics {
   appUsage: Array<{
@@ -83,14 +84,22 @@ export default function RealTimeDashboard() {
   const [backendConnected, setBackendConnected] = useState(false);
   const [wsStatus, setWsStatus] = useState<WebSocketStatus>({ connected: false, connecting: false });
 
+  // Performance optimizations
+  const rafBatcher = useRAFBatching();
+  const renderCount = useRenderTracker('RealTimeDashboard');
+  
+  // Create rolling window functions for different data types
+  const rollingWindow72 = createRollingWindow(72); // 72 points for 6 hours at 5-min intervals
+  const rollingWindow48 = createRollingWindow(48); // 48 points for 4 hours at 5-min intervals
+
   // Apply smoothing to rapid-changing metrics to reduce jitter
   const smoothedFocusScore = useSmoothedNumber(data?.focus_score || 0, 120, 18);
   const smoothedAppSwitches = useSmoothedNumber(data?.metrics_summary?.app_switches || 0, 120, 18);
   const smoothedIdleEvents = useSmoothedNumber(data?.metrics_summary?.idle_events || 0, 120, 18);
 
-  // Throttle chart data updates to prevent excessive re-renders
-  const throttledInputActivity = useThrottledValue(realTimeMetrics.inputActivity, 250);
-  const throttledAppUsage = useThrottledValue(realTimeMetrics.appUsage, 250);
+  // Throttle chart data updates and apply rolling window caps
+  const throttledInputActivity = useThrottledValue(rollingWindow72(realTimeMetrics.inputActivity), 250);
+  const throttledAppUsage = useThrottledValue(rollingWindow48(realTimeMetrics.appUsage), 250);
 
   // Convert real-time data to ActivityTimeline format
   const timelineEvents = useMemo(() => {
@@ -184,80 +193,90 @@ export default function RealTimeDashboard() {
     }
   };
 
-  // WebSocket event handlers
+  // WebSocket event handlers with RAF batching
   const handleAppUsageUpdate = useCallback((event: WebSocketEvent) => {
     console.log('App usage update received:', event.data);
-    setRealTimeMetrics(prev => ({
-      ...prev,
-      appUsage: [
-        ...prev.appUsage,
-        {
-          app_name: event.data.app_name,
-          duration: event.data.duration,
-          timestamp: event.timestamp
-        }
-      ].slice(-50) // Keep last 50 entries
-    }));
-  }, []);
+    rafBatcher.schedule(() => {
+      setRealTimeMetrics(prev => ({
+        ...prev,
+        appUsage: [
+          ...prev.appUsage,
+          {
+            app_name: event.data.app_name,
+            duration: event.data.duration,
+            timestamp: event.timestamp
+          }
+        ].slice(-100) // Keep last 100 entries (rolling window will cap to 48)
+      }));
+    });
+  }, [rafBatcher]);
 
   const handleIdleStatus = useCallback((event: WebSocketEvent) => {
     console.log('Idle status update received:', event.data);
-    setRealTimeMetrics(prev => ({
-      ...prev,
-      idleStatus: {
-        is_idle: event.data.is_idle,
-        duration: event.data.idle_seconds,
-        timestamp: event.timestamp
-      }
-    }));
-  }, []);
+    rafBatcher.schedule(() => {
+      setRealTimeMetrics(prev => ({
+        ...prev,
+        idleStatus: {
+          is_idle: event.data.is_idle,
+          duration: event.data.idle_seconds,
+          timestamp: event.timestamp
+        }
+      }));
+    });
+  }, [rafBatcher]);
 
   const handleInputActivity = useCallback((event: WebSocketEvent) => {
     console.log('Input activity update received:', event.data);
-    setRealTimeMetrics(prev => ({
-      ...prev,
-      inputActivity: [
-        ...prev.inputActivity,
-        {
-          timestamp: event.timestamp,
-          total_inputs: event.data.total_inputs,
-          keypress_count: event.data.keypress_count,
-          mouse_click_count: event.data.mouse_click_count
-        }
-      ].slice(-30) // Keep last 30 entries
-    }));
-  }, []);
+    rafBatcher.schedule(() => {
+      setRealTimeMetrics(prev => ({
+        ...prev,
+        inputActivity: [
+          ...prev.inputActivity,
+          {
+            timestamp: event.timestamp,
+            total_inputs: event.data.total_inputs,
+            keypress_count: event.data.keypress_count,
+            mouse_click_count: event.data.mouse_click_count
+          }
+        ].slice(-150) // Keep last 150 entries (rolling window will cap to 72)
+      }));
+    });
+  }, [rafBatcher]);
 
   const handleFocusSessionUpdate = useCallback((event: WebSocketEvent) => {
     console.log('Focus session update received:', event.data);
-    setRealTimeMetrics(prev => ({
-      ...prev,
-      focusSessions: [
-        ...prev.focusSessions,
-        {
-          session_id: event.data.session_id,
-          duration: event.data.duration,
-          was_interrupted: event.data.was_interrupted,
-          timestamp: event.timestamp
-        }
-      ].slice(-10) // Keep last 10 entries
-    }));
-  }, []);
+    rafBatcher.schedule(() => {
+      setRealTimeMetrics(prev => ({
+        ...prev,
+        focusSessions: [
+          ...prev.focusSessions,
+          {
+            session_id: event.data.session_id,
+            duration: event.data.duration,
+            was_interrupted: event.data.was_interrupted,
+            timestamp: event.timestamp
+          }
+        ].slice(-20) // Keep last 20 entries
+      }));
+    });
+  }, [rafBatcher]);
 
   const handleBreakUpdate = useCallback((event: WebSocketEvent) => {
     console.log('Break update received:', event.data);
-    setRealTimeMetrics(prev => ({
-      ...prev,
-      breaks: [
-        ...prev.breaks,
-        {
-          duration: event.data.duration,
-          break_type: event.data.break_type,
-          timestamp: event.timestamp
-        }
-      ].slice(-10) // Keep last 10 entries
-    }));
-  }, []);
+    rafBatcher.schedule(() => {
+      setRealTimeMetrics(prev => ({
+        ...prev,
+        breaks: [
+          ...prev.breaks,
+          {
+            duration: event.data.duration,
+            break_type: event.data.break_type,
+            timestamp: event.timestamp
+          }
+        ].slice(-20) // Keep last 20 entries
+      }));
+    });
+  }, [rafBatcher]);
 
   useEffect(() => {
     fetchData();

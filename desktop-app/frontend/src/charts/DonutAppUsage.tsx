@@ -11,6 +11,7 @@ import {
 import { motion } from 'framer-motion';
 import { Monitor } from 'lucide-react';
 import { formatMinutes, truncateText, getChartColor } from './utils';
+import { shallowCompareChartData, useRenderTracker } from '../utils/performance';
 
 interface AppUsageDataPoint {
   id: string;
@@ -143,12 +144,14 @@ const CustomLegend: React.FC<{
   );
 };
 
-export default function DonutAppUsage({ 
+function DonutAppUsageComponent({ 
   data, 
   height = 400, 
   className = '',
   maxItems = 8
 }: DonutAppUsageProps) {
+  // Track render performance in development
+  const renderCount = useRenderTracker('DonutAppUsage');
   // Process and optimize data
   const processedData = useMemo(() => {
     if (!data || data.length === 0) return [];
@@ -251,3 +254,8 @@ export default function DonutAppUsage({
     </div>
   );
 }
+
+// Memoized component with shallow comparison
+const DonutAppUsage = React.memo(DonutAppUsageComponent, shallowCompareChartData);
+
+export default DonutAppUsage;

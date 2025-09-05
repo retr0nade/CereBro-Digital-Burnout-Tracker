@@ -13,6 +13,7 @@ import {
 import { motion } from 'framer-motion';
 import { Clock, Coffee } from 'lucide-react';
 import { stableDomain, formatHour, formatMinutes, shouldHideLabels } from './utils';
+import { shallowCompareChartData, useRenderTracker } from '../utils/performance';
 
 interface IdleBreakDataPoint {
   hour: number;
@@ -93,12 +94,15 @@ const CustomTooltip: React.FC<CustomTooltipProps> = ({ active, payload, label })
   );
 };
 
-export default function IdleBreakBar({ 
+function IdleBreakBarComponent({ 
   data, 
   height = 320, 
   className = '' 
 }: IdleBreakBarProps) {
   const [containerWidth, setContainerWidth] = useState(800); // Default assumption
+  
+  // Track render performance in development
+  const renderCount = useRenderTracker('IdleBreakBar');
 
   // Process data for the chart
   const processedData = useMemo(() => {
@@ -238,3 +242,8 @@ export default function IdleBreakBar({
     </div>
   );
 }
+
+// Memoized component with shallow comparison
+const IdleBreakBar = React.memo(IdleBreakBarComponent, shallowCompareChartData);
+
+export default IdleBreakBar;

@@ -13,6 +13,7 @@ import {
 import { motion } from 'framer-motion';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { stableDomain, clampedSeries, formatHour, formatMinutes, percentageChange } from './utils';
+import { shallowCompareChartData, useRenderTracker } from '../utils/performance';
 
 interface FocusDataPoint {
   hour: number;
@@ -114,11 +115,13 @@ const CustomTooltip: React.FC<CustomTooltipProps> = ({ active, payload, label, d
   );
 };
 
-export default function FocusVsDistractionLine({ 
+function FocusVsDistractionLineComponent({ 
   data, 
   height = 320, 
   className = '' 
 }: FocusVsDistractionLineProps) {
+  // Track render performance in development
+  const renderCount = useRenderTracker('FocusVsDistractionLine');
   // Process and optimize data
   const processedData = useMemo(() => {
     if (!data || data.length === 0) return [];
@@ -270,3 +273,8 @@ export default function FocusVsDistractionLine({
     </div>
   );
 }
+
+// Memoized component with shallow comparison
+const FocusVsDistractionLine = React.memo(FocusVsDistractionLineComponent, shallowCompareChartData);
+
+export default FocusVsDistractionLine;
