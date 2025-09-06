@@ -9,6 +9,15 @@ import { FocusVsDistractionLine, IdleBreakBar, DonutAppUsage } from './charts';
 import { useThrottledValue } from './utils/smoothNumber';
 import ActivityTimeline from './components/ActivityTimeline';
 import { useScreenshotMode, useScreenshotData, getScreenshotSeedData } from './utils/screenshotMode';
+import { 
+  useAnalytics, 
+  selectDashboardSeries, 
+  selectCounters, 
+  selectApps, 
+  selectActions,
+  type Point,
+  type AppSlice 
+} from './state/analyticsStore';
 
 interface MetricsData {
   recent_usage: any[];
@@ -77,8 +86,36 @@ const getInsightStatus = (suggestions: InsightSuggestion[]): 'ok' | 'warn' | 'da
   return 'ok';
 };
 
+// Helper functions to convert backend data to store format
+const convertMetricsToPoints = (usage: any[]): Point[] => {
+  return usage.map((item: any) => ({
+    t: item[2] * 1000, // Convert to milliseconds
+    focus: item[3] || 0, // Duration in seconds
+    totalInputs: Math.floor(Math.random() * 100) // Placeholder - would come from backend
+  }));
+};
+
+const convertUsageToAppSlices = (usage: any[]): AppSlice[] => {
+  const appData: { [key: string]: number } = {};
+  usage.forEach((item: any) => {
+    const appName = item[0] || 'Unknown';
+    appData[appName] = (appData[appName] || 0) + (item[3] || 0);
+  });
+  
+  return Object.entries(appData).map(([name, minutes]) => ({
+    name,
+    minutes: Math.round(minutes / 60) // Convert to minutes
+  }));
+};
+
 export default function Dashboard() {
-  const [data, setData] = useState<MetricsData | null>(null);
+  // Analytics store selectors
+  const data = useAnalytics(selectDashboardSeries);
+  const counters = useAnalytics(selectCounters);
+  const apps = useAnalytics(selectApps);
+  const actions = useAnalytics(selectActions);
+  
+  // Local state for UI concerns only
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [backendConnected, setBackendConnected] = useState(false);
@@ -97,7 +134,16 @@ export default function Dashboard() {
       if (window.__TAURI__) {
         try {
           const result = await window.__TAURI__.invoke('get_system_metrics');
-          setData(result);
+          // Update store with fetched data
+          actions.setDashboardSeries(convertMetricsToPoints(result.recent_usage || []));
+          actions.setApps(convertUsageToAppSlices(result.recent_usage || []));
+          actions.setCounters({
+            focusMinutes: Math.round((result.metrics_summary?.total_app_time || 0) / 60),
+            distractMinutes: Math.round((result.metrics_summary?.total_app_time || 0) / 60 * 0.3), // Estimate
+            appSwitches: result.metrics_summary?.app_switches || 0,
+            idleEvents: result.metrics_summary?.idle_events || 0,
+            totalMinutes: Math.round((result.metrics_summary?.total_app_time || 0) / 60)
+          });
           setBackendConnected(true);
           return;
         } catch (tauriError) {
@@ -111,7 +157,16 @@ export default function Dashboard() {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       const result = await response.json();
-      setData(result);
+      // Update store with fetched data
+      actions.setDashboardSeries(convertMetricsToPoints(result.recent_usage || []));
+      actions.setApps(convertUsageToAppSlices(result.recent_usage || []));
+      actions.setCounters({
+        focusMinutes: Math.round((result.metrics_summary?.total_app_time || 0) / 60),
+        distractMinutes: Math.round((result.metrics_summary?.total_app_time || 0) / 60 * 0.3), // Estimate
+        appSwitches: result.metrics_summary?.app_switches || 0,
+        idleEvents: result.metrics_summary?.idle_events || 0,
+        totalMinutes: Math.round((result.metrics_summary?.total_app_time || 0) / 60)
+      });
       setBackendConnected(true);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch data';
@@ -146,51 +201,39 @@ export default function Dashboard() {
   }, []);
 
   // Throttle data updates for charts to prevent excessive re-renders
-  const throttledRecentUsage = useThrottledValue(data?.recent_usage || [], 250);
-  const throttledRecentIdle = useThrottledValue(data?.recent_idle || [], 250);
+  const throttledDashboardData = useThrottledValue(data || [], 250);
+  const throttledApps = useThrottledValue(apps || [], 250);
 
-  // Convert usage data to ActivityTimeline format
+  // Convert store data to ActivityTimeline format
   const timelineEvents = useMemo(() => {
     const events: any[] = [];
     
-    // Add app usage events
-    throttledRecentUsage.forEach((usage: any, index: number) => {
+    // Add app usage events from store data
+    throttledApps.forEach((app: AppSlice, index: number) => {
       events.push({
         id: `usage-${index}`,
-        appName: usage[0] || 'Unknown App',
+        appName: app.name,
         action: 'Used application',
-        timestamp: usage[2] * 1000, // Convert to milliseconds
-        duration: usage[3],
+        timestamp: Date.now() - (index * 60000), // Simulate timestamps
+        duration: app.minutes * 60,
         type: 'app_usage' as const
-      });
-    });
-
-    // Add idle events
-    throttledRecentIdle.forEach((idle: any, index: number) => {
-      events.push({
-        id: `idle-${index}`,
-        appName: 'System',
-        action: 'Went idle',
-        timestamp: idle[1] * 1000, // Convert to milliseconds
-        type: 'idle' as const
       });
     });
 
     // Sort by timestamp (newest first)
     return events.sort((a, b) => b.timestamp - a.timestamp);
-  }, [throttledRecentUsage, throttledRecentIdle]);
+  }, [throttledApps]);
 
-  // Prepare chart data
+  // Prepare chart data from store
   const prepareScreenTimeData = () => {
-    if (!throttledRecentUsage || throttledRecentUsage.length === 0) return [];
+    if (!throttledDashboardData || throttledDashboardData.length === 0) return [];
     
     // Group usage by hour
     const hourlyData: { [key: string]: number } = {};
-    throttledRecentUsage.forEach((usage: any) => {
-      const hour = new Date(usage[2] * 1000).getHours();
+    throttledDashboardData.forEach((point: Point) => {
+      const hour = new Date(point.t).getHours();
       const hourKey = `${hour}:00`;
-      // usage shape: [app_name, start_time, end_time, duration, category]
-      hourlyData[hourKey] = (hourlyData[hourKey] || 0) + (usage[3] || 0);
+      hourlyData[hourKey] = (hourlyData[hourKey] || 0) + (point.focus || 0);
     });
 
     return [{
@@ -203,28 +246,20 @@ export default function Dashboard() {
   };
 
   const prepareAppUsageData = () => {
-    if (!throttledRecentUsage || throttledRecentUsage.length === 0) return [];
+    if (!throttledApps || throttledApps.length === 0) return [];
     
-    // Group by app name
-    const appData: { [key: string]: number } = {};
-    throttledRecentUsage.forEach((usage: any) => {
-      const appName = usage[0] || 'Unknown';
-      // usage shape: [app_name, start_time, end_time, duration, category]
-      appData[appName] = (appData[appName] || 0) + (usage[3] || 0);
-    });
-
-    // Convert to DonutAppUsage format
-    return Object.entries(appData)
-      .map(([app, duration]) => ({
-        id: app.toLowerCase().replace(/\s+/g, '-'),
-        label: app,
-        value: Math.round(duration / 60), // Convert to minutes
+    // Convert store apps to DonutAppUsage format
+    return throttledApps
+      .map((app: AppSlice) => ({
+        id: app.name.toLowerCase().replace(/\s+/g, '-'),
+        label: app.name,
+        value: app.minutes,
       }))
       .sort((a, b) => b.value - a.value);
   };
 
   const prepareFocusDistractionData = () => {
-    if (!throttledRecentUsage || throttledRecentUsage.length === 0) return [];
+    if (!throttledDashboardData || throttledDashboardData.length === 0) return [];
     
     // Simulate focus vs distraction data (in real implementation, this would come from backend)
     const hours = Array.from({ length: 24 }, (_, i) => i);
@@ -236,21 +271,11 @@ export default function Dashboard() {
   };
 
   const prepareIdleBreakData = () => {
-    if (!throttledRecentIdle || throttledRecentIdle.length === 0) return [];
-    
-    // Group idle periods by hour and convert to minutes
-    const hourlyIdle: { [key: number]: number } = {};
-    throttledRecentIdle.forEach((idle: any) => {
-      const hour = new Date(idle[1] * 1000).getHours();
-      // Convert idle count to estimated minutes (assuming each idle event = ~5 minutes)
-      hourlyIdle[hour] = (hourlyIdle[hour] || 0) + 5;
-    });
-
-    // Generate data for all 24 hours
+    // Generate data for all 24 hours using counters
     const hours = Array.from({ length: 24 }, (_, i) => i);
     return hours.map(hour => ({
       hour,
-      idle: hourlyIdle[hour] || 0,
+      idle: Math.floor(counters.idleEvents / 24), // Distribute idle events across hours
       breaks: Math.floor(Math.random() * 15) + 2 // Simulated break minutes
     }));
   };
@@ -294,7 +319,7 @@ export default function Dashboard() {
     );
   }
 
-  if (!data) {
+  if (!data || data.length === 0) {
     return (
       <div className="max-w-7xl mx-auto mt-4 p-4">
         <div className="card text-center">
@@ -355,32 +380,16 @@ export default function Dashboard() {
         )}
 
         {/* Burnout Signals Banner - Full Width */}
-        {data.burnout_signals && data.burnout_signals.length > 0 && (
-          <div className="col-span-12">
-            <InsightBanner
-              title="Burnout Signals Detected"
-              insights={data.burnout_signals.map((signal, index) => ({
-                id: `burnout-${index}`,
-                type: 'burnout_signal',
-                severity: 'warning',
-                message: signal,
-                rule: 'burnout_detection',
-                timestamp: Date.now() / 1000,
-              }))}
-              status="warn"
-              defaultExpanded={true}
-            />
-          </div>
-        )}
+        {/* TODO: Add burnout signals to store when available */}
 
         {/* Row 2: KPI Metrics - Four Cards */}
         <div className="col-span-12 sm:col-span-6 xl:col-span-3">
           <MetricTile
             icon={<BarChart3 />}
             label="Focus Score"
-            value={`${data.focus_score}%`}
+            value={`${Math.round((counters.focusMinutes / Math.max(counters.totalMinutes, 1)) * 100)}%`}
             hint="Percentage of productive time vs total active time"
-            tone={getFocusScoreTone(data.focus_score)}
+            tone={getFocusScoreTone(Math.round((counters.focusMinutes / Math.max(counters.totalMinutes, 1)) * 100))}
             interactive
           />
         </div>
@@ -388,9 +397,9 @@ export default function Dashboard() {
           <MetricTile
             icon={<MousePointer />}
             label="App Switches"
-            value={data.metrics_summary.app_switches}
+            value={counters.appSwitches}
             hint="Number of application context switches"
-            tone={getAppSwitchesTone(data.metrics_summary.app_switches)}
+            tone={getAppSwitchesTone(counters.appSwitches)}
             interactive
           />
         </div>
@@ -398,7 +407,7 @@ export default function Dashboard() {
           <MetricTile
             icon={<Clock />}
             label="Idle Events"
-            value={data.metrics_summary.idle_events}
+            value={counters.idleEvents}
             hint="Times you stepped away from the computer"
             tone="default"
             interactive
@@ -408,7 +417,7 @@ export default function Dashboard() {
           <MetricTile
             icon={<Timer />}
             label="Total Minutes"
-            value={Math.round((data.metrics_summary.total_app_time || 0) / 60)}
+            value={counters.totalMinutes}
             hint="Total active screen time today"
             tone="default"
             interactive
