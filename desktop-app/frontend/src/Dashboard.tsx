@@ -18,6 +18,7 @@ import {
   type Point,
   type AppSlice 
 } from './state/analyticsStore';
+import { focusScore, formatMinutes } from './utils/derive';
 
 interface MetricsData {
   recent_usage: any[];
@@ -387,9 +388,9 @@ export default function Dashboard() {
           <MetricTile
             icon={<BarChart3 />}
             label="Focus Score"
-            value={`${Math.round((counters.focusMinutes / Math.max(counters.totalMinutes, 1)) * 100)}%`}
+            value={`${focusScore(counters.focusMinutes, counters.distractMinutes)}%`}
             hint="Percentage of productive time vs total active time"
-            tone={getFocusScoreTone(Math.round((counters.focusMinutes / Math.max(counters.totalMinutes, 1)) * 100))}
+            tone={getFocusScoreTone(focusScore(counters.focusMinutes, counters.distractMinutes))}
             interactive
           />
         </div>
@@ -417,7 +418,7 @@ export default function Dashboard() {
           <MetricTile
             icon={<Timer />}
             label="Total Minutes"
-            value={counters.totalMinutes}
+            value={formatMinutes(counters.totalMinutes)}
             hint="Total active screen time today"
             tone="default"
             interactive

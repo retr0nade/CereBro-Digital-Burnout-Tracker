@@ -19,6 +19,7 @@ import {
   selectActions,
   type Point 
 } from './state/analyticsStore';
+import { focusScore, formatMinutes } from './utils/derive';
 
 interface RealTimeMetrics {
   appUsage: Array<{
@@ -104,7 +105,7 @@ export default function RealTimeDashboard() {
   const rollingWindow48 = createRollingWindow(48); // 48 points for 4 hours at 5-min intervals
 
   // Apply smoothing to rapid-changing metrics to reduce jitter
-  const smoothedFocusScore = useSmoothedNumber(Math.round((counters.focusMinutes / Math.max(counters.totalMinutes, 1)) * 100), 120, 18);
+  const smoothedFocusScore = useSmoothedNumber(focusScore(counters.focusMinutes, counters.distractMinutes), 120, 18);
   const smoothedAppSwitches = useSmoothedNumber(counters.appSwitches, 120, 18);
   const smoothedIdleEvents = useSmoothedNumber(counters.idleEvents, 120, 18);
 
@@ -423,10 +424,10 @@ export default function RealTimeDashboard() {
         <div className="col-span-12 sm:col-span-6 xl:col-span-3">
           <MetricTile
             icon={<Activity />}
-            label="Current Status"
-            value={getConnectionStatusText(backendConnected, wsStatus)}
-            hint="Backend and WebSocket connection status"
-            tone={getConnectionStatusTone(backendConnected, wsStatus)}
+            label="Total Time"
+            value={formatMinutes(counters.totalMinutes)}
+            hint="Total active screen time"
+            tone="default"
             interactive
           />
         </div>
