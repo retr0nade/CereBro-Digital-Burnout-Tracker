@@ -16,10 +16,12 @@ import {
   selectCounters, 
   selectApps, 
   selectActions,
+  selectDashRange,
   type Point,
   type AppSlice 
 } from './state/analyticsStore';
 import { focusScore, formatMinutes } from './utils/derive';
+import RangeControl from './components/RangeControl';
 
 interface MetricsData {
   recent_usage: any[];
@@ -115,6 +117,7 @@ export default function Dashboard() {
   const data = useAnalytics(selectDashboardSeries);
   const counters = useAnalytics(selectCounters);
   const apps = useAnalytics(selectApps);
+  const dashRange = useAnalytics(selectDashRange);
   const actions = useAnalytics(selectActions);
   
   // Local state for UI concerns only
@@ -127,7 +130,7 @@ export default function Dashboard() {
   const screenshotMode = useScreenshotMode();
   const seedData = getScreenshotSeedData();
 
-  const fetchData = async () => {
+  const loadAggregatedHistory = async (range: typeof dashRange) => {
     try {
       setLoading(true);
       setError(null);
@@ -135,13 +138,17 @@ export default function Dashboard() {
       // Try Tauri command first
       if (window.__TAURI__) {
         try {
-          const result = await window.__TAURI__.invoke('get_system_metrics');
-          // Update store with fetched data
-          actions.setDashboardSeries(convertMetricsToPoints(result.recent_usage || []));
-          actions.setApps(convertUsageToAppSlices(result.recent_usage || []));
+          const result = await window.__TAURI__.invoke('get_aggregated_metrics', {
+            from: range.from,
+            to: range.to,
+            preset: range.preset
+          });
+          // Update store with aggregated data
+          actions.setDashboardSeries(convertMetricsToPoints(result.aggregated_usage || []));
+          actions.setApps(convertUsageToAppSlices(result.aggregated_usage || []));
           actions.setCounters({
             focusMinutes: Math.round((result.metrics_summary?.total_app_time || 0) / 60),
-            distractMinutes: Math.round((result.metrics_summary?.total_app_time || 0) / 60 * 0.3), // Estimate
+            distractMinutes: Math.round((result.metrics_summary?.total_app_time || 0) / 60 * 0.3),
             appSwitches: result.metrics_summary?.app_switches || 0,
             idleEvents: result.metrics_summary?.idle_events || 0,
             totalMinutes: Math.round((result.metrics_summary?.total_app_time || 0) / 60)
@@ -154,30 +161,35 @@ export default function Dashboard() {
       }
 
       // Fallback to direct HTTP
-      const response = await fetch('http://localhost:5005/api/metrics');
+      const response = await fetch(`http://localhost:5005/api/metrics/aggregated?from=${range.from}&to=${range.to}&preset=${range.preset}`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       const result = await response.json();
-      // Update store with fetched data
-      actions.setDashboardSeries(convertMetricsToPoints(result.recent_usage || []));
-      actions.setApps(convertUsageToAppSlices(result.recent_usage || []));
+      // Update store with aggregated data
+      actions.setDashboardSeries(convertMetricsToPoints(result.aggregated_usage || []));
+      actions.setApps(convertUsageToAppSlices(result.aggregated_usage || []));
       actions.setCounters({
         focusMinutes: Math.round((result.metrics_summary?.total_app_time || 0) / 60),
-        distractMinutes: Math.round((result.metrics_summary?.total_app_time || 0) / 60 * 0.3), // Estimate
+        distractMinutes: Math.round((result.metrics_summary?.total_app_time || 0) / 60 * 0.3),
         appSwitches: result.metrics_summary?.app_switches || 0,
         idleEvents: result.metrics_summary?.idle_events || 0,
         totalMinutes: Math.round((result.metrics_summary?.total_app_time || 0) / 60)
       });
       setBackendConnected(true);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch data';
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch aggregated data';
       setError(errorMessage);
       setBackendConnected(false);
-      console.error('Dashboard fetch error:', err);
+      console.error('Dashboard aggregated fetch error:', err);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleRangeChange = (range: typeof dashRange) => {
+    actions.setDashRange(range);
+    loadAggregatedHistory(range);
   };
 
   const fetchInsights = async () => {
@@ -193,14 +205,15 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
-    fetchData();
+    // Load initial data based on current range
+    loadAggregatedHistory(dashRange);
     fetchInsights();
     const interval = setInterval(() => {
-      fetchData();
+      loadAggregatedHistory(dashRange);
       fetchInsights();
     }, 30000); // Refresh every 30 seconds
     return () => clearInterval(interval);
-  }, []);
+  }, [dashRange]);
 
   // Throttle data updates for charts to prevent excessive re-renders
   const throttledDashboardData = useThrottledValue(data || [], 250);
@@ -359,10 +372,16 @@ export default function Dashboard() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-semibold">Dashboard</h1>
-        <div className={`px-3 py-1.5 rounded text-dashboard-sm ${
-          backendConnected ? 'bg-green-500/20 text-green-300 border border-green-500/40' : 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/40'
-        }`}>
-          {backendConnected ? 'Connected (Tauri)' : 'Connected via HTTP'}
+        <div className="flex items-center gap-4">
+          <RangeControl 
+            value={dashRange} 
+            onChange={handleRangeChange}
+          />
+          <div className={`px-3 py-1.5 rounded text-dashboard-sm ${
+            backendConnected ? 'bg-green-500/20 text-green-300 border border-green-500/40' : 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/40'
+          }`}>
+            {backendConnected ? 'Connected (Tauri)' : 'Connected via HTTP'}
+          </div>
         </div>
       </div>
 
@@ -558,20 +577,70 @@ export default function Dashboard() {
           </ChartCard>
         </div>
 
-        {/* Row 5: Recent Activity - Full Width with Virtualized Timeline */}
+        {/* Row 5: Recent Highlights - Full Width */}
         <div className="col-span-12">
-          <GlassCard>
-            <SectionHeader
-              title="Recent Activity"
-              subtitle="Latest application usage events"
-              tooltip="Real-time feed of your recent computer activity. Useful for reviewing what you've been working on and identifying patterns."
-              className="mb-4"
-            />
-            <ActivityTimeline 
-              events={timelineEvents}
-              maxHeight={400}
-            />
-          </GlassCard>
+          <ChartCard
+            title="Recent Highlights"
+            subtitle="Key events and insights from the selected period"
+            tooltip="Summary of important events and patterns detected in your activity."
+            minHeight={200}
+          >
+            <div className="space-y-3">
+              {apps.length > 0 ? (
+                <>
+                  <div className="flex items-center gap-3 p-3 bg-surface-hover rounded-lg">
+                    <div className="w-2 h-2 bg-brand rounded-full"></div>
+                    <div className="flex-1">
+                      <p className="text-sm text-text">
+                        <strong>{apps[0]?.name}</strong> was your most used application with {apps[0]?.minutes} minutes
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 p-3 bg-surface-hover rounded-lg">
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    <div className="flex-1">
+                      <p className="text-sm text-text">
+                        Focus score of <strong>{focusScore(counters.focusMinutes, counters.distractMinutes)}%</strong> 
+                        {focusScore(counters.focusMinutes, counters.distractMinutes) > 70 ? ' - Great focus!' : ' - Room for improvement'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 p-3 bg-surface-hover rounded-lg">
+                    <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                    <div className="flex-1">
+                      <p className="text-sm text-text">
+                        <strong>{counters.appSwitches}</strong> application switches detected
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 p-3 bg-surface-hover rounded-lg">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                    <div className="flex-1">
+                      <p className="text-sm text-text">
+                        <strong>{counters.idleEvents}</strong> break periods taken
+                      </p>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="h-full flex items-center justify-center">
+                  <div className="text-center space-y-3">
+                    <div className="w-12 h-12 rounded-full bg-brand/10 flex items-center justify-center mx-auto">
+                      <svg className="w-6 h-6 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <div className="space-y-1">
+                      <h4 className="font-medium text-text">Building your highlights</h4>
+                      <p className="text-sm text-text-muted">
+                        Select a time range to see key insights and patterns from your activity.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </ChartCard>
         </div>
       </div>
     </div>

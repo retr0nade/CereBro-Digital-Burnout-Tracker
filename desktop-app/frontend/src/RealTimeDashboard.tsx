@@ -21,6 +21,7 @@ import {
   type Point 
 } from './state/analyticsStore';
 import { focusScore, formatMinutes } from './utils/derive';
+import WindowSelect from './components/WindowSelect';
 
 interface RealTimeMetrics {
   appUsage: Array<{
@@ -82,10 +83,13 @@ const getConnectionStatusText = (backendConnected: boolean, wsStatus: WebSocketS
 };
 
 export default function RealTimeDashboard() {
-  // Analytics store selectors
+  // Analytics store selectors - ONLY using realtime data
   const rt = useAnalytics(selectRealtime);
   const counters = useAnalytics(selectCounters);
   const actions = useAnalytics(selectActions);
+  
+  // Get current window setting from store
+  const rtWindowMinutes = useAnalytics(state => state.rtWindowMinutes);
   
   // Local state for UI concerns only
   const [loading, setLoading] = useState(true);
@@ -137,6 +141,11 @@ export default function RealTimeDashboard() {
       .sort((a, b) => b.timestamp - a.timestamp)
       .slice(0, 50);
   }, [throttledRealtimeData, screenshotMode.useSeedData, seedData.activityTimelineEvents]);
+
+  const handleWindowChange = (minutes: number) => {
+    // Update the rolling window size in the store
+    actions.setRtWindowMinutes(minutes);
+  };
 
   const fetchData = async () => {
     try {
@@ -386,6 +395,17 @@ export default function RealTimeDashboard() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-semibold">Real-Time Dashboard</h1>
+        <div className="flex items-center gap-4">
+          <WindowSelect 
+            value={rtWindowMinutes} 
+            onChange={handleWindowChange}
+          />
+          <div className={`px-3 py-1.5 rounded text-dashboard-sm ${
+            backendConnected ? 'bg-green-500/20 text-green-300 border border-green-500/40' : 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/40'
+          }`}>
+            {backendConnected ? 'Connected (Tauri)' : 'Connected via HTTP'}
+          </div>
+        </div>
       </div>
 
       {/* 12-Column Grid Layout */}
@@ -436,9 +456,9 @@ export default function RealTimeDashboard() {
         {/* Row 2: Real-time Charts */}
         <div className="col-span-12 md:col-span-6 xl:col-span-7">
           <ChartCard
-            title="Real-time Input Activity"
-            subtitle="Live input activity tracking"
-            tooltip="Shows your real-time keyboard and mouse activity patterns."
+            title="Live Input Activity"
+            subtitle="Real-time keyboard and mouse activity"
+            tooltip="Shows your live input activity patterns with point-per-second updates."
             minHeight={360}
           >
             {inputActivityData[0].data.length > 0 ? (
@@ -544,9 +564,9 @@ export default function RealTimeDashboard() {
         
         <div className="col-span-12 md:col-span-6 xl:col-span-5">
           <ChartCard
-            title="Recent App Usage"
-            subtitle="Top applications by time spent"
-            tooltip="Visual breakdown of which applications consume most of your time."
+            title="Live App Usage"
+            subtitle={`Last ${rtWindowMinutes} minutes`}
+            tooltip="Real-time breakdown of applications used in the current rolling window."
             minHeight={360}
           >
             {appUsageData.length > 0 ? (
@@ -628,9 +648,9 @@ export default function RealTimeDashboard() {
         {/* Row 3: Activity Timeline - Full Width */}
         <div className="col-span-12">
           <ChartCard
-            title="Real-time Activity Timeline"
-            subtitle="Live activity feed with 5-minute grouping"
-            tooltip="Real-time feed of your computer activity, grouped by time for better readability."
+            title="Live Activity Timeline"
+            subtitle="Real-time activity feed with virtualized scrolling"
+            tooltip="Live feed of your computer activity with virtualized timeline for performance."
             minHeight={400}
           >
             <ActivityTimeline 

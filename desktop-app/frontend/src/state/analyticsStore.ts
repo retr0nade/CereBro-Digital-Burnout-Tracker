@@ -60,6 +60,7 @@ interface AnalyticsState {
     setCounters(partial: Partial<Counters>): void;
     setConnection(partial: Partial<Connection>): void;
     setDashRange(range: DashRange): void;
+    setRtWindowMinutes(minutes: number): void;
     resetRealtime(): void;
   };
 }
@@ -174,6 +175,10 @@ export const useAnalytics = create<AnalyticsState>()(
         
         setDashRange: (range: DashRange) => {
           set(() => ({ dashRange: range }));
+        },
+        
+        setRtWindowMinutes: (minutes: number) => {
+          set(() => ({ rtWindowMinutes: minutes }));
         },
         
         resetRealtime: () => {
