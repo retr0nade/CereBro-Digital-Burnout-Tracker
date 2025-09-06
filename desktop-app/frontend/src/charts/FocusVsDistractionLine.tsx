@@ -97,13 +97,11 @@ export const FocusVsDistractionLine = memo<FocusVsDistractionLineProps>(({
           tickFormatter={formatHour}
           minTickGap={24}
           interval="preserveStartEnd"
-          stroke="#9CA3AF"
-          fontSize={12}
+          className="axis-label"
         />
         <YAxis 
           domain={yDomain}
-          stroke="#9CA3AF"
-          fontSize={12}
+          className="axis-label"
           tickFormatter={(value) => `${value}m`}
         />
         <Tooltip content={<CustomTooltip />} />

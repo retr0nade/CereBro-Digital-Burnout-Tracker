@@ -371,7 +371,7 @@ export default function Dashboard() {
     <div className="dashboard-content max-w-7xl mx-auto mt-4 p-4">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-semibold">Dashboard</h1>
+        <h1 className="text-[22px] md:text-2xl font-semibold tracking-[-0.01em]">Dashboard</h1>
         <div className="flex items-center gap-4">
           <RangeControl 
             value={dashRange} 

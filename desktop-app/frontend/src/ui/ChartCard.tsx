@@ -22,7 +22,7 @@ export const ChartCard = React.memo<ChartCardProps>(({
   const chartMinHeight = minHeight;
   
   return (
-    <GlassCard className={`${className}`}>
+    <GlassCard className={`card-pad ${className}`}>
       <SectionHeader
         title={title}
         subtitle={subtitle}
