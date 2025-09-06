@@ -1,7 +1,8 @@
 // Chart components exports
-export { default as FocusVsDistractionLine } from './FocusVsDistractionLine';
-export { default as IdleBreakBar } from './IdleBreakBar';
+export { FocusVsDistractionLine } from './FocusVsDistractionLine';
+export { IdleBreakBar } from './IdleBreakBar';
 export { default as DonutAppUsage } from './DonutAppUsage';
+export { StableContainer } from './StableRechart';
 
 // Utility functions
 export * from './utils';

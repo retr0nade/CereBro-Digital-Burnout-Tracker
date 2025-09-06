@@ -1,136 +1,73 @@
-import React, { useMemo, useState } from 'react';
-import {
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  TooltipProps,
-} from 'recharts';
-import { motion } from 'framer-motion';
-import { Clock, Coffee } from 'lucide-react';
-import { stableDomain, formatHour, formatMinutes, shouldHideLabels } from './utils';
-import { shallowCompareChartData, useRenderTracker } from '../utils/performance';
-
-interface IdleBreakDataPoint {
-  hour: number;
-  idle: number;
-  breaks: number;
-}
+import React, { memo, useMemo } from 'react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { StableContainer } from './StableRechart';
+import { Point } from '../state/analyticsStore';
+import { legendFormatter, formatHour, calculateYDomain } from './utils';
 
 interface IdleBreakBarProps {
-  data?: IdleBreakDataPoint[];
+  data: Point[];
   height?: number;
-  className?: string;
+  animationOnMountOnly?: boolean;
 }
 
-interface CustomTooltipProps extends TooltipProps<number, string> {}
-
-const CustomTooltip: React.FC<CustomTooltipProps> = ({ active, payload, label }) => {
-  if (!active || !payload || !payload.length) {
-    return null;
-  }
-
-  const idleValue = payload.find(p => p.dataKey === 'idle')?.value || 0;
-  const breakValue = payload.find(p => p.dataKey === 'breaks')?.value || 0;
-  const total = idleValue + breakValue;
+// Custom tooltip component with memo to prevent re-renders
+const CustomTooltip = memo(({ active, payload, label }: any) => {
+  if (!active || !payload || !payload.length) return null;
 
   return (
-    <motion.div
+    <div 
       className="bg-surface border border-border rounded-lg p-3 shadow-pop"
-      initial={{ opacity: 0, scale: 0.9 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.15 }}
+      style={{ pointerEvents: 'auto' }}
     >
-      <div className="text-dashboard-sm font-medium text-text mb-2">
-        {formatHour(Number(label))}
+      <div className="text-sm font-medium text-text mb-2">
+        {formatHour(label)}
       </div>
-      
-      <div className="space-y-1.5">
-        <div className="flex items-center justify-between gap-4">
+      {payload.map((entry: any, index: number) => (
+        <div key={index} className="flex items-center justify-between gap-3 mb-1">
           <div className="flex items-center gap-2">
-            <Clock className="w-3 h-3 text-text-muted" />
-            <span className="text-dashboard-sm text-text-muted">Idle Time</span>
+            <div 
+              className="w-3 h-3 rounded-full" 
+              style={{ backgroundColor: entry.color }}
+            />
+            <span className="text-sm text-text-muted">{entry.name}</span>
           </div>
-          <span className="text-dashboard-sm font-medium text-text">
-            {formatMinutes(idleValue)}
+          <span className="text-sm font-medium text-text">
+            {Math.round(entry.value)}m
           </span>
         </div>
-        
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <Coffee className="w-3 h-3 text-text-muted" />
-            <span className="text-dashboard-sm text-text-muted">Breaks</span>
-          </div>
-          <span className="text-dashboard-sm font-medium text-text">
-            {formatMinutes(breakValue)}
-          </span>
-        </div>
-        
-        {total > 0 && (
-          <div className="border-t border-border pt-1.5 mt-1.5">
-            <div className="flex items-center justify-between gap-4">
-              <span className="text-dashboard-sm text-text-muted">Total Away</span>
-              <span className="text-dashboard-sm font-medium text-text">
-                {formatMinutes(total)}
-              </span>
-            </div>
-            
-            {idleValue > 0 && breakValue > 0 && (
-              <div className="flex items-center justify-between gap-4 mt-1">
-                <span className="text-dashboard-sm text-text-muted">Break Ratio</span>
-                <span className="text-dashboard-sm font-medium text-text">
-                  {Math.round((breakValue / total) * 100)}%
-                </span>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    </motion.div>
+      ))}
+    </div>
   );
-};
+});
 
-function IdleBreakBarComponent({ 
+CustomTooltip.displayName = 'CustomTooltip';
+
+
+export const IdleBreakBar = memo<IdleBreakBarProps>(({ 
   data, 
-  height = 320, 
-  className = '' 
-}: IdleBreakBarProps) {
-  const [containerWidth, setContainerWidth] = useState(800); // Default assumption
-  
-  // Track render performance in development
-  const renderCount = useRenderTracker('IdleBreakBar');
-
-  // Process data for the chart
-  const processedData = useMemo(() => {
-    if (!data || data.length === 0) return [];
-    
-    // Ensure data is sorted by hour
-    return data.sort((a, b) => a.hour - b.hour);
+  height = 280,
+  animationOnMountOnly = true 
+}) => {
+  // Transform data for chart
+  const chartData = useMemo(() => {
+    return data.map(point => ({
+      hour: new Date(point.t).getHours(),
+      idle: Math.round((point.idle || 0) / 60), // Convert to minutes
+      breaks: Math.round((point.focus || 0) / 60) // Using focus as break placeholder
+    }));
   }, [data]);
 
-  // Calculate stable domain for consistent scaling
   const yDomain = useMemo(() => {
-    if (processedData.length === 0) return [0, 10];
-    
-    const maxValues = processedData.map(d => Math.max(d.idle + d.breaks, d.idle, d.breaks));
-    const maxTotal = Math.max(...maxValues);
-    
-    return [0, maxTotal * 1.1]; // 10% padding on top
-  }, [processedData]);
+    const allValues = data.flatMap(point => [
+      point.idle || 0,
+      point.focus || 0 // Using focus as break time placeholder
+    ]);
+    return calculateYDomain(allValues);
+  }, [data]);
 
-  // Determine if labels should be hidden based on available space
-  const hideLabels = useMemo(() => 
-    shouldHideLabels(containerWidth, processedData.length, 50), 
-    [containerWidth, processedData.length]
-  );
-
-  if (processedData.length === 0) {
+  if (!chartData.length) {
     return (
-      <div className={`flex items-center justify-center ${className}`} style={{ height }}>
+      <div className="h-full flex items-center justify-center">
         <div className="text-center space-y-3">
           <div className="w-12 h-12 rounded-full bg-brand/10 flex items-center justify-center mx-auto">
             <svg className="w-6 h-6 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -142,9 +79,6 @@ function IdleBreakBarComponent({
             <p className="text-sm text-text-muted">
               Take some breaks and step away from your computer! We'll track your break patterns to help optimize your work-rest balance.
             </p>
-            <a href="#" className="text-xs text-brand hover:text-brand-hover transition-colors">
-              Learn more →
-            </a>
           </div>
         </div>
       </div>
@@ -152,113 +86,48 @@ function IdleBreakBarComponent({
   }
 
   return (
-    <div className={className} style={{ height }}>
-      <ResponsiveContainer 
-        width="100%" 
-        height="100%"
-        onResize={(width) => setContainerWidth(width || 800)}
-      >
-        <BarChart
-          data={processedData}
-          margin={{ top: 20, right: 30, left: 20, bottom: hideLabels ? 40 : 60 }}
-          barCategoryGap="15%"
-        >
-          <CartesianGrid 
-            strokeDasharray="3 3" 
-            stroke="var(--color-border)" 
-            opacity={0.3}
-          />
-          
-          <XAxis
-            dataKey="hour"
-            tickFormatter={hideLabels ? () => '' : formatHour}
-            tick={hideLabels ? false : { 
-              fill: 'var(--color-text-muted)', 
-              fontSize: 13,
-              letterSpacing: '0.025em'
-            }}
-            axisLine={{ stroke: 'var(--color-border)' }}
-            tickLine={{ stroke: 'var(--color-border)' }}
-            angle={0}
-            textAnchor="middle"
-            height={hideLabels ? 20 : 40}
-            interval={0}
-            minTickGap={10}
-          />
-          
-          <YAxis
-            domain={yDomain}
-            tickFormatter={(value) => formatMinutes(value)}
-            tick={{ 
-              fill: 'var(--color-text-muted)', 
-              fontSize: 13,
-              letterSpacing: '0.025em'
-            }}
-            axisLine={{ stroke: 'var(--color-border)' }}
-            tickLine={{ stroke: 'var(--color-border)' }}
-            width={60}
-            tickCount={6}
-          />
-          
-          <Tooltip 
-            content={<CustomTooltip />}
-            cursor={{ 
-              fill: 'var(--color-surface-alt)', 
-              opacity: 0.3
-            }}
-          />
-          
-          <Legend
-            wrapperStyle={{
-              fontSize: '13px',
-              color: 'var(--color-text-muted)',
-              letterSpacing: '0.025em'
-            }}
-            iconType="rect"
-          />
-          
-          <Bar
-            dataKey="idle"
-            stackId="activity"
-            fill="var(--color-text-muted)"
-            name="Idle Time"
-            radius={[0, 0, 0, 0]}
-            animationBegin={0}
-            animationDuration={800}
-            animationEasing="ease-out"
-          />
-          
-          <Bar
-            dataKey="breaks"
-            stackId="activity"
-            fill="var(--color-warn)"
-            name="Planned Breaks"
-            radius={[4, 4, 0, 0]}
-            animationBegin={200}
-            animationDuration={800}
-            animationEasing="ease-out"
-          />
-        </BarChart>
-      </ResponsiveContainer>
-      
-      {/* Show hint when labels are hidden */}
-      {hideLabels && (
-        <motion.div
-          className="text-center mt-2"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.5 }}
-        >
-          <span className="text-dashboard-sm text-text-muted">
-            Hover bars for time details
-          </span>
-        </motion.div>
-      )}
-    </div>
+    <StableContainer 
+      height={height} 
+      animationOnMountOnly={animationOnMountOnly}
+    >
+      <BarChart data={chartData} margin={{ top: 20, right: 20, bottom: 50, left: 60 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+        <XAxis 
+          dataKey="hour"
+          tickFormatter={formatHour}
+          minTickGap={24}
+          interval="preserveStartEnd"
+          stroke="#9CA3AF"
+          fontSize={12}
+        />
+        <YAxis 
+          domain={yDomain}
+          stroke="#9CA3AF"
+          fontSize={12}
+          tickFormatter={(value) => `${value}m`}
+        />
+        <Tooltip content={<CustomTooltip />} />
+        <Legend 
+          wrapperStyle={{ paddingTop: '20px' }}
+          formatter={(value) => legendFormatter(value)}
+        />
+        <Bar 
+          dataKey="idle" 
+          stackId="a"
+          fill="#F59E0B" 
+          name="Idle Time"
+          radius={[0, 0, 4, 4]}
+        />
+        <Bar 
+          dataKey="breaks" 
+          stackId="a"
+          fill="#8B5CF6" 
+          name="Break Time"
+          radius={[4, 4, 0, 0]}
+        />
+      </BarChart>
+    </StableContainer>
   );
-}
+});
 
-// Memoized component with shallow comparison
-const IdleBreakBar = React.memo(IdleBreakBarComponent, shallowCompareChartData);
-
-export default IdleBreakBar;
+IdleBreakBar.displayName = 'IdleBreakBar';

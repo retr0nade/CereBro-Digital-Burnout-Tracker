@@ -259,25 +259,25 @@ export default function Dashboard() {
       .sort((a, b) => b.value - a.value);
   };
 
-  const prepareFocusDistractionData = () => {
+  const prepareFocusDistractionData = (): Point[] => {
     if (!throttledDashboardData || throttledDashboardData.length === 0) return [];
     
-    // Simulate focus vs distraction data (in real implementation, this would come from backend)
-    const hours = Array.from({ length: 24 }, (_, i) => i);
-    return hours.map(hour => ({
-      hour,
-      focus: Math.floor(Math.random() * 60) + 20, // Simulated focus time in minutes
-      distraction: Math.floor(Math.random() * 30) + 5 // Simulated distraction time in minutes
+    // Convert dashboard data to Point format for charts
+    return throttledDashboardData.map(point => ({
+      t: point.t,
+      focus: point.focus,
+      distract: point.distract || 0
     }));
   };
 
-  const prepareIdleBreakData = () => {
-    // Generate data for all 24 hours using counters
-    const hours = Array.from({ length: 24 }, (_, i) => i);
-    return hours.map(hour => ({
-      hour,
-      idle: Math.floor(counters.idleEvents / 24), // Distribute idle events across hours
-      breaks: Math.floor(Math.random() * 15) + 2 // Simulated break minutes
+  const prepareIdleBreakData = (): Point[] => {
+    if (!throttledDashboardData || throttledDashboardData.length === 0) return [];
+    
+    // Convert dashboard data to Point format for charts
+    return throttledDashboardData.map(point => ({
+      t: point.t,
+      idle: point.idle || 0,
+      focus: Math.floor(Math.random() * 15) + 2 // Simulated break minutes
     }));
   };
 
