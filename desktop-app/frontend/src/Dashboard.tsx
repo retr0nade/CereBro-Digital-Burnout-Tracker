@@ -4,6 +4,7 @@ import MetricTile from './ui/MetricTile';
 import InsightBanner from './ui/InsightBanner';
 import GlassCard from './ui/GlassCard';
 import SectionHeader from './ui/SectionHeader';
+import ChartCard from './ui/ChartCard';
 import { EmptyStateBox } from './ui/InfoBox';
 import { FocusVsDistractionLine, IdleBreakBar, DonutAppUsage } from './charts';
 import { useThrottledValue } from './utils/smoothNumber';
@@ -366,7 +367,7 @@ export default function Dashboard() {
       </div>
 
       {/* 12-Column Grid Layout */}
-      <div className="grid grid-cols-12 gap-3 md:gap-4 xl:gap-6">
+      <div className="grid grid-cols-12 gap-6">
         
         {/* Row 1: AI Insights Banner - Full Width */}
         {insights?.suggestions && insights.suggestions.length > 0 && (
@@ -426,147 +427,135 @@ export default function Dashboard() {
         </div>
 
         {/* Row 3: Daily Screen Time (7 cols) + App Usage Distribution (5 cols) */}
-        <div className="col-span-12 lg:col-span-7">
-          <GlassCard className="h-full">
-            <SectionHeader
-              title="Daily Screen Time"
-              subtitle="Hourly breakdown of active computer usage"
-              tooltip="Shows your screen time distribution throughout the day. Peak hours may indicate periods of high focus or potential overwork."
-              className="mb-4"
-            />
-            <div className="min-h-[280px]">
-              {screenTimeData[0]?.data.length > 0 ? (
-                <div className="text-dashboard-sm text-text-muted">
-                  Screen time chart will be implemented with hour-by-hour data
-                </div>
-              ) : (
-                <div className="h-full flex items-center justify-center">
-                  <div className="text-center space-y-3">
-                    <div className="w-12 h-12 rounded-full bg-brand/10 flex items-center justify-center mx-auto">
-                      <svg className="w-6 h-6 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                    </div>
-                    <div className="space-y-1">
-                      <h4 className="font-medium text-text">Building your screen time profile</h4>
-                      <p className="text-sm text-text-muted">
-                        Keep the backend running and tracker active to see your daily usage patterns.
-                      </p>
-                      <a href="#" className="text-xs text-brand hover:text-brand-hover transition-colors">
-                        Learn more →
-                      </a>
-                    </div>
+        <div className="col-span-12 md:col-span-6 xl:col-span-7">
+          <ChartCard
+            title="Daily Screen Time"
+            subtitle="Hourly breakdown of active computer usage"
+            tooltip="Shows your screen time distribution throughout the day. Peak hours may indicate periods of high focus or potential overwork."
+            minHeight={320}
+          >
+            {screenTimeData[0]?.data.length > 0 ? (
+              <div className="text-dashboard-sm text-text-muted">
+                Screen time chart will be implemented with hour-by-hour data
+              </div>
+            ) : (
+              <div className="h-full flex items-center justify-center">
+                <div className="text-center space-y-3">
+                  <div className="w-12 h-12 rounded-full bg-brand/10 flex items-center justify-center mx-auto">
+                    <svg className="w-6 h-6 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="font-medium text-text">Building your screen time profile</h4>
+                    <p className="text-sm text-text-muted">
+                      Keep the backend running and tracker active to see your daily usage patterns.
+                    </p>
+                    <a href="#" className="text-xs text-brand hover:text-brand-hover transition-colors">
+                      Learn more →
+                    </a>
                   </div>
                 </div>
-              )}
-            </div>
-          </GlassCard>
+              </div>
+            )}
+          </ChartCard>
         </div>
         
-        <div className="col-span-12 lg:col-span-5">
-          <GlassCard className="h-full">
-            <SectionHeader
-              title="App Usage Distribution"
-              subtitle="Top applications by time spent"
-              tooltip="Visual breakdown of which applications consume most of your time. This helps identify productivity apps vs potential distractions."
-              className="mb-4"
-            />
-            <div className="min-h-[280px]">
-              {appUsageData.length > 0 ? (
-                <DonutAppUsage data={appUsageData} height={280} />
-              ) : (
-                <div className="h-full flex items-center justify-center">
-                  <div className="text-center space-y-3">
-                    <div className="w-12 h-12 rounded-full bg-brand/10 flex items-center justify-center mx-auto">
-                      <svg className="w-6 h-6 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                      </svg>
-                    </div>
-                    <div className="space-y-1">
-                      <h4 className="font-medium text-text">Desktop tracking in progress</h4>
-                      <p className="text-sm text-text-muted">
-                        This chart populates automatically as you use different applications throughout the day.
-                      </p>
-                      <a href="#" className="text-xs text-brand hover:text-brand-hover transition-colors">
-                        Learn more →
-                      </a>
-                    </div>
+        <div className="col-span-12 md:col-span-6 xl:col-span-5">
+          <ChartCard
+            title="App Usage Distribution"
+            subtitle="Top applications by time spent"
+            tooltip="Visual breakdown of which applications consume most of your time. This helps identify productivity apps vs potential distractions."
+            minHeight={320}
+          >
+            {appUsageData.length > 0 ? (
+              <DonutAppUsage data={appUsageData} height={320} />
+            ) : (
+              <div className="h-full flex items-center justify-center">
+                <div className="text-center space-y-3">
+                  <div className="w-12 h-12 rounded-full bg-brand/10 flex items-center justify-center mx-auto">
+                    <svg className="w-6 h-6 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="font-medium text-text">Desktop tracking in progress</h4>
+                    <p className="text-sm text-text-muted">
+                      This chart populates automatically as you use different applications throughout the day.
+                    </p>
+                    <a href="#" className="text-xs text-brand hover:text-brand-hover transition-colors">
+                      Learn more →
+                    </a>
                   </div>
                 </div>
-              )}
-            </div>
-          </GlassCard>
+              </div>
+            )}
+          </ChartCard>
         </div>
 
         {/* Row 4: Focus vs Distraction (7 cols) + Idle & Break Frequency (5 cols) */}
-        <div className="col-span-12 lg:col-span-7">
-          <GlassCard className="h-full">
-            <SectionHeader
-              title="Focus vs Distraction Trend"
-              subtitle="Productive vs non-productive time throughout the day"
-              tooltip="Compares time spent in productive applications versus potentially distracting ones. Helps identify when you're most focused and when distractions peak."
-              className="mb-4"
-            />
-            <div className="min-h-[280px]">
-              {focusDistractionData.length > 0 ? (
-                <FocusVsDistractionLine data={focusDistractionData} height={280} />
-              ) : (
-                <div className="h-full flex items-center justify-center">
-                  <div className="text-center space-y-3">
-                    <div className="w-12 h-12 rounded-full bg-brand/10 flex items-center justify-center mx-auto">
-                      <svg className="w-6 h-6 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                      </svg>
-                    </div>
-                    <div className="space-y-1">
-                      <h4 className="font-medium text-text">Analyzing your focus patterns</h4>
-                      <p className="text-sm text-text-muted">
-                        We're learning about your productivity patterns. Use your computer normally and we'll start showing focus vs distraction trends.
-                      </p>
-                      <a href="#" className="text-xs text-brand hover:text-brand-hover transition-colors">
-                        Learn more →
-                      </a>
-                    </div>
+        <div className="col-span-12 md:col-span-6 xl:col-span-7">
+          <ChartCard
+            title="Focus vs Distraction Trend"
+            subtitle="Productive vs non-productive time throughout the day"
+            tooltip="Compares time spent in productive applications versus potentially distracting ones. Helps identify when you're most focused and when distractions peak."
+            minHeight={360}
+          >
+            {focusDistractionData.length > 0 ? (
+              <FocusVsDistractionLine data={focusDistractionData} height={360} />
+            ) : (
+              <div className="h-full flex items-center justify-center">
+                <div className="text-center space-y-3">
+                  <div className="w-12 h-12 rounded-full bg-brand/10 flex items-center justify-center mx-auto">
+                    <svg className="w-6 h-6 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                    </svg>
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="font-medium text-text">Analyzing your focus patterns</h4>
+                    <p className="text-sm text-text-muted">
+                      We're learning about your productivity patterns. Use your computer normally and we'll start showing focus vs distraction trends.
+                    </p>
+                    <a href="#" className="text-xs text-brand hover:text-brand-hover transition-colors">
+                      Learn more →
+                    </a>
                   </div>
                 </div>
-              )}
-            </div>
-          </GlassCard>
+              </div>
+            )}
+          </ChartCard>
         </div>
         
-        <div className="col-span-12 lg:col-span-5">
-          <GlassCard className="h-full">
-            <SectionHeader
-              title="Idle & Break Frequency"
-              subtitle="When you step away from your computer"
-              tooltip="Shows patterns of breaks and idle time. Regular breaks are healthy, but irregular patterns might indicate stress or distraction."
-              className="mb-4"
-            />
-            <div className="min-h-[280px]">
-              {idleBreakData.length > 0 ? (
-                <IdleBreakBar data={idleBreakData} height={280} />
-              ) : (
-                <div className="h-full flex items-center justify-center">
-                  <div className="text-center space-y-3">
-                    <div className="w-12 h-12 rounded-full bg-brand/10 flex items-center justify-center mx-auto">
-                      <svg className="w-6 h-6 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                    </div>
-                    <div className="space-y-1">
-                      <h4 className="font-medium text-text">Ready to track your breaks</h4>
-                      <p className="text-sm text-text-muted">
-                        Take some breaks and step away from your computer! We'll track your break patterns to help optimize your work-rest balance.
-                      </p>
-                      <a href="#" className="text-xs text-brand hover:text-brand-hover transition-colors">
-                        Learn more →
-                      </a>
-                    </div>
+        <div className="col-span-12 md:col-span-6 xl:col-span-5">
+          <ChartCard
+            title="Idle & Break Frequency"
+            subtitle="When you step away from your computer"
+            tooltip="Shows patterns of breaks and idle time. Regular breaks are healthy, but irregular patterns might indicate stress or distraction."
+            minHeight={360}
+          >
+            {idleBreakData.length > 0 ? (
+              <IdleBreakBar data={idleBreakData} height={360} />
+            ) : (
+              <div className="h-full flex items-center justify-center">
+                <div className="text-center space-y-3">
+                  <div className="w-12 h-12 rounded-full bg-brand/10 flex items-center justify-center mx-auto">
+                    <svg className="w-6 h-6 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="font-medium text-text">Ready to track your breaks</h4>
+                    <p className="text-sm text-text-muted">
+                      Take some breaks and step away from your computer! We'll track your break patterns to help optimize your work-rest balance.
+                    </p>
+                    <a href="#" className="text-xs text-brand hover:text-brand-hover transition-colors">
+                      Learn more →
+                    </a>
                   </div>
                 </div>
-              )}
-            </div>
-          </GlassCard>
+              </div>
+            )}
+          </ChartCard>
         </div>
 
         {/* Row 5: Recent Activity - Full Width with Virtualized Timeline */}

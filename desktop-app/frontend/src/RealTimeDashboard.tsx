@@ -9,6 +9,7 @@ import SectionHeader from './ui/SectionHeader';
 import { EmptyStateBox } from './ui/InfoBox';
 import MetricTile from './ui/MetricTile';
 import GlassCard from './ui/GlassCard';
+import ChartCard from './ui/ChartCard';
 import { BarChart3, MousePointer, Clock, Timer, Activity } from 'lucide-react';
 import { createRollingWindow, useRAFBatching, useRenderTracker } from './utils/performance';
 import { useScreenshotMode, getScreenshotSeedData } from './utils/screenshotMode';
@@ -388,7 +389,7 @@ export default function RealTimeDashboard() {
       </div>
 
       {/* 12-Column Grid Layout */}
-      <div className="grid grid-cols-12 gap-3 md:gap-4 xl:gap-6">
+      <div className="grid grid-cols-12 gap-6">
         
         {/* Row 1: KPI Metrics - Four Cards */}
         <div className="col-span-12 sm:col-span-6 xl:col-span-3">
@@ -433,219 +434,210 @@ export default function RealTimeDashboard() {
         </div>
 
         {/* Row 2: Real-time Charts */}
-        <div className="col-span-12 lg:col-span-7">
-          <GlassCard className="h-full">
-            <SectionHeader
-              title="Real-time Input Activity"
-              subtitle="Live input activity tracking"
-              tooltip="Shows your real-time keyboard and mouse activity patterns."
-              className="mb-4"
-            />
-            <div className="min-h-[280px]">
-              {inputActivityData[0].data.length > 0 ? (
-                <ResponsiveLine
-                  data={inputActivityData}
-                  margin={{ top: 20, right: 20, bottom: 50, left: 60 }}
-                  xScale={{ type: 'point' }}
-                  yScale={{ type: 'linear', min: 'auto', max: 'auto' }}
-                  axisTop={null}
-                  axisRight={null}
-                  axisLeft={{
-                    tickSize: 5,
-                    tickPadding: 5,
-                    tickRotation: 0,
-                    legend: 'Inputs',
-                    legendOffset: -40,
-                    legendPosition: 'middle',
-                    tickValues: 'every 2'
-                  }}
-                  axisBottom={{
-                    tickSize: 5,
-                    tickPadding: 5,
-                    tickRotation: 0,
-                    legend: 'Time',
-                    legendOffset: 36,
-                    legendPosition: 'middle',
-                    tickValues: window.innerWidth < 900 ? 'every 2' : 'every 1'
-                  }}
-                  colors={['#12ffe0', '#ff6b6b', '#4ecdc4']}
-                  pointSize={6}
-                  pointColor={{ theme: 'background' }}
-                  pointBorderWidth={2}
-                  pointBorderColor={{ from: 'serieColor' }}
-                  pointLabelYOffset={-12}
-                  useMesh={true}
-                  enableSlices="x"
-                  sliceTooltip={({ slice }) => (
-                    <div className="bg-surface border border-border rounded-lg p-3 shadow-pop">
-                      <div className="text-sm font-medium text-text mb-2">
-                        {slice.points[0]?.data.x}
-                      </div>
-                      {slice.points.map((point) => (
-                        <div key={point.id} className="flex items-center justify-between gap-3 mb-1">
-                          <div className="flex items-center gap-2">
-                            <div 
-                              className="w-3 h-3 rounded-full" 
-                              style={{ backgroundColor: point.color }}
-                            />
-                            <span className="text-sm text-text-muted">{point.serieId}</span>
-                          </div>
-                          <span className="text-sm font-medium text-text">{point.data.y}</span>
+        <div className="col-span-12 md:col-span-6 xl:col-span-7">
+          <ChartCard
+            title="Real-time Input Activity"
+            subtitle="Live input activity tracking"
+            tooltip="Shows your real-time keyboard and mouse activity patterns."
+            minHeight={360}
+          >
+            {inputActivityData[0].data.length > 0 ? (
+              <ResponsiveLine
+                data={inputActivityData}
+                margin={{ top: 20, right: 20, bottom: 50, left: 60 }}
+                xScale={{ type: 'point' }}
+                yScale={{ type: 'linear', min: 'auto', max: 'auto' }}
+                axisTop={null}
+                axisRight={null}
+                axisLeft={{
+                  tickSize: 5,
+                  tickPadding: 5,
+                  tickRotation: 0,
+                  legend: 'Inputs',
+                  legendOffset: -40,
+                  legendPosition: 'middle',
+                  tickValues: 'every 2'
+                }}
+                axisBottom={{
+                  tickSize: 5,
+                  tickPadding: 5,
+                  tickRotation: 0,
+                  legend: 'Time',
+                  legendOffset: 36,
+                  legendPosition: 'middle',
+                  tickValues: window.innerWidth < 900 ? 'every 2' : 'every 1'
+                }}
+                colors={['#12ffe0', '#ff6b6b', '#4ecdc4']}
+                pointSize={6}
+                pointColor={{ theme: 'background' }}
+                pointBorderWidth={2}
+                pointBorderColor={{ from: 'serieColor' }}
+                pointLabelYOffset={-12}
+                useMesh={true}
+                enableSlices="x"
+                sliceTooltip={({ slice }) => (
+                  <div className="bg-surface border border-border rounded-lg p-3 shadow-pop">
+                    <div className="text-sm font-medium text-text mb-2">
+                      {slice.points[0]?.data.x}
+                    </div>
+                    {slice.points.map((point) => (
+                      <div key={point.id} className="flex items-center justify-between gap-3 mb-1">
+                        <div className="flex items-center gap-2">
+                          <div 
+                            className="w-3 h-3 rounded-full" 
+                            style={{ backgroundColor: point.color }}
+                          />
+                          <span className="text-sm text-text-muted">{point.serieId}</span>
                         </div>
-                      ))}
-                    </div>
-                  )}
-                  legends={[
-                    {
-                      anchor: 'top',
-                      direction: 'row',
-                      justify: false,
-                      translateX: 0,
-                      translateY: -30,
-                      itemsSpacing: 0,
-                      itemDirection: 'left-to-right',
-                      itemWidth: 80,
-                      itemHeight: 20,
-                      itemTextColor: '#a3a3a3',
-                      symbolSize: 12,
-                      symbolShape: 'circle',
-                      effects: [
-                        {
-                          on: 'hover',
-                          style: {
-                            itemTextColor: '#000'
-                          }
+                        <span className="text-sm font-medium text-text">{point.data.y}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                legends={[
+                  {
+                    anchor: 'top',
+                    direction: 'row',
+                    justify: false,
+                    translateX: 0,
+                    translateY: -30,
+                    itemsSpacing: 0,
+                    itemDirection: 'left-to-right',
+                    itemWidth: 80,
+                    itemHeight: 20,
+                    itemTextColor: '#a3a3a3',
+                    symbolSize: 12,
+                    symbolShape: 'circle',
+                    effects: [
+                      {
+                        on: 'hover',
+                        style: {
+                          itemTextColor: '#000'
                         }
-                      ]
-                    }
-                  ]}
-                />
-              ) : (
-                <div className="h-full flex items-center justify-center">
-                  <div className="text-center space-y-3">
-                    <div className="w-12 h-12 rounded-full bg-brand/10 flex items-center justify-center mx-auto">
-                      <svg className="w-6 h-6 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 011-1h1a2 2 0 100-4H7a1 1 0 01-1-1V7a1 1 0 011-1h3a1 1 0 001-1V4z" />
-                      </svg>
-                    </div>
-                    <div className="space-y-1">
-                      <h4 className="font-medium text-text">Start interacting to see spikes</h4>
-                      <p className="text-sm text-text-muted">
-                        Type on your keyboard and move your mouse to see real-time input activity patterns appear here.
-                      </p>
-                      <a href="#" className="text-xs text-brand hover:text-brand-hover transition-colors">
-                        Learn more →
-                      </a>
-                    </div>
+                      }
+                    ]
+                  }
+                ]}
+              />
+            ) : (
+              <div className="h-full flex items-center justify-center">
+                <div className="text-center space-y-3">
+                  <div className="w-12 h-12 rounded-full bg-brand/10 flex items-center justify-center mx-auto">
+                    <svg className="w-6 h-6 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 011-1h1a2 2 0 100-4H7a1 1 0 01-1-1V7a1 1 0 011-1h3a1 1 0 001-1V4z" />
+                    </svg>
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="font-medium text-text">Start interacting to see spikes</h4>
+                    <p className="text-sm text-text-muted">
+                      Type on your keyboard and move your mouse to see real-time input activity patterns appear here.
+                    </p>
+                    <a href="#" className="text-xs text-brand hover:text-brand-hover transition-colors">
+                      Learn more →
+                    </a>
                   </div>
                 </div>
-              )}
-            </div>
-          </GlassCard>
+              </div>
+            )}
+          </ChartCard>
         </div>
         
-        <div className="col-span-12 lg:col-span-5">
-          <GlassCard className="h-full">
-            <SectionHeader
-              title="Recent App Usage"
-              subtitle="Top applications by time spent"
-              tooltip="Visual breakdown of which applications consume most of your time."
-              className="mb-4"
-            />
-            <div className="min-h-[280px]">
-              {appUsageData.length > 0 ? (
-                <ResponsivePie
-                  data={appUsageData}
-                  margin={{ top: 20, right: 20, bottom: 20, left: 20 }}
-                  innerRadius={0.5}
-                  padAngle={0.7}
-                  cornerRadius={3}
-                  activeOuterRadiusOffset={8}
-                  colors={{ scheme: 'nivo' }}
-                  borderWidth={1}
-                  borderColor={{ from: 'color', modifiers: [['darker', 0.2]] }}
-                  arcLinkLabelsSkipAngle={10}
-                  arcLinkLabelsTextColor="#333333"
-                  arcLinkLabelsThickness={2}
-                  arcLinkLabelsColor={{ from: 'color' }}
-                  arcLabelsSkipAngle={10}
-                  arcLabelsTextColor={{ from: 'color', modifiers: [['darker', 2]] }}
-                  tooltip={({ datum }) => (
-                    <div className="bg-surface border border-border rounded-lg p-3 shadow-pop">
-                      <div className="text-sm font-medium text-text mb-1">
-                        {datum.label}
-                      </div>
-                      <div className="text-sm text-text-muted">
-                        {Math.round(datum.value)} seconds ({Math.round(datum.percent)}%)
-                      </div>
+        <div className="col-span-12 md:col-span-6 xl:col-span-5">
+          <ChartCard
+            title="Recent App Usage"
+            subtitle="Top applications by time spent"
+            tooltip="Visual breakdown of which applications consume most of your time."
+            minHeight={360}
+          >
+            {appUsageData.length > 0 ? (
+              <ResponsivePie
+                data={appUsageData}
+                margin={{ top: 20, right: 20, bottom: 20, left: 20 }}
+                innerRadius={0.5}
+                padAngle={0.7}
+                cornerRadius={3}
+                activeOuterRadiusOffset={8}
+                colors={{ scheme: 'nivo' }}
+                borderWidth={1}
+                borderColor={{ from: 'color', modifiers: [['darker', 0.2]] }}
+                arcLinkLabelsSkipAngle={10}
+                arcLinkLabelsTextColor="#333333"
+                arcLinkLabelsThickness={2}
+                arcLinkLabelsColor={{ from: 'color' }}
+                arcLabelsSkipAngle={10}
+                arcLabelsTextColor={{ from: 'color', modifiers: [['darker', 2]] }}
+                tooltip={({ datum }) => (
+                  <div className="bg-surface border border-border rounded-lg p-3 shadow-pop">
+                    <div className="text-sm font-medium text-text mb-1">
+                      {datum.label}
                     </div>
-                  )}
-                  legends={[
-                    {
-                      anchor: 'bottom',
-                      direction: 'row',
-                      justify: false,
-                      translateX: 0,
-                      translateY: 56,
-                      itemsSpacing: 0,
-                      itemWidth: 100,
-                      itemHeight: 18,
-                      itemTextColor: '#a3a3a3',
-                      itemDirection: 'left-to-right',
-                      itemOpacity: 1,
-                      symbolSize: 18,
-                      symbolShape: 'circle',
-                      effects: [
-                        {
-                          on: 'hover',
-                          style: {
-                            itemTextColor: '#000'
-                          }
-                        }
-                      ]
-                    }
-                  ]}
-                />
-              ) : (
-                <div className="h-full flex items-center justify-center">
-                  <div className="text-center space-y-3">
-                    <div className="w-12 h-12 rounded-full bg-brand/10 flex items-center justify-center mx-auto">
-                      <svg className="w-6 h-6 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                      </svg>
-                    </div>
-                    <div className="space-y-1">
-                      <h4 className="font-medium text-text">Desktop tracking in progress</h4>
-                      <p className="text-sm text-text-muted">
-                        This chart populates automatically as you use different applications throughout the day.
-                      </p>
-                      <a href="#" className="text-xs text-brand hover:text-brand-hover transition-colors">
-                        Learn more →
-                      </a>
+                    <div className="text-sm text-text-muted">
+                      {Math.round(datum.value)} seconds ({Math.round(datum.percent)}%)
                     </div>
                   </div>
+                )}
+                legends={[
+                  {
+                    anchor: 'bottom',
+                    direction: 'row',
+                    justify: false,
+                    translateX: 0,
+                    translateY: 56,
+                    itemsSpacing: 0,
+                    itemWidth: 100,
+                    itemHeight: 18,
+                    itemTextColor: '#a3a3a3',
+                    itemDirection: 'left-to-right',
+                    itemOpacity: 1,
+                    symbolSize: 18,
+                    symbolShape: 'circle',
+                    effects: [
+                      {
+                        on: 'hover',
+                        style: {
+                          itemTextColor: '#000'
+                        }
+                      }
+                    ]
+                  }
+                ]}
+              />
+            ) : (
+              <div className="h-full flex items-center justify-center">
+                <div className="text-center space-y-3">
+                  <div className="w-12 h-12 rounded-full bg-brand/10 flex items-center justify-center mx-auto">
+                    <svg className="w-6 h-6 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="font-medium text-text">Desktop tracking in progress</h4>
+                    <p className="text-sm text-text-muted">
+                      This chart populates automatically as you use different applications throughout the day.
+                    </p>
+                    <a href="#" className="text-xs text-brand hover:text-brand-hover transition-colors">
+                      Learn more →
+                    </a>
+                  </div>
                 </div>
-              )}
-            </div>
-          </GlassCard>
+              </div>
+            )}
+          </ChartCard>
         </div>
 
         {/* Row 3: Activity Timeline - Full Width */}
         <div className="col-span-12">
-          <GlassCard>
-            <SectionHeader
-              title="Real-time Activity Timeline"
-              subtitle="Live activity feed with 5-minute grouping"
-              tooltip="Real-time feed of your computer activity, grouped by time for better readability."
-              className="mb-4"
+          <ChartCard
+            title="Real-time Activity Timeline"
+            subtitle="Live activity feed with 5-minute grouping"
+            tooltip="Real-time feed of your computer activity, grouped by time for better readability."
+            minHeight={400}
+          >
+            <ActivityTimeline 
+              events={timelineEvents}
+              maxHeight={400}
             />
-            <div className="h-[400px]">
-              <ActivityTimeline 
-                events={timelineEvents}
-                maxHeight={400}
-              />
-            </div>
-          </GlassCard>
+          </ChartCard>
         </div>
       </div>
     </div>
