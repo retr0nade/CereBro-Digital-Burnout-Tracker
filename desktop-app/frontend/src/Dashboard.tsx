@@ -45,6 +45,27 @@ interface MetricsData {
   };
 }
 
+interface AnalyticsData {
+  analytics_data: Record<string, {
+    daily_summary: any;
+    app_stats: Record<string, any>;
+    total_app_time: number;
+    total_idle_time: number;
+    focus_sessions: number;
+    breaks: number;
+    burnout_signals: any;
+  }>;
+  total_records: number;
+  total_idle_records: number;
+  days_analyzed: number;
+}
+
+interface MetricsSummary {
+  total_app_time?: number;
+  app_switches?: number;
+  idle_events?: number;
+}
+
 interface InsightSuggestion {
   id: string;
   type: string;
@@ -138,14 +159,10 @@ export default function Dashboard() {
       // Try Tauri command first
       if (window.__TAURI__) {
         try {
-          const result = await window.__TAURI__.invoke('get_aggregated_metrics', {
-            from: range.from,
-            to: range.to,
-            preset: range.preset
-          });
-          // Update store with aggregated data
-          actions.setDashboardSeries(convertMetricsToPoints(result.aggregated_usage || []));
-          actions.setApps(convertUsageToAppSlices(result.aggregated_usage || []));
+          const result = await window.__TAURI__.invoke('get_system_metrics');
+          // Update store with fetched data
+          actions.setDashboardSeries(convertMetricsToPoints(result.recent_usage || []));
+          actions.setApps(convertUsageToAppSlices(result.recent_usage || []));
           actions.setCounters({
             focusMinutes: Math.round((result.metrics_summary?.total_app_time || 0) / 60),
             distractMinutes: Math.round((result.metrics_summary?.total_app_time || 0) / 60 * 0.3),
@@ -160,28 +177,62 @@ export default function Dashboard() {
         }
       }
 
-      // Fallback to direct HTTP
-      const response = await fetch(`http://localhost:5005/api/metrics/aggregated?from=${range.from}&to=${range.to}&preset=${range.preset}`);
+      // Determine which endpoint to use based on range
+      let endpoint = 'http://localhost:5005/api/metrics';
+      let params = '';
+      
+      if (range.preset === 'week') {
+        endpoint = 'http://localhost:5005/api/analytics';
+        params = '?days=7';
+      } else if (range.preset === 'month') {
+        endpoint = 'http://localhost:5005/api/analytics';
+        params = '?days=30';
+      }
+      // For 'today' or custom ranges, use the basic metrics endpoint
+
+      const response = await fetch(endpoint + params);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       const result = await response.json();
-      // Update store with aggregated data
-      actions.setDashboardSeries(convertMetricsToPoints(result.aggregated_usage || []));
-      actions.setApps(convertUsageToAppSlices(result.aggregated_usage || []));
+      
+      // Handle different response formats
+      let usageData: any[] = [];
+      let metricsSummary: MetricsSummary = {};
+      
+      if (endpoint.includes('/analytics')) {
+        // Analytics endpoint returns different structure
+        const analyticsResult = result as AnalyticsData;
+        usageData = analyticsResult.analytics_data ? 
+          Object.values(analyticsResult.analytics_data).flatMap(day => Object.values(day.app_stats || {})) : [];
+        metricsSummary = {
+          total_app_time: analyticsResult.total_records * 60, // Rough estimate
+          app_switches: analyticsResult.total_records,
+          idle_events: analyticsResult.total_idle_records || 0
+        };
+      } else {
+        // Basic metrics endpoint
+        const metricsResult = result as MetricsData;
+        usageData = metricsResult.recent_usage || [];
+        metricsSummary = metricsResult.metrics_summary || {};
+      }
+      
+      // Update store with fetched data
+      actions.setDashboardSeries(convertMetricsToPoints(usageData));
+      actions.setApps(convertUsageToAppSlices(usageData));
       actions.setCounters({
-        focusMinutes: Math.round((result.metrics_summary?.total_app_time || 0) / 60),
-        distractMinutes: Math.round((result.metrics_summary?.total_app_time || 0) / 60 * 0.3),
-        appSwitches: result.metrics_summary?.app_switches || 0,
-        idleEvents: result.metrics_summary?.idle_events || 0,
-        totalMinutes: Math.round((result.metrics_summary?.total_app_time || 0) / 60)
+        focusMinutes: Math.round((metricsSummary.total_app_time || 0) / 60),
+        distractMinutes: Math.round((metricsSummary.total_app_time || 0) / 60 * 0.3),
+        appSwitches: metricsSummary.app_switches || 0,
+        idleEvents: metricsSummary.idle_events || 0,
+        totalMinutes: Math.round((metricsSummary.total_app_time || 0) / 60)
       });
       setBackendConnected(true);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch aggregated data';
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch data';
       setError(errorMessage);
       setBackendConnected(false);
-      console.error('Dashboard aggregated fetch error:', err);
+      console.error('Dashboard fetch error:', err);
     } finally {
       setLoading(false);
     }
@@ -324,7 +375,7 @@ export default function Dashboard() {
             }
           </p>
           <button 
-            onClick={fetchData}
+            onClick={() => loadAggregatedHistory(dashRange)}
             className="btn btn-danger mt-4"
           >
             Retry
