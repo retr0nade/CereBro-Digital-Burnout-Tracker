@@ -7,7 +7,7 @@ export type Point = {
   focus?: number; 
   distract?: number; 
   idle?: number; 
-  totalInputs?: number; 
+  totalInputs?: number;
 };
 
 export type AppSlice = { 
@@ -36,13 +36,8 @@ export type Counters = {
 
 // Store interface
 interface AnalyticsState {
-  // Configuration
   rtWindowMinutes: number;
-  
-  // Dashboard range settings
   dashRange: DashRange;
-  
-  // Data
   timeseries: {
     realtime: Point[];
     dashboard: Point[];
@@ -50,182 +45,166 @@ interface AnalyticsState {
   apps: AppSlice[];
   counters: Counters;
   connection: Connection;
-  
-  // Actions
   actions: {
-    appendRealtime(p: Point): void;
-    setDashboardSeries(data: Point[]): void;
-    setApps(apps: AppSlice[]): void;
-    bumpCounter(key: "appSwitches" | "idleEvents", inc?: number): void;
-    setCounters(partial: Partial<Counters>): void;
-    setConnection(partial: Partial<Connection>): void;
-    setDashRange(range: DashRange): void;
-    setRtWindowMinutes(minutes: number): void;
-    resetRealtime(): void;
+    appendRealtime: (p: Point) => void;
+    setDashboardSeries: (data: Point[]) => void;
+    setApps: (apps: AppSlice[]) => void;
+    bumpCounter: (key: "appSwitches" | "idleEvents", inc?: number) => void;
+    setCounters: (partial: Partial<Counters>) => void;
+    setConnection: (partial: Partial<Connection>) => void;
+    setDashRange: (range: Partial<DashRange>) => void;
+    resetRealtime: () => void;
   };
 }
 
-// Initial state
-const initialState = {
-  rtWindowMinutes: 10,
-  dashRange: {
-    from: null,
-    to: null,
-    preset: "today" as const,
-  },
-  timeseries: {
-    realtime: [],
-    dashboard: [],
-  },
-  apps: [],
-  counters: {
-    focusMinutes: 0,
-    distractMinutes: 0,
-    appSwitches: 0,
-    idleEvents: 0,
-    totalMinutes: 0,
-  },
-  connection: {
-    backend: false,
-    ws: false,
-  },
-};
-
-// Create the store
+// Create store with persist middleware
 export const useAnalytics = create<AnalyticsState>()(
   persist(
     (set, get) => ({
-      ...initialState,
-      
+      rtWindowMinutes: 10,
+      dashRange: {
+        from: null,
+        to: null,
+        preset: "today"
+      },
+      timeseries: {
+        realtime: [],
+        dashboard: []
+      },
+      apps: [],
+      counters: {
+        focusMinutes: 0,
+        distractMinutes: 0,
+        appSwitches: 0,
+        idleEvents: 0,
+        totalMinutes: 0
+      },
+      connection: {
+        backend: false,
+        ws: false
+      },
       actions: {
         appendRealtime: (p: Point) => {
           set((state) => {
             const { rtWindowMinutes } = state;
             const cutoff = Date.now() - rtWindowMinutes * 60 * 1000;
             
-            // Filter existing points to rolling window
-            const filteredRealtime = state.timeseries.realtime.filter(
-              (point) => point.t >= cutoff
+            // Add new point and filter old ones
+            const newRealtime = [...state.timeseries.realtime, p].filter(
+              point => point.t >= cutoff
             );
             
-            // Add new point
-            const newRealtime = [...filteredRealtime, p];
-            
-            // Calculate total minutes from time deltas
-            let totalMinutes = 0;
+            // Compute totalMinutes from minute deltas if data is available
+            let totalMinutes = state.counters.totalMinutes;
             if (newRealtime.length > 1) {
-              for (let i = 1; i < newRealtime.length; i++) {
-                const delta = newRealtime[i].t - newRealtime[i - 1].t;
-                totalMinutes += delta / (60 * 1000); // Convert ms to minutes
+              const sortedPoints = newRealtime.sort((a, b) => a.t - b.t);
+              totalMinutes = 0;
+              for (let i = 1; i < sortedPoints.length; i++) {
+                const deltaMs = sortedPoints[i].t - sortedPoints[i - 1].t;
+                const deltaMinutes = deltaMs / (1000 * 60);
+                totalMinutes += deltaMinutes;
               }
             }
             
             return {
               timeseries: {
                 ...state.timeseries,
-                realtime: newRealtime,
+                realtime: newRealtime
               },
               counters: {
                 ...state.counters,
-                totalMinutes,
-              },
+                totalMinutes
+              }
             };
           });
         },
-        
+
         setDashboardSeries: (data: Point[]) => {
           set((state) => ({
             timeseries: {
               ...state.timeseries,
-              dashboard: data,
-            },
+              dashboard: data
+            }
           }));
         },
-        
+
         setApps: (apps: AppSlice[]) => {
-          set(() => ({ apps }));
+          set({ apps });
         },
-        
+
         bumpCounter: (key: "appSwitches" | "idleEvents", inc = 1) => {
           set((state) => ({
             counters: {
               ...state.counters,
-              [key]: state.counters[key] + inc,
-            },
+              [key]: state.counters[key] + inc
+            }
           }));
         },
-        
+
         setCounters: (partial: Partial<Counters>) => {
           set((state) => ({
             counters: {
               ...state.counters,
-              ...partial,
-            },
+              ...partial
+            }
           }));
         },
-        
+
         setConnection: (partial: Partial<Connection>) => {
           set((state) => ({
             connection: {
               ...state.connection,
-              ...partial,
-            },
+              ...partial
+            }
           }));
         },
-        
-        setDashRange: (range: DashRange) => {
-          set(() => ({ dashRange: range }));
+
+        setDashRange: (range: Partial<DashRange>) => {
+          set((state) => ({
+            dashRange: {
+              ...state.dashRange,
+              ...range
+            }
+          }));
         },
-        
-        setRtWindowMinutes: (minutes: number) => {
-          set(() => ({ rtWindowMinutes: minutes }));
-        },
-        
+
         resetRealtime: () => {
           set((state) => ({
             timeseries: {
               ...state.timeseries,
-              realtime: [],
-            },
-            counters: {
-              ...state.counters,
-              totalMinutes: 0,
-            },
+              realtime: []
+            }
           }));
-        },
-      },
+        }
+      }
     }),
     {
-      name: "cerebro_state_v1",
+      name: 'cerebro_state_v1',
+      // Only persist dashboard timeseries, apps, dashRange, and counters
+      // Do NOT persist realtime timeseries or connection state
       partialize: (state) => ({
-        // Persist dashboard data, apps, range, and counters
+        dashRange: state.dashRange,
         timeseries: {
-          dashboard: state.timeseries.dashboard,
-          realtime: [], // Don't persist realtime data
+          dashboard: state.timeseries.dashboard
         },
         apps: state.apps,
-        dashRange: state.dashRange,
-        counters: state.counters,
-        rtWindowMinutes: state.rtWindowMinutes,
-      }),
+        counters: state.counters
+      })
     }
   )
 );
 
-// Select helpers
+// Selector hooks for easy access
 export const selectRealtime = (state: AnalyticsState) => state.timeseries.realtime;
 export const selectDashboardSeries = (state: AnalyticsState) => state.timeseries.dashboard;
 export const selectCounters = (state: AnalyticsState) => state.counters;
 export const selectApps = (state: AnalyticsState) => state.apps;
 export const selectConn = (state: AnalyticsState) => state.connection;
-export const selectDashRange = (state: AnalyticsState) => state.dashRange;
-export const selectActions = (state: AnalyticsState) => state.actions;
 
 // Convenience hooks
 export const useRealtimeData = () => useAnalytics(selectRealtime);
-export const useDashboardSeries = () => useAnalytics(selectDashboardSeries);
+export const useDashboardData = () => useAnalytics(selectDashboardSeries);
 export const useCounters = () => useAnalytics(selectCounters);
 export const useApps = () => useAnalytics(selectApps);
 export const useConnection = () => useAnalytics(selectConn);
-export const useDashRange = () => useAnalytics(selectDashRange);
-export const useAnalyticsActions = () => useAnalytics(selectActions);
+export const useAnalyticsActions = () => useAnalytics(state => state.actions);
