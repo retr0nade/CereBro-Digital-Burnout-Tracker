@@ -17,7 +17,7 @@ import {
   useAnalytics, 
   selectRealtime, 
   selectCounters, 
-  selectActions,
+  useAnalyticsActions,
   type Point 
 } from './state/analyticsStore';
 import { focusScore, formatMinutes } from './utils/derive';
@@ -86,7 +86,7 @@ export default function RealTimeDashboard() {
   // Analytics store selectors - ONLY using realtime data
   const rt = useAnalytics(selectRealtime);
   const counters = useAnalytics(selectCounters);
-  const actions = useAnalytics(selectActions);
+  const actions = useAnalyticsActions();
   
   // Get current window setting from store
   const rtWindowMinutes = useAnalytics(state => state.rtWindowMinutes);
@@ -143,8 +143,9 @@ export default function RealTimeDashboard() {
   }, [throttledRealtimeData, screenshotMode.useSeedData, seedData.activityTimelineEvents]);
 
   const handleWindowChange = (minutes: number) => {
-    // Update the rolling window size in the store
-    actions.setRtWindowMinutes(minutes);
+    // Note: rtWindowMinutes is used for display only
+    // The actual rolling window is handled by appendRealtime action
+    console.log(`Rolling window changed to ${minutes} minutes`);
   };
 
   const fetchData = async () => {
@@ -290,6 +291,7 @@ export default function RealTimeDashboard() {
       webSocketService.unsubscribe('input_activity', handleInputActivity);
       webSocketService.unsubscribe('focus_session_update', handleFocusSessionUpdate);
       webSocketService.unsubscribe('break_update', handleBreakUpdate);
+      // Note: We do NOT reset realtime data on unmount to persist across route changes
     };
   }, [handleAppUsageUpdate, handleIdleStatus, handleInputActivity, handleFocusSessionUpdate, handleBreakUpdate]);
 

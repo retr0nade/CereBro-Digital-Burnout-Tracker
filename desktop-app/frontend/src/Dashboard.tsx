@@ -15,8 +15,7 @@ import {
   selectDashboardSeries, 
   selectCounters, 
   selectApps, 
-  selectActions,
-  selectDashRange,
+  useAnalyticsActions,
   type Point,
   type AppSlice 
 } from './state/analyticsStore';
@@ -138,8 +137,8 @@ export default function Dashboard() {
   const data = useAnalytics(selectDashboardSeries);
   const counters = useAnalytics(selectCounters);
   const apps = useAnalytics(selectApps);
-  const dashRange = useAnalytics(selectDashRange);
-  const actions = useAnalytics(selectActions);
+  const dashRange = useAnalytics(state => state.dashRange);
+  const actions = useAnalyticsActions();
   
   // Local state for UI concerns only
   const [loading, setLoading] = useState(true);
@@ -264,7 +263,7 @@ export default function Dashboard() {
       fetchInsights();
     }, 30000); // Refresh every 30 seconds
     return () => clearInterval(interval);
-  }, [dashRange]);
+  }, [dashRange.preset, dashRange.from, dashRange.to]);
 
   // Throttle data updates for charts to prevent excessive re-renders
   const throttledDashboardData = useThrottledValue(data || [], 250);
