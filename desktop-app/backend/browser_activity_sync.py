@@ -25,17 +25,19 @@ class BrowserActivitySync:
                  cerebro_db_path: str = "data/metrics.db",
                  browser_db_path: str = "browser_activity.db",
                  enable_http_sync: bool = True,
-                 cerebro_api_url: str = "http://localhost:5000/api"):
+                 cerebro_api_url: str = "http://localhost:5000/api",
+                 unified_db = None):  # BurnoutTrackerDB instance
         """
         Initialize browser activity sync
         
         Args:
             sync_interval_minutes: How often to sync data (default: 5 minutes)
             extension_data_path: Path to extension data directory
-            cerebro_db_path: Path to Cerebro's main database
-            browser_db_path: Path to browser activity database
+            cerebro_db_path: Path to Cerebro's main database (legacy)
+            browser_db_path: Path to browser activity database (legacy)
             enable_http_sync: Whether to sync via HTTP API
             cerebro_api_url: URL of Cerebro's API
+            unified_db: BurnoutTrackerDB instance for unified storage
         """
         self.sync_interval_minutes = sync_interval_minutes
         self.sync_interval_seconds = sync_interval_minutes * 60
@@ -44,6 +46,7 @@ class BrowserActivitySync:
         self.browser_db_path = browser_db_path
         self.enable_http_sync = enable_http_sync
         self.cerebro_api_url = cerebro_api_url
+        self.unified_db = unified_db  # NEW: BurnoutTrackerDB
         
         # State variables
         self.is_running = False
@@ -197,10 +200,42 @@ class BrowserActivitySync:
     def _sync_browser_activity(self, extension_data: Dict[str, Any]):
         """Sync browser activity data to database"""
         try:
+            current_time = int(time.time())  # Use seconds for unified DB
+            
+            # NEW: Write to BurnoutTrackerDB if available
+            if self.unified_db:
+                site_visit_history = extension_data.get("site_visit_history", {})
+                for domain, visits in site_visit_history.items():
+                    if visits and len(visits) > 0:
+                        # Calculate duration from visits
+                        total_duration_ms = 0
+                        for i in range(len(visits) - 1):
+                            duration = visits[i + 1] - visits[i]
+                            if 0 < duration < 300000:  # Between 0 and 5 minutes
+                                total_duration_ms += duration
+                        
+                        if total_duration_ms > 0:
+                            try:
+                                # Write to unified DB
+                                url = f"https://{domain}"
+                                duration_seconds = total_duration_ms // 1000
+                                start_time = current_time - duration_seconds
+                                
+                                self.unified_db.insert_browser_activity(
+                                    domain=domain,
+                                    url=url,
+                                    start_time=start_time,
+                                    end_time=current_time,
+                                    duration=duration_seconds
+                                )
+                            except Exception as e:
+                                self.logger.debug(f"Unified DB write failed for {domain}: {e}")
+            
+            # Legacy: Keep writing to browser_activity.db
             conn = sqlite3.connect(self.browser_db_path)
             cursor = conn.cursor()
             
-            current_time = int(time.time() * 1000)  # Milliseconds
+            current_time_ms = int(time.time() * 1000)  # Milliseconds for legacy
             
             # Process site visit history
             site_visit_history = extension_data.get("site_visit_history", {})
@@ -221,7 +256,7 @@ class BrowserActivitySync:
                         INSERT INTO browser_activity 
                         (domain, category, duration_ms, visit_count, timestamp, session_id)
                         VALUES (?, ?, ?, ?, ?, ?)
-                    ''', (domain, category, total_duration, len(visits), current_time, f"session_{current_time}"))
+                    ''', (domain, category, total_duration, len(visits), current_time_ms, f"session_{current_time_ms}"))
             
             # Process site category stats
             site_category_stats = extension_data.get("site_category_stats", {})

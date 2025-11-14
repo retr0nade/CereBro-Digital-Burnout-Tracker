@@ -10,7 +10,7 @@ import sqlite3
 import threading
 import logging
 from datetime import datetime, timedelta, date
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Optional, Tuple, List
 import platform
 import os
 import signal
@@ -31,7 +31,7 @@ if platform.system() == "Windows":
     from ctypes import wintypes
 elif platform.system() == "Darwin":  # macOS
     try:
-        import Quartz
+        import Quartz  # type: ignore
     except ImportError:
         Quartz = None
 elif platform.system() == "Linux":
@@ -48,22 +48,25 @@ class ScreenTimeTracker:
                  idle_threshold: int = 60,  # 60 seconds of inactivity
                  check_interval: float = 1.0,  # Check every second
                  daily_reset_hour: int = 0,  # Reset at midnight
-                 cerebro_db = None):  # Unified CerebroDB instance
+                 cerebro_db = None,  # Unified CerebroDB instance
+                 unified_db = None):  # BurnoutTrackerDB instance
         """
         Initialize the screen time tracker
         
         Args:
-            db_path: Path to SQLite database file
+            db_path: Path to SQLite database file (legacy)
             idle_threshold: Seconds of inactivity before considering idle
             check_interval: How often to check for activity in seconds
             daily_reset_hour: Hour of day to reset daily totals (0 = midnight)
-            cerebro_db: Unified CerebroDB instance for logging
+            cerebro_db: Unified CerebroDB instance for logging (legacy)
+            unified_db: BurnoutTrackerDB instance for unified storage
         """
         self.db_path = db_path
         self.idle_threshold = idle_threshold
         self.check_interval = check_interval
         self.daily_reset_hour = daily_reset_hour
         self.cerebro_db = cerebro_db
+        self.unified_db = unified_db  # NEW: BurnoutTrackerDB
         
         # Tracking state
         self.is_running = False
@@ -84,7 +87,7 @@ class ScreenTimeTracker:
         
         # Setup logging
         log_config = config.get_log_config('screen_time_tracker')
-        handlers = [logging.StreamHandler()]
+        handlers: List[logging.Handler] = [logging.StreamHandler()]
         
         if 'file' in log_config:
             handlers.append(logging.FileHandler(log_config['file']))
@@ -213,16 +216,16 @@ class ScreenTimeTracker:
         try:
             if platform.system() == "Windows":
                 # Windows implementation
-                class LASTINPUTINFO(ctypes.Structure):
+                class LASTINPUTINFO(ctypes.Structure):  # type: ignore
                     _fields_ = [
-                        ("cbSize", ctypes.c_uint),
-                        ("dwTime", ctypes.c_uint)
+                        ("cbSize", ctypes.c_uint),  # type: ignore
+                        ("dwTime", ctypes.c_uint)  # type: ignore
                     ]
                 
                 last_input = LASTINPUTINFO()
-                last_input.cbSize = ctypes.sizeof(last_input)
+                last_input.cbSize = ctypes.sizeof(last_input)  # type: ignore
                 
-                if ctypes.windll.user32.GetLastInputInfo(ctypes.byref(last_input)):
+                if ctypes.windll.user32.GetLastInputInfo(ctypes.byref(last_input)):  # type: ignore
                     return last_input.dwTime / 1000.0
                 return None
                 
@@ -236,9 +239,10 @@ class ScreenTimeTracker:
                 
             elif platform.system() == "Linux" and Xlib:  # Linux
                 # Linux implementation
-                display_obj = display.Display()
+                from Xlib import display as xlib_display, X as xlib_X  # type: ignore
+                display_obj = xlib_display.Display()  # type: ignore
                 root = display_obj.screen().root
-                root.change_attributes(event_mask=X.MotionNotifyMask)
+                root.change_attributes(event_mask=xlib_X.PropertyChangeMask)  # type: ignore
                 return time.time()  # Simplified for now
                 
             else:
@@ -327,6 +331,22 @@ class ScreenTimeTracker:
                     duration: float, is_active: bool = True):
         """Log a screen session to the database"""
         try:
+            # NEW: Write to BurnoutTrackerDB if available
+            if self.unified_db and is_active:
+                try:
+                    from data.unified_schema import AppUsage
+                    app_usage = AppUsage(
+                        app_name="Screen Time - Active Session",
+                        start_time=int(session_start.timestamp()),
+                        end_time=int(session_end.timestamp()),
+                        duration=int(duration),
+                        category="screen_time"
+                    )
+                    self.unified_db.insert_app_usage(app_usage)
+                except Exception as e:
+                    self.logger.debug(f"Unified DB write failed: {e}")
+            
+            # Legacy: Keep writing to screen_time.db for backward compatibility
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
             

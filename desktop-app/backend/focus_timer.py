@@ -24,7 +24,7 @@ if platform.system() == "Windows":
     from ctypes import wintypes
 elif platform.system() == "Darwin":  # macOS
     try:
-        import Quartz
+        import Quartz  # type: ignore
     except ImportError:
         Quartz = None
 elif platform.system() == "Linux":
@@ -37,12 +37,13 @@ elif platform.system() == "Linux":
 class FocusTimer:
     """Focus session timer with interruption detection"""
     
-    def __init__(self, idle_threshold: int = 60, cerebro_db: CerebroDB = None):  # 1 minute of inactivity
+    def __init__(self, idle_threshold: int = 60, cerebro_db: Optional[CerebroDB] = None, unified_db = None):  # 1 minute of inactivity
         # Validate configuration
         if idle_threshold is None or idle_threshold < 0:
             raise ValueError("idle_threshold must be >= 0")
         self.idle_threshold = idle_threshold
         self.cerebro_db = cerebro_db or CerebroDB("cerebro.db")
+        self.unified_db = unified_db  # NEW: BurnoutTrackerDB
         
         # Test-friendly flag (avoid background threads when running under pytest)
         self._is_test_env = 'PYTEST_CURRENT_TEST' in os.environ
@@ -71,7 +72,7 @@ class FocusTimer:
         
         # Setup logging
         log_config = config.get_log_config('focus_timer')
-        handlers = [logging.StreamHandler()]
+        handlers: List[logging.Handler] = [logging.StreamHandler()]
         
         if 'file' in log_config:
             handlers.append(logging.FileHandler(log_config['file']))
@@ -96,47 +97,17 @@ class FocusTimer:
             self.stop_session()
         sys.exit(0)
     
-    def _init_database(self):
-        """Initialize SQLite database with focus sessions table"""
-        try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            
-            # Create focus sessions table
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS focus_sessions (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    session_id TEXT UNIQUE,
-                    start_time TIMESTAMP NOT NULL,
-                    end_time TIMESTAMP,
-                    target_duration INTEGER DEFAULT 1500,
-                    actual_duration REAL,
-                    interrupted BOOLEAN DEFAULT 0,
-                    interruption_duration REAL DEFAULT 0.0,
-                    notes TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            ''')
-            
-            conn.commit()
-            conn.close()
-            self.logger.info(f"Database initialized: {self.db_path}")
-            
-        except Exception as e:
-            self.logger.error(f"Failed to initialize database: {e}")
-            raise
-    
     def _get_last_input_time(self) -> Optional[float]:
         """Get the last input time from the system"""
         try:
             if platform.system() == "Windows":
-                class LASTINPUTINFO(ctypes.Structure):
-                    _fields_ = [("cbSize", ctypes.c_uint), ("dwTime", ctypes.c_uint)]
+                class LASTINPUTINFO(ctypes.Structure):  # type: ignore
+                    _fields_ = [("cbSize", ctypes.c_uint), ("dwTime", ctypes.c_uint)]  # type: ignore
                 
                 last_input = LASTINPUTINFO()
-                last_input.cbSize = ctypes.sizeof(last_input)
+                last_input.cbSize = ctypes.sizeof(last_input)  # type: ignore
                 
-                if ctypes.windll.user32.GetLastInputInfo(ctypes.byref(last_input)):
+                if ctypes.windll.user32.GetLastInputInfo(ctypes.byref(last_input)):  # type: ignore
                     return last_input.dwTime / 1000.0
                 return None
                 
@@ -386,44 +357,61 @@ class FocusTimer:
     def _log_session_end(self, actual_duration: float, notes: str = ""):
         """Log session end to database"""
         try:
-            # Log to unified cerebro database
-            try:
-                self.cerebro_db.insert_focus_session(
-                    start_time=int(self.session_start.timestamp()),
-                    end_time=int(self.session_end.timestamp()),
-                    was_interrupted=self.interrupted,
-                    duration=int(actual_duration)
-                )
-                
-                # Emit WebSocket event for focus session update
+            # NEW: Write to BurnoutTrackerDB if available
+            if self.unified_db and self.session_id and self.session_start and self.session_end:
                 try:
-                    from websocket_events import get_event_manager
-                    event_manager = get_event_manager()
-                    if event_manager:
-                        event_manager.emit_focus_session_update({
-                            "session_id": self.session_id,
-                            "start_time": int(self.session_start.timestamp()),
-                            "end_time": int(self.session_end.timestamp()),
-                            "was_interrupted": self.interrupted,
-                            "duration": int(actual_duration),
-                            "notes": notes,
-                            "status": "completed"
-                        })
-                except Exception as ws_error:
-                    self.logger.debug(f"WebSocket event emission failed: {ws_error}")
-                
-            except Exception as db_error:
-                error_msg = f"Database error in focus timer: {db_error}"
-                self.logger.error(error_msg, exc_info=True)
-                
-                # Log to cerebro.log for service manager monitoring
+                    from data.unified_schema import FocusSession
+                    focus_session = FocusSession(
+                        session_id=self.session_id,
+                        start_time=int(self.session_start.timestamp()),
+                        end_time=int(self.session_end.timestamp()),
+                        was_interrupted=self.interrupted,
+                        focus_score=1.0 - (self.interruption_duration / actual_duration) if actual_duration > 0 else 0.0,
+                        notes=notes
+                    )
+                    self.unified_db.insert_focus_session(focus_session)
+                except Exception as e:
+                    self.logger.debug(f"Unified DB write failed: {e}")
+            
+            # Legacy: Write to CerebroDB (keep for backward compatibility)
+            if self.session_start and self.session_end:
                 try:
-                    with open('cerebro.log', 'a') as f:
-                        f.write(f"{datetime.now().isoformat()} - FOCUS_TIMER - DATABASE ERROR: {error_msg}\n")
-                except:
-                    pass
-                
-                # Don't raise the exception - continue running
+                    self.cerebro_db.insert_focus_session(
+                        start_time=int(self.session_start.timestamp()),
+                        end_time=int(self.session_end.timestamp()),
+                        was_interrupted=self.interrupted,
+                        duration=int(actual_duration)
+                    )
+                    
+                    # Emit WebSocket event for focus session update
+                    try:
+                        from websocket_events import get_event_manager
+                        event_manager = get_event_manager()
+                        if event_manager:
+                            event_manager.emit_focus_session_update({
+                                "session_id": self.session_id,
+                                "start_time": int(self.session_start.timestamp()),
+                                "end_time": int(self.session_end.timestamp()),
+                                "was_interrupted": self.interrupted,
+                                "duration": int(actual_duration),
+                                "notes": notes,
+                                "status": "completed"
+                            })
+                    except Exception as ws_error:
+                        self.logger.debug(f"WebSocket event emission failed: {ws_error}")
+                    
+                except Exception as db_error:
+                    error_msg = f"Database error in focus timer: {db_error}"
+                    self.logger.error(error_msg, exc_info=True)
+                    
+                    # Log to cerebro.log for service manager monitoring
+                    try:
+                        with open('cerebro.log', 'a') as f:
+                            f.write(f"{datetime.now().isoformat()} - FOCUS_TIMER - DATABASE ERROR: {error_msg}\n")
+                    except:
+                        pass
+                    
+                    # Don't raise the exception - continue running
                 
         except Exception as e:
             error_msg = f"Failed to log session end: {e}"
@@ -536,7 +524,6 @@ def main():
     args = parser.parse_args()
     
     timer = FocusTimer(
-        db_path=args.db,
         idle_threshold=args.idle_threshold
     )
     
