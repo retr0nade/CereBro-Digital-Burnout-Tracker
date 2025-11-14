@@ -189,7 +189,7 @@ class BurnoutTrackerDB:
             
             conn.commit()
     
-    def insert_app_usage(self, app_usage: AppUsage) -> int:
+    def insert_app_usage(self, app_usage: AppUsage) -> Optional[int]:
         """Insert app usage record"""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
@@ -209,7 +209,7 @@ class BurnoutTrackerDB:
             conn.commit()
             return cursor.lastrowid
     
-    def insert_idle_period(self, idle_period: IdlePeriod) -> int:
+    def insert_idle_period(self, idle_period: IdlePeriod) -> Optional[int]:
         """Insert idle period record"""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
@@ -227,7 +227,7 @@ class BurnoutTrackerDB:
             conn.commit()
             return cursor.lastrowid
     
-    def insert_input_activity(self, input_activity: InputActivity) -> int:
+    def insert_input_activity(self, input_activity: InputActivity) -> Optional[int]:
         """Insert input activity record"""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
@@ -245,7 +245,7 @@ class BurnoutTrackerDB:
             conn.commit()
             return cursor.lastrowid
     
-    def insert_focus_session(self, focus_session: FocusSession) -> int:
+    def insert_focus_session(self, focus_session: FocusSession) -> Optional[int]:
         """Insert focus session record"""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
@@ -265,7 +265,7 @@ class BurnoutTrackerDB:
             conn.commit()
             return cursor.lastrowid
     
-    def insert_break_log(self, break_log: BreakLog) -> int:
+    def insert_break_log(self, break_log: BreakLog) -> Optional[int]:
         """Insert break log record"""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
@@ -286,7 +286,7 @@ class BurnoutTrackerDB:
             return cursor.lastrowid
     
     def insert_burnout_signal(self, signal_type: str, severity: float = 1.0, 
-                            description: str = None, metadata: Dict = None) -> int:
+                            description: Optional[str] = None, metadata: Optional[Dict] = None) -> Optional[int]:
         """Insert burnout signal record"""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()

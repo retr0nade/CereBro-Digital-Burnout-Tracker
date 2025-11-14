@@ -15,6 +15,7 @@ import platform
 import os
 import signal
 import sys
+import ctypes
 from config_manager import config
 
 # Platform-specific imports for idle detection
@@ -27,7 +28,7 @@ if platform.system() == "Windows":
     import win32process
 elif platform.system() == "Darwin":  # macOS
     try:
-        import Quartz
+        import Quartz  # type: ignore
     except ImportError:
         Quartz = None
 elif platform.system() == "Linux":
@@ -83,7 +84,7 @@ class BreakMonitor:
         
         # Setup logging
         log_config = config.get_log_config('break_monitor')
-        handlers = [logging.StreamHandler()]
+        handlers: List[logging.Handler] = [logging.StreamHandler()]
         
         if 'file' in log_config:
             handlers.append(logging.FileHandler(log_config['file']))
@@ -186,9 +187,10 @@ class BreakMonitor:
                 
             elif platform.system() == "Linux" and Xlib:
                 # Linux implementation
-                display_obj = display.Display()
+                from Xlib import display as xlib_display, X as xlib_X
+                display_obj = xlib_display.Display()
                 root = display_obj.screen().root
-                root.change_attributes(event_mask=X.MotionNotifyMask)
+                root.change_attributes(event_mask=xlib_X.PropertyChangeMask)
                 return time.time()  # Simplified for now
                 
             else:
@@ -227,8 +229,10 @@ class BreakMonitor:
                 except:
                     # Fallback: Check if screensaver is active
                     try:
+                        # SPI_GETSCREENSAVERRUNNING constant value
+                        SPI_GETSCREENSAVERRUNNING = 0x0072
                         result = ctypes.windll.user32.SystemParametersInfoW(
-                            win32con.SPI_GETSCREENSAVERRUNNING, 0, None, 0
+                            SPI_GETSCREENSAVERRUNNING, 0, None, 0
                         )
                         if result:
                             return "locked"
@@ -282,10 +286,16 @@ class BreakMonitor:
             if self.cerebro_db:
                 try:
                     from data.unified_schema import BreakLog, BreakType
+                    # Map break_type string to available BreakType enum values
+                    if break_type == "inactivity":
+                        bt = BreakType.SHORT  # Map inactivity to SHORT break
+                    else:
+                        bt = BreakType.SHORT  # Default to SHORT for manual breaks
+                    
                     break_log = BreakLog(
                         start_time=int(break_start.timestamp()),
                         end_time=int(break_end.timestamp()),
-                        break_type=BreakType.INACTIVITY if break_type == "inactivity" else BreakType.MANUAL,
+                        break_type=bt,
                         duration=int(duration),
                         was_productive=False,
                         notes=notes

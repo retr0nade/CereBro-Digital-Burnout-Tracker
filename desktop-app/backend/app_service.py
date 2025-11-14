@@ -51,15 +51,12 @@ CORS(app, resources={
 })
 
 # Initialize SocketIO with CORS support
-socketio = SocketIO(app, cors_allowed_origins=["http://localhost:3000", "http://localhost:3001", "http://localhost:5005"])
+socketio = SocketIO(app, cors_allowed_origins=["http://localhost:3000", "http://localhost:3001", "http://localhost:5005"], async_mode='threading')
 event_manager = init_event_manager(socketio)
 setup_socketio_handlers(socketio)  # No need to pass event_manager as it's managed globally
 
 # Register API routes
 app.register_blueprint(api, url_prefix='/api')
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
-init_event_manager(socketio)
-setup_socketio_handlers(socketio)
 
 # Initialize unified database
 unified_db = CerebroDB(config.get_database_path())

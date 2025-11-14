@@ -5,11 +5,12 @@ from data.unified_schema import BurnoutTrackerDB, AppUsage, IdlePeriod, InputAct
 from metrics.util import calculate_focus_score, detect_burnout_signals, format_duration
 from cerebro_db import CerebroDB
 from ai_insights import compute_insights
+from config_manager import config
 import json
 import time
 import csv
 import io
-from datetime import datetime
+from datetime import datetime, timedelta
 
 api = Blueprint('api', __name__)
 
@@ -82,48 +83,7 @@ def track_extension_data():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@api.route('/metrics', methods=['GET'])
-def get_metrics():
-    """Get all metrics for dashboard"""
-    try:
-        # Get today's data from unified database
-        today = datetime.now().strftime("%Y-%m-%d")
-        daily_summary = unified_db.get_daily_summary(today)
-        recent_activity = unified_db.get_recent_activity(hours=24)
-        
-        # Get recent app usage, idle periods, and input activity
-        recent_usage = recent_activity['app_usage'][:50]
-        recent_idle = recent_activity['idle_periods'][:50]
-        recent_input = recent_activity['input_activity'][:50]
-        
-        # Calculate focus score based on recent usage
-        focus_score = calculate_focus_score(recent_usage) if recent_usage else 0.0
-        
-        # Get burnout signals from today
-        burnout_signals = list(daily_summary['burnout_signals'].keys())
-        
-        # Prepare metrics summary
-        metrics_data = {
-            "app_switches": len([u for u in recent_usage if u[4] != "productive"]),  # Non-productive app switches
-            "recent_usage": len(recent_usage),
-            "idle_events": len(recent_idle),
-            "focus_score": focus_score,
-            "total_app_time": daily_summary['total_app_time'],
-            "total_idle_time": daily_summary['total_idle_time'],
-            "focus_sessions": daily_summary['focus_sessions']
-        }
-        
-        return jsonify({
-            "recent_usage": recent_usage,
-            "recent_idle": recent_idle,
-            "recent_input": recent_input,
-            "focus_score": focus_score,
-            "burnout_signals": burnout_signals,
-            "metrics_summary": metrics_data,
-            "daily_summary": daily_summary
-        })
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+
 
 @api.route('/insights', methods=['GET'])
 def get_insights():
@@ -147,7 +107,7 @@ def get_analytics():
         total_idle_records = 0
         
         for i in range(days):
-            date = datetime.now().date() - datetime.timedelta(days=i)
+            date = datetime.now().date() - timedelta(days=i)
             date_str = date.strftime('%Y-%m-%d')
             
             # Get daily summary
@@ -463,7 +423,7 @@ def export_pdf():
         # Add data tables
         if tables == 'all' or 'app_usage' in tables:
             story.append(Paragraph("Application Usage", styles['Heading2']))
-            app_usage = cerebro_db.get_app_usage(start_time=start_timestamp, end_time=end_timestamp)
+            app_usage = cerebro_db.get_app_usage(limit=1000)
             if app_usage:
                 data = [['App Name', 'Duration', 'Start Time', 'End Time']]
                 for row in app_usage[:20]:  # Limit to first 20 rows for PDF
@@ -489,7 +449,7 @@ def export_pdf():
         
         if tables == 'all' or 'focus_sessions' in tables:
             story.append(Paragraph("Focus Sessions", styles['Heading2']))
-            focus_sessions = cerebro_db.get_focus_sessions(start_time=start_timestamp, end_time=end_timestamp)
+            focus_sessions = cerebro_db.get_focus_sessions(limit=1000)
             if focus_sessions:
                 data = [['Start Time', 'End Time', 'Duration', 'Interrupted']]
                 for row in focus_sessions[:20]:
@@ -562,7 +522,7 @@ def export_csv():
         if tables == 'all' or 'app_usage' in tables:
             writer.writerow(['Table: app_usage'])
             writer.writerow(['id', 'app_name', 'start_time', 'end_time', 'duration', 'created_at'])
-            app_usage = cerebro_db.get_app_usage(start_time=start_timestamp, end_time=end_timestamp)
+            app_usage = cerebro_db.get_app_usage(limit=10000)
             for row in app_usage:
                 writer.writerow([row['id'], row['app_name'], row['start_time'], row['end_time'], row['duration'], row['created_at']])
             writer.writerow([])
@@ -570,7 +530,7 @@ def export_csv():
         if tables == 'all' or 'idle_periods' in tables:
             writer.writerow(['Table: idle_periods'])
             writer.writerow(['id', 'start_time', 'end_time', 'duration', 'created_at'])
-            idle_periods = cerebro_db.get_idle_periods(start_time=start_timestamp, end_time=end_timestamp)
+            idle_periods = cerebro_db.get_idle_periods(limit=10000)
             for row in idle_periods:
                 writer.writerow([row['id'], row['start_time'], row['end_time'], row['duration'], row['created_at']])
             writer.writerow([])
@@ -578,7 +538,7 @@ def export_csv():
         if tables == 'all' or 'input_activity' in tables:
             writer.writerow(['Table: input_activity'])
             writer.writerow(['id', 'timestamp', 'keypress_count', 'mouse_click_count', 'created_at'])
-            input_activity = cerebro_db.get_input_activity(start_time=start_timestamp, end_time=end_timestamp)
+            input_activity = cerebro_db.get_input_activity(limit=10000)
             for row in input_activity:
                 writer.writerow([row['id'], row['timestamp'], row['keypress_count'], row['mouse_click_count'], row['created_at']])
             writer.writerow([])
@@ -586,7 +546,7 @@ def export_csv():
         if tables == 'all' or 'focus_sessions' in tables:
             writer.writerow(['Table: focus_sessions'])
             writer.writerow(['id', 'start_time', 'end_time', 'was_interrupted', 'duration', 'created_at'])
-            focus_sessions = cerebro_db.get_focus_sessions(start_time=start_timestamp, end_time=end_timestamp)
+            focus_sessions = cerebro_db.get_focus_sessions(limit=10000)
             for row in focus_sessions:
                 writer.writerow([row['id'], row['start_time'], row['end_time'], row['was_interrupted'], row['duration'], row['created_at']])
             writer.writerow([])
@@ -594,7 +554,7 @@ def export_csv():
         if tables == 'all' or 'breaks' in tables:
             writer.writerow(['Table: breaks'])
             writer.writerow(['id', 'start_time', 'end_time', 'type', 'created_at'])
-            breaks = cerebro_db.get_breaks(start_time=start_timestamp, end_time=end_timestamp)
+            breaks = cerebro_db.get_breaks(limit=10000)
             for row in breaks:
                 writer.writerow([row['id'], row['start_time'], row['end_time'], row['type'], row['created_at']])
             writer.writerow([])
@@ -602,7 +562,7 @@ def export_csv():
         if tables == 'all' or 'browser_activity' in tables:
             writer.writerow(['Table: browser_activity'])
             writer.writerow(['id', 'domain', 'url', 'start_time', 'end_time', 'duration', 'created_at'])
-            browser_activity = cerebro_db.get_browser_activity(start_time=start_timestamp, end_time=end_timestamp)
+            browser_activity = cerebro_db.get_browser_activity(limit=10000)
             for row in browser_activity:
                 writer.writerow([row['id'], row['domain'], row['url'], row['start_time'], row['end_time'], row['duration'], row['created_at']])
             writer.writerow([])
@@ -610,7 +570,7 @@ def export_csv():
         if tables == 'all' or 'system_metrics' in tables:
             writer.writerow(['Table: system_metrics'])
             writer.writerow(['id', 'timestamp', 'cpu_usage', 'ram_usage', 'created_at'])
-            system_metrics = cerebro_db.get_system_metrics(start_time=start_timestamp, end_time=end_timestamp)
+            system_metrics = cerebro_db.get_system_metrics(limit=10000)
             for row in system_metrics:
                 writer.writerow([row['id'], row['timestamp'], row['cpu_usage'], row['ram_usage'], row['created_at']])
             writer.writerow([])
@@ -659,25 +619,25 @@ def export_json():
         }
         
         if tables == 'all' or 'app_usage' in tables:
-            export_data['tables']['app_usage'] = cerebro_db.get_app_usage(start_time=start_timestamp, end_time=end_timestamp)
+            export_data['tables']['app_usage'] = cerebro_db.get_app_usage(limit=10000)
         
         if tables == 'all' or 'idle_periods' in tables:
-            export_data['tables']['idle_periods'] = cerebro_db.get_idle_periods(start_time=start_timestamp, end_time=end_timestamp)
+            export_data['tables']['idle_periods'] = cerebro_db.get_idle_periods(limit=10000)
         
         if tables == 'all' or 'input_activity' in tables:
-            export_data['tables']['input_activity'] = cerebro_db.get_input_activity(start_time=start_timestamp, end_time=end_timestamp)
+            export_data['tables']['input_activity'] = cerebro_db.get_input_activity(limit=10000)
         
         if tables == 'all' or 'focus_sessions' in tables:
-            export_data['tables']['focus_sessions'] = cerebro_db.get_focus_sessions(start_time=start_timestamp, end_time=end_timestamp)
+            export_data['tables']['focus_sessions'] = cerebro_db.get_focus_sessions(limit=10000)
         
         if tables == 'all' or 'breaks' in tables:
-            export_data['tables']['breaks'] = cerebro_db.get_breaks(start_time=start_timestamp, end_time=end_timestamp)
+            export_data['tables']['breaks'] = cerebro_db.get_breaks(limit=10000)
         
         if tables == 'all' or 'browser_activity' in tables:
-            export_data['tables']['browser_activity'] = cerebro_db.get_browser_activity(start_time=start_timestamp, end_time=end_timestamp)
+            export_data['tables']['browser_activity'] = cerebro_db.get_browser_activity(limit=10000)
         
         if tables == 'all' or 'system_metrics' in tables:
-            export_data['tables']['system_metrics'] = cerebro_db.get_system_metrics(start_time=start_timestamp, end_time=end_timestamp)
+            export_data['tables']['system_metrics'] = cerebro_db.get_system_metrics(limit=10000)
         
         # Create response
         json_data = json.dumps(export_data, indent=2, default=str)
@@ -714,37 +674,37 @@ def export_summary():
         table_counts = {}
         
         if tables == 'all' or 'app_usage' in tables:
-            app_usage = cerebro_db.get_app_usage(start_time=start_timestamp, end_time=end_timestamp)
+            app_usage = cerebro_db.get_app_usage(limit=10000)
             table_counts['app_usage'] = len(app_usage)
             total_rows += len(app_usage)
         
         if tables == 'all' or 'idle_periods' in tables:
-            idle_periods = cerebro_db.get_idle_periods(start_time=start_timestamp, end_time=end_timestamp)
+            idle_periods = cerebro_db.get_idle_periods(limit=10000)
             table_counts['idle_periods'] = len(idle_periods)
             total_rows += len(idle_periods)
         
         if tables == 'all' or 'input_activity' in tables:
-            input_activity = cerebro_db.get_input_activity(start_time=start_timestamp, end_time=end_timestamp)
+            input_activity = cerebro_db.get_input_activity(limit=10000)
             table_counts['input_activity'] = len(input_activity)
             total_rows += len(input_activity)
         
         if tables == 'all' or 'focus_sessions' in tables:
-            focus_sessions = cerebro_db.get_focus_sessions(start_time=start_timestamp, end_time=end_timestamp)
+            focus_sessions = cerebro_db.get_focus_sessions(limit=10000)
             table_counts['focus_sessions'] = len(focus_sessions)
             total_rows += len(focus_sessions)
         
         if tables == 'all' or 'breaks' in tables:
-            breaks = cerebro_db.get_breaks(start_time=start_timestamp, end_time=end_timestamp)
+            breaks = cerebro_db.get_breaks(limit=10000)
             table_counts['breaks'] = len(breaks)
             total_rows += len(breaks)
         
         if tables == 'all' or 'browser_activity' in tables:
-            browser_activity = cerebro_db.get_browser_activity(start_time=start_timestamp, end_time=end_timestamp)
+            browser_activity = cerebro_db.get_browser_activity(limit=10000)
             table_counts['browser_activity'] = len(browser_activity)
             total_rows += len(browser_activity)
         
         if tables == 'all' or 'system_metrics' in tables:
-            system_metrics = cerebro_db.get_system_metrics(start_time=start_timestamp, end_time=end_timestamp)
+            system_metrics = cerebro_db.get_system_metrics(limit=10000)
             table_counts['system_metrics'] = len(system_metrics)
             total_rows += len(system_metrics)
         
