@@ -16,20 +16,21 @@ from typing import Optional, Dict, Any, List
 import platform
 
 # Platform-specific imports
+# Windows-only MVP implementation
 if platform.system() == "Windows":
     import ctypes
     from ctypes import wintypes
-elif platform.system() == "Darwin":  # macOS
-    try:
-        import Quartz
-    except ImportError:
-        Quartz = None
-elif platform.system() == "Linux":
-    try:
-        import Xlib
-        from Xlib import display, X
-    except ImportError:
-        Xlib = None
+# elif platform.system() == "Darwin":  # macOS
+#     try:
+#         import Quartz
+#     except ImportError:
+#         Quartz = None
+# elif platform.system() == "Linux":
+#     try:
+#         import Xlib
+#         from Xlib import display, X
+#     except ImportError:
+#         Xlib = None
 
 class SimpleBreakMonitor:
     """Simple monitor for short breaks (2-15 minutes of inactivity)"""

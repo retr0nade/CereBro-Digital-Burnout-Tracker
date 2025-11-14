@@ -16,6 +16,7 @@ import os
 import json
 
 # Platform-specific imports
+# Windows-only MVP implementation
 if platform.system() == "Windows":
     import ctypes
     from ctypes import wintypes
@@ -23,20 +24,20 @@ if platform.system() == "Windows":
     import win32con
     import win32gui
     import win32process
-elif platform.system() == "Darwin":  # macOS
-    try:
-        import Quartz
-    except ImportError:
-        print("Quartz not available. Install with: pip install pyobjc-framework-Quartz")
-        Quartz = None
-elif platform.system() == "Linux":
-    try:
-        import Xlib
-        from Xlib import display, X
-        from Xlib.ext import randr
-    except ImportError:
-        print("Xlib not available. Install with: pip install python-xlib")
-        Xlib = None
+# elif platform.system() == "Darwin":  # macOS
+#     try:
+#         import Quartz
+#     except ImportError:
+#         print("Quartz not available. Install with: pip install pyobjc-framework-Quartz")
+#         Quartz = None
+# elif platform.system() == "Linux":
+#     try:
+#         import Xlib
+#         from Xlib import display, X
+#         from Xlib.ext import randr
+#     except ImportError:
+#         print("Xlib not available. Install with: pip install python-xlib")
+#         Xlib = None
 
 class ShortBreakMonitor:
     """Monitor short breaks (2-15 minutes of inactivity)"""

@@ -26,20 +26,21 @@ except ImportError:
     IDLE_MONITOR_AVAILABLE = False
 
 # Platform-specific imports for idle detection
+# Windows-only MVP implementation
 if platform.system() == "Windows":
     import ctypes
     from ctypes import wintypes
-elif platform.system() == "Darwin":  # macOS
-    try:
-        import Quartz  # type: ignore
-    except ImportError:
-        Quartz = None
-elif platform.system() == "Linux":
-    try:
-        import Xlib
-        from Xlib import display, X
-    except ImportError:
-        Xlib = None
+# elif platform.system() == "Darwin":  # macOS
+#     try:
+#         import Quartz  # type: ignore
+#     except ImportError:
+#         Quartz = None
+# elif platform.system() == "Linux":
+#     try:
+#         import Xlib
+#         from Xlib import display, X
+#     except ImportError:
+#         Xlib = None
 
 class ScreenTimeTracker:
     """Daily screen time tracker with active period detection"""
@@ -212,7 +213,7 @@ class ScreenTimeTracker:
             self.logger.error(f"Failed to load today's data: {e}")
     
     def _get_last_input_time(self) -> Optional[float]:
-        """Get the last input time from the system"""
+        """Get the last input time from the system (Windows only)"""
         try:
             if platform.system() == "Windows":
                 # Windows implementation
@@ -228,23 +229,20 @@ class ScreenTimeTracker:
                 if ctypes.windll.user32.GetLastInputInfo(ctypes.byref(last_input)):  # type: ignore
                     return last_input.dwTime / 1000.0
                 return None
-                
-            elif platform.system() == "Darwin" and Quartz:  # macOS
-                # macOS implementation
-                idle_time = Quartz.CGEventSourceSecondsSinceLastEventType(
-                    Quartz.kCGEventSourceStateHIDSystemState,
-                    Quartz.kCGEventSourceStateHIDSystemState
-                )
-                return time.time() - idle_time
-                
-            elif platform.system() == "Linux" and Xlib:  # Linux
-                # Linux implementation
-                from Xlib import display as xlib_display, X as xlib_X  # type: ignore
-                display_obj = xlib_display.Display()  # type: ignore
-                root = display_obj.screen().root
-                root.change_attributes(event_mask=xlib_X.PropertyChangeMask)  # type: ignore
-                return time.time()  # Simplified for now
-                
+            # elif platform.system() == "Darwin" and Quartz:  # macOS
+            #     # macOS implementation
+            #     idle_time = Quartz.CGEventSourceSecondsSinceLastEventType(
+            #         Quartz.kCGEventSourceStateHIDSystemState,
+            #         Quartz.kCGEventSourceStateHIDSystemState
+            #     )
+            #     return time.time() - idle_time
+            # elif platform.system() == "Linux" and Xlib:  # Linux
+            #     # Linux implementation
+            #     from Xlib import display as xlib_display, X as xlib_X  # type: ignore
+            #     display_obj = xlib_display.Display()  # type: ignore
+            #     root = display_obj.screen().root
+            #     root.change_attributes(event_mask=xlib_X.PropertyChangeMask)  # type: ignore
+            #     return time.time()  # Simplified for now
             else:
                 # Fallback - assume always active
                 return time.time()

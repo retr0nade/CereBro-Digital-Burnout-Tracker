@@ -19,20 +19,21 @@ from cerebro_db import CerebroDB
 from config_manager import config
 
 # Platform-specific imports for idle detection
+# Windows-only MVP implementation
 if platform.system() == "Windows":
     import ctypes
     from ctypes import wintypes
-elif platform.system() == "Darwin":  # macOS
-    try:
-        import Quartz  # type: ignore
-    except ImportError:
-        Quartz = None
-elif platform.system() == "Linux":
-    try:
-        import Xlib
-        from Xlib import display, X
-    except ImportError:
-        Xlib = None
+# elif platform.system() == "Darwin":  # macOS
+#     try:
+#         import Quartz  # type: ignore
+#     except ImportError:
+#         Quartz = None
+# elif platform.system() == "Linux":
+#     try:
+#         import Xlib
+#         from Xlib import display, X
+#     except ImportError:
+#         Xlib = None
 
 class FocusTimer:
     """Focus session timer with interruption detection"""
@@ -98,7 +99,7 @@ class FocusTimer:
         sys.exit(0)
     
     def _get_last_input_time(self) -> Optional[float]:
-        """Get the last input time from the system"""
+        """Get the last input time from the system (Windows only)"""
         try:
             if platform.system() == "Windows":
                 class LASTINPUTINFO(ctypes.Structure):  # type: ignore
@@ -110,14 +111,12 @@ class FocusTimer:
                 if ctypes.windll.user32.GetLastInputInfo(ctypes.byref(last_input)):  # type: ignore
                     return last_input.dwTime / 1000.0
                 return None
-                
-            elif platform.system() == "Darwin" and Quartz:
-                idle_time = Quartz.CGEventSourceSecondsSinceLastEventType(
-                    Quartz.kCGEventSourceStateHIDSystemState,
-                    Quartz.kCGEventSourceStateHIDSystemState
-                )
-                return time.time() - idle_time
-                
+            # elif platform.system() == "Darwin" and Quartz:
+            #     idle_time = Quartz.CGEventSourceSecondsSinceLastEventType(
+            #         Quartz.kCGEventSourceStateHIDSystemState,
+            #         Quartz.kCGEventSourceStateHIDSystemState
+            #     )
+            #     return time.time() - idle_time
             else:
                 return time.time()
                 

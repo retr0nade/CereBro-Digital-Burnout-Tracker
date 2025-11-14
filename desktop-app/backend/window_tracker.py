@@ -10,36 +10,37 @@ import sqlite3
 import threading
 import logging
 from datetime import datetime, timedelta
-from typing import Optional, Tuple, Dict, Any
+from typing import Optional, Tuple, Dict, Any, List
 import platform
 import os
 from cerebro_db import CerebroDB
 from config_manager import config
 
 # Platform-specific imports
+# Windows-only MVP implementation
 if platform.system() == "Windows":
     import win32gui
     import win32process
     import psutil
-elif platform.system() == "Darwin":  # macOS
-    try:
-        import Quartz
-    except ImportError:
-        print("Quartz not available. Install with: pip install pyobjc-framework-Quartz")
-        Quartz = None
-elif platform.system() == "Linux":
-    try:
-        import Xlib
-        from Xlib import display, X
-        from Xlib.ext import randr
-    except ImportError:
-        print("Xlib not available. Install with: pip install python-xlib")
-        Xlib = None
+# elif platform.system() == "Darwin":  # macOS
+#     try:
+#         import Quartz
+#     except ImportError:
+#         print("Quartz not available. Install with: pip install pyobjc-framework-Quartz")
+#         Quartz = None
+# elif platform.system() == "Linux":
+#     try:
+#         import Xlib
+#         from Xlib import display, X
+#         from Xlib.ext import randr
+#     except ImportError:
+#         print("Xlib not available. Install with: pip install python-xlib")
+#         Xlib = None
 
 class WindowTracker:
     """Cross-platform window activity tracker"""
     
-    def __init__(self, log_interval: float = 1.0, cerebro_db: CerebroDB = None):
+    def __init__(self, log_interval: float = 1.0, cerebro_db: Optional[CerebroDB] = None):
         """
         Initialize the window tracker
         
@@ -53,13 +54,13 @@ class WindowTracker:
         self.log_interval = log_interval
         self.cerebro_db = cerebro_db or CerebroDB("cerebro.db")
         self.current_window = None
-        self.current_start_time = None
+        self.current_start_time: Optional[int] = None  # Unix timestamp
         self.is_running = False
         self.tracker_thread = None
         
         # Setup logging
         log_config = config.get_log_config('window_tracker')
-        handlers = [logging.StreamHandler()]
+        handlers: List[logging.Handler] = [logging.StreamHandler()]
         
         if 'file' in log_config:
             handlers.append(logging.FileHandler(log_config['file']))
@@ -77,47 +78,52 @@ class WindowTracker:
         self._setup_platform()
     
     def _setup_platform(self):
-        """Setup platform-specific components"""
+        """Setup platform-specific components (Windows only for MVP)"""
         self.system = platform.system()
         
         if self.system == "Windows":
             self.logger.info("Initializing Windows window tracker")
-        elif self.system == "Darwin":
-            if Quartz is None:
-                raise ImportError("Quartz module not available for macOS")
-            self.logger.info("Initializing macOS window tracker")
-        elif self.system == "Linux":
-            if Xlib is None:
-                raise ImportError("Xlib module not available for Linux")
-            self.logger.info("Initializing Linux window tracker")
-            self._setup_x11()
         else:
-            raise NotImplementedError(f"Unsupported operating system: {self.system}")
+            # Non-Windows platforms not supported in MVP
+            error_msg = f"Window tracking not supported on {self.system} in MVP release (Windows only)"
+            self.logger.error(error_msg)
+            raise NotImplementedError(error_msg)
+    # elif self.system == "Darwin":
+    #     if Quartz is None:
+    #         raise ImportError("Quartz module not available for macOS")
+    #     self.logger.info("Initializing macOS window tracker")
+    # elif self.system == "Linux":
+    #     if Xlib is None:
+    #         raise ImportError("Xlib module not available for Linux")
+    #     self.logger.info("Initializing Linux window tracker")
+    #     self._setup_x11()
+    # else:
+    #     raise NotImplementedError(f"Unsupported operating system: {self.system}")
     
-    def _setup_x11(self):
-        """Setup X11 display for Linux"""
-        try:
-            self.display = display.Display()
-            self.screen = self.display.screen()
-            self.root = self.screen.root
-            self.logger.info("X11 display initialized successfully")
-        except Exception as e:
-            self.logger.error(f"Failed to initialize X11 display: {e}")
-            raise
+    # def _setup_x11(self):
+    #     """Setup X11 display for Linux"""
+    #     try:
+    #         self.display = display.Display()
+    #         self.screen = self.display.screen()
+    #         self.root = self.screen.root
+    #         self.logger.info("X11 display initialized successfully")
+    #     except Exception as e:
+    #         self.logger.error(f"Failed to initialize X11 display: {e}")
+    #         raise
     
 
     
     def _get_active_window_windows(self) -> Optional[Tuple[str, str, int]]:
         """Get active window info on Windows"""
         try:
-            hwnd = win32gui.GetForegroundWindow()
+            hwnd = win32gui.GetForegroundWindow()  # type: ignore
             if not hwnd:
                 return None
             
-            window_title = win32gui.GetWindowText(hwnd)
+            window_title = win32gui.GetWindowText(hwnd)  # type: ignore
             
             # Get process ID
-            _, pid = win32process.GetWindowThreadProcessId(hwnd)
+            _, pid = win32process.GetWindowThreadProcessId(hwnd)  # type: ignore
             
             # Validate process ID
             if pid is None or pid <= 0:
@@ -126,9 +132,9 @@ class WindowTracker:
             
             # Get process name
             try:
-                process = psutil.Process(pid)
+                process = psutil.Process(pid)  # type: ignore
                 app_name = process.name()
-            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess) as e:
+            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess) as e:  # type: ignore
                 self.logger.warning(f"Error accessing process {pid}: {e}")
                 app_name = f"Unknown_{pid}"
             except ValueError as e:
@@ -141,87 +147,88 @@ class WindowTracker:
             self.logger.error(f"Error getting Windows active window: {e}")
             return None
     
-    def _get_active_window_macos(self) -> Optional[Tuple[str, str, int]]:
-        """Get active window info on macOS"""
-        try:
-            # Get active application
-            active_app = Quartz.CGSCopyActiveApplicationList(Quartz.CGSMainConnectionID(), None, None)
-            if not active_app:
-                return None
-            
-            # Get frontmost application
-            app_list = Quartz.CGSApplicationListCopyApplicationArray(Quartz.CGSMainConnectionID(), active_app)
-            if not app_list:
-                return None
-            
-            # Get the first (frontmost) application
-            app_info = app_list[0]
-            app_name = Quartz.CGSApplicationListCopyApplicationName(Quartz.CGSMainConnectionID(), app_info)
-            
-            # Get window title (this is more complex on macOS)
-            window_title = "Unknown"  # Placeholder - would need more complex implementation
-            
-            # Get process ID
-            pid = Quartz.CGSApplicationListCopyApplicationPID(Quartz.CGSMainConnectionID(), app_info)
-            
-            return app_name, window_title, pid
-            
-        except Exception as e:
-            self.logger.error(f"Error getting macOS active window: {e}")
-            return None
-    
-    def _get_active_window_linux(self) -> Optional[Tuple[str, str, int]]:
-        """Get active window info on Linux"""
-        try:
-            # Get active window
-            active_window = self.root.get_full_property(
-                self.display.intern_atom('_NET_ACTIVE_WINDOW'),
-                X.AnyPropertyType
-            )
-            
-            if not active_window:
-                return None
-            
-            window_id = active_window.value[0]
-            window = self.display.create_resource_object('window', window_id)
-            
-            # Get window title
-            window_title_prop = window.get_full_property(
-                self.display.intern_atom('_NET_WM_NAME'),
-                X.AnyPropertyType
-            )
-            
-            window_title = window_title_prop.value.decode('utf-8') if window_title_prop else "Unknown"
-            
-            # Get process ID
-            pid_prop = window.get_full_property(
-                self.display.intern_atom('_NET_WM_PID'),
-                X.AnyPropertyType
-            )
-            
-            pid = pid_prop.value[0] if pid_prop else 0
-            
-            # Validate process ID
-            if pid <= 0:
-                self.logger.warning(f"Invalid process ID: {pid}")
-                return "unknown", window_title, 0
-            
-            # Get process name
-            try:
-                process = psutil.Process(pid)
-                app_name = process.name()
-            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess) as e:
-                self.logger.warning(f"Error accessing process {pid}: {e}")
-                app_name = f"Unknown_{pid}"
-            except ValueError as e:
-                self.logger.warning(f"Invalid process ID {pid}: {e}")
-                app_name = f"Unknown_{pid}"
-            
-            return app_name, window_title, pid
-            
-        except Exception as e:
-            self.logger.error(f"Error getting Linux active window: {e}")
-            return None
+    # macOS/Linux methods disabled for MVP
+    # def _get_active_window_macos(self) -> Optional[Tuple[str, str, int]]:
+    #     """Get active window info on macOS"""
+    #     try:
+    #         # Get active application
+    #         active_app = Quartz.CGSCopyActiveApplicationList(Quartz.CGSMainConnectionID(), None, None)
+    #         if not active_app:
+    #             return None
+    #         
+    #         # Get frontmost application
+    #         app_list = Quartz.CGSApplicationListCopyApplicationArray(Quartz.CGSMainConnectionID(), active_app)
+    #         if not app_list:
+    #             return None
+    #         
+    #         # Get the first (frontmost) application
+    #         app_info = app_list[0]
+    #         app_name = Quartz.CGSApplicationListCopyApplicationName(Quartz.CGSMainConnectionID(), app_info)
+    #         
+    #         # Get window title (this is more complex on macOS)
+    #         window_title = "Unknown"  # Placeholder - would need more complex implementation
+    #         
+    #         # Get process ID
+    #         pid = Quartz.CGSApplicationListCopyApplicationPID(Quartz.CGSMainConnectionID(), app_info)
+    #         
+    #         return app_name, window_title, pid
+    #         
+    #     except Exception as e:
+    #         self.logger.error(f"Error getting macOS active window: {e}")
+    #         return None
+    # 
+    # def _get_active_window_linux(self) -> Optional[Tuple[str, str, int]]:
+    #     """Get active window info on Linux"""
+    #     try:
+    #         # Get active window
+    #         active_window = self.root.get_full_property(
+    #             self.display.intern_atom('_NET_ACTIVE_WINDOW'),
+    #             X.AnyPropertyType
+    #         )
+    #         
+    #         if not active_window:
+    #             return None
+    #         
+    #         window_id = active_window.value[0]
+    #         window = self.display.create_resource_object('window', window_id)
+    #         
+    #         # Get window title
+    #         window_title_prop = window.get_full_property(
+    #             self.display.intern_atom('_NET_WM_NAME'),
+    #             X.AnyPropertyType
+    #         )
+    #         
+    #         window_title = window_title_prop.value.decode('utf-8') if window_title_prop else "Unknown"
+    #         
+    #         # Get process ID
+    #         pid_prop = window.get_full_property(
+    #             self.display.intern_atom('_NET_WM_PID'),
+    #             X.AnyPropertyType
+    #         )
+    #         
+    #         pid = pid_prop.value[0] if pid_prop else 0
+    #         
+    #         # Validate process ID
+    #         if pid <= 0:
+    #             self.logger.warning(f"Invalid process ID: {pid}")
+    #             return "unknown", window_title, 0
+    #         
+    #         # Get process name
+    #         try:
+    #             process = psutil.Process(pid)
+    #             app_name = process.name()
+    #         except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess) as e:
+    #             self.logger.warning(f"Error accessing process {pid}: {e}")
+    #             app_name = f"Unknown_{pid}"
+    #         except ValueError as e:
+    #             self.logger.warning(f"Invalid process ID {pid}: {e}")
+    #             app_name = f"Unknown_{pid}"
+    #         
+    #         return app_name, window_title, pid
+    #         
+    #     except Exception as e:
+    #         self.logger.error(f"Error getting Linux active window: {e}")
+    #         return None
     
     def _get_active_window(self) -> Optional[Tuple[str, str, int]]:
         """Get active window info based on platform.
@@ -246,13 +253,13 @@ class WindowTracker:
             # Ignore and fall back
             pass
 
-        # Fallback: platform-specific
+        # Fallback: platform-specific (Windows only for MVP)
         if self.system == "Windows":
             return self._get_active_window_windows()
-        elif self.system == "Darwin":
-            return self._get_active_window_macos()
-        elif self.system == "Linux":
-            return self._get_active_window_linux()
+        # elif self.system == "Darwin":
+        #     return self._get_active_window_macos()
+        # elif self.system == "Linux":
+        #     return self._get_active_window_linux()
         else:
             return None
     
@@ -371,12 +378,16 @@ class WindowTracker:
                         # Log previous window if exists
                         if self.current_window and self.current_start_time:
                             try:
-                                duration = (current_time - self.current_start_time).total_seconds()
+                                current_time_ts = int(time.time())
+                                duration = float(current_time_ts - self.current_start_time)
+                                prev_start_dt = datetime.fromtimestamp(self.current_start_time)
+                                current_time_dt = datetime.fromtimestamp(current_time_ts)
+                                
                                 self._log_window_activity(
                                     self.current_window[0],  # app_name
                                     self.current_window[1],  # window_title
-                                    self.current_start_time,
-                                    current_time,
+                                    prev_start_dt,
+                                    current_time_dt,
                                     duration,
                                     0  # pid for previous window
                                 )
@@ -393,7 +404,7 @@ class WindowTracker:
                         
                         # Update current window
                         self.current_window = (app_name, window_title)
-                        self.current_start_time = current_time
+                        self.current_start_time = int(time.time())
                         self.logger.info(f"Active window: {app_name} - {window_title}")
                 
                 time.sleep(self.log_interval)
@@ -492,13 +503,16 @@ class WindowTracker:
             # Log final window if exists
             if self.current_window and self.current_start_time:
                 try:
-                    current_time = datetime.now()
-                    duration = (current_time - self.current_start_time).total_seconds()
+                    current_time_ts = int(time.time())
+                    duration = float(current_time_ts - self.current_start_time)
+                    start_time_dt = datetime.fromtimestamp(self.current_start_time)
+                    current_time_dt = datetime.fromtimestamp(current_time_ts)
+                    
                     self._log_window_activity(
                         self.current_window[0],
                         self.current_window[1],
-                        self.current_start_time,
-                        current_time,
+                        start_time_dt,
+                        current_time_dt,
                         duration,
                         0
                     )

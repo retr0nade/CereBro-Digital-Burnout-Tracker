@@ -19,6 +19,7 @@ import ctypes
 from config_manager import config
 
 # Platform-specific imports for idle detection
+# Windows-only MVP implementation
 if platform.system() == "Windows":
     import ctypes
     from ctypes import wintypes
@@ -26,17 +27,17 @@ if platform.system() == "Windows":
     import win32con
     import win32gui
     import win32process
-elif platform.system() == "Darwin":  # macOS
-    try:
-        import Quartz  # type: ignore
-    except ImportError:
-        Quartz = None
-elif platform.system() == "Linux":
-    try:
-        import Xlib
-        from Xlib import display, X
-    except ImportError:
-        Xlib = None
+# elif platform.system() == "Darwin":  # macOS
+#     try:
+#         import Quartz  # type: ignore
+#     except ImportError:
+#         Quartz = None
+# elif platform.system() == "Linux":
+#     try:
+#         import Xlib
+#         from Xlib import display, X
+#     except ImportError:
+#         Xlib = None
 
 class BreakMonitor:
     """Monitor for short user inactivity periods (breaks) and system lock events"""
@@ -165,7 +166,7 @@ class BreakMonitor:
             raise
     
     def _get_last_input_time(self) -> Optional[float]:
-        """Get the last input time from the system"""
+        """Get the last input time from the system (Windows only)"""
         try:
             if platform.system() == "Windows":
                 class LASTINPUTINFO(ctypes.Structure):
@@ -177,22 +178,19 @@ class BreakMonitor:
                 if ctypes.windll.user32.GetLastInputInfo(ctypes.byref(last_input)):
                     return last_input.dwTime / 1000.0
                 return None
-                
-            elif platform.system() == "Darwin" and Quartz:
-                idle_time = Quartz.CGEventSourceSecondsSinceLastEventType(
-                    Quartz.kCGEventSourceStateHIDSystemState,
-                    Quartz.kCGEventSourceStateHIDSystemState
-                )
-                return time.time() - idle_time
-                
-            elif platform.system() == "Linux" and Xlib:
-                # Linux implementation
-                from Xlib import display as xlib_display, X as xlib_X
-                display_obj = xlib_display.Display()
-                root = display_obj.screen().root
-                root.change_attributes(event_mask=xlib_X.PropertyChangeMask)
-                return time.time()  # Simplified for now
-                
+            # elif platform.system() == "Darwin" and Quartz:
+            #     idle_time = Quartz.CGEventSourceSecondsSinceLastEventType(
+            #         Quartz.kCGEventSourceStateHIDSystemState,
+            #         Quartz.kCGEventSourceStateHIDSystemState
+            #     )
+            #     return time.time() - idle_time
+            # elif platform.system() == "Linux" and Xlib:
+            #     # Linux implementation
+            #     from Xlib import display as xlib_display, X as xlib_X
+            #     display_obj = xlib_display.Display()
+            #     root = display_obj.screen().root
+            #     root.change_attributes(event_mask=xlib_X.PropertyChangeMask)
+            #     return time.time()  # Simplified for now
             else:
                 return time.time()
                 
@@ -240,23 +238,20 @@ class BreakMonitor:
                             return "unlocked"
                     except:
                         return None
-                        
-            elif platform.system() == "Darwin" and Quartz:
-                # macOS: Check if screen is locked
-                try:
-                    # This is a simplified check - in practice you'd need more complex logic
-                    return "unlocked"  # Placeholder
-                except:
-                    return None
-                    
-            elif platform.system() == "Linux":
-                # Linux: Check if screen is locked
-                try:
-                    # This would require checking X11 session state
-                    return "unlocked"  # Placeholder
-                except:
-                    return None
-                    
+            # elif platform.system() == "Darwin" and Quartz:
+            #     # macOS: Check if screen is locked
+            #     try:
+            #         # This is a simplified check - in practice you'd need more complex logic
+            #         return "unlocked"  # Placeholder
+            #     except:
+            #         return None
+            # elif platform.system() == "Linux":
+            #     # Linux: Check if screen is locked
+            #     try:
+            #         # This would require checking X11 session state
+            #         return "unlocked"  # Placeholder
+            #     except:
+            #         return None
             else:
                 return None
                 

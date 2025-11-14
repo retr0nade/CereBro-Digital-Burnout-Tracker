@@ -2,7 +2,9 @@
 """
 User Idle Monitor for CereBro Mental Burnout Tracker
 Continuously monitors mouse and keyboard activity to detect user inactivity
-Supports Windows, macOS, and Linux with configurable timeout periods
+
+Windows-only MVP implementation
+TODO: Future cross-platform support for macOS and Linux
 """
 
 import time
@@ -10,45 +12,54 @@ import sqlite3
 import threading
 import logging
 from datetime import datetime, timedelta
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 import platform
 import os
 from cerebro_db import CerebroDB
 from config_manager import config
 
 # Platform-specific imports
+# Windows-only MVP - macOS/Linux support disabled for now
 if platform.system() == "Windows":
     import ctypes
     from ctypes import wintypes
     import win32api
     import win32con
-elif platform.system() == "Darwin":  # macOS
-    try:
-        import Quartz
-    except ImportError:
-        print("Quartz not available. Install with: pip install pyobjc-framework-Quartz")
-        Quartz = None
-elif platform.system() == "Linux":
-    try:
-        import Xlib
-        from Xlib import display, X
-        from Xlib.ext import randr
-    except ImportError:
-        print("Xlib not available. Install with: pip install python-xlib")
-        Xlib = None
+# else:
+#     # Non-Windows platforms not supported in MVP
+#     # TODO: Re-enable when implementing cross-platform support
+#     pass
+#     # elif platform.system() == "Darwin":  # macOS
+#     #     try:
+#     #         import Quartz  # type: ignore
+#     #     except ImportError:
+#     #         print("Quartz not available. Install with: pip install pyobjc-framework-Quartz")
+#     #         Quartz = None
+#     # elif platform.system() == "Linux":
+#     #     try:
+#     #         import Xlib
+#     #         from Xlib import display, X
+#     #         from Xlib.ext import randr
+#     #     except ImportError:
+#     #         print("Xlib not available. Install with: pip install python-xlib")
+#     #         Xlib = None
 
 class IdleMonitor:
-    """Cross-platform user idle monitoring"""
+    """Windows-only user idle monitoring (MVP implementation)"""
     
     def __init__(self, timeout_seconds: int = 300, 
-                 check_interval: float = 1.0, cerebro_db: CerebroDB = None):
+                 check_interval: float = 1.0, cerebro_db: Optional[CerebroDB] = None):
         """
-        Initialize the idle monitor
+        Initialize the idle monitor (Windows only)
         
         Args:
             timeout_seconds: Seconds of inactivity before logging idle period
             check_interval: How often to check for activity (seconds)
             cerebro_db: Unified CerebroDB instance for logging
+            
+        Note:
+            Windows-only MVP implementation
+            TODO: Add macOS/Linux support in future releases
         """
         # Validate configuration
         if timeout_seconds is None or timeout_seconds < 0:
@@ -62,12 +73,12 @@ class IdleMonitor:
         self.is_running = False
         self.monitor_thread = None
         self.last_activity_time = time.time()
-        self.current_idle_start = None
+        self.current_idle_start: Optional[int] = None  # Unix timestamp
         self.is_idle = False
         
         # Setup logging
         log_config = config.get_log_config('idle_monitor')
-        handlers = [logging.StreamHandler()]
+        handlers: List[logging.Handler] = [logging.StreamHandler()]
         
         if 'file' in log_config:
             handlers.append(logging.FileHandler(log_config['file']))
@@ -85,64 +96,61 @@ class IdleMonitor:
         self._setup_platform()
     
     def _setup_platform(self):
-        """Setup platform-specific components"""
+        """Setup platform-specific components (Windows only for MVP)"""
         self.system = platform.system()
         
         if self.system == "Windows":
             self.logger.info("Initializing Windows idle monitor")
             self._setup_windows()
-        elif self.system == "Darwin":
-            if Quartz is None:
-                raise ImportError("Quartz module not available for macOS")
-            self.logger.info("Initializing macOS idle monitor")
-            self._setup_macos()
-        elif self.system == "Linux":
-            if Xlib is None:
-                raise ImportError("Xlib module not available for Linux")
-            self.logger.info("Initializing Linux idle monitor")
-            self._setup_linux()
         else:
-            raise NotImplementedError(f"Unsupported operating system: {self.system}")
+            # Non-Windows platforms not supported in MVP
+            # TODO: Implement macOS support using Quartz/IOKit
+            # TODO: Implement Linux support using X11/Wayland
+            error_msg = f"Idle monitoring not supported on {self.system} in MVP release (Windows only)"
+            self.logger.error(error_msg)
+            raise NotImplementedError(error_msg)
     
     def _setup_windows(self):
-        """Setup Windows-specific components"""
+        """Setup Windows-specific components for idle detection"""
         # Windows uses GetLastInputInfo for idle detection
-        self.user32 = ctypes.windll.user32
-        self.kernel32 = ctypes.windll.kernel32
+        self.user32 = ctypes.windll.user32  # type: ignore
+        self.kernel32 = ctypes.windll.kernel32  # type: ignore
         
         # Define structures for GetLastInputInfo
-        class LASTINPUTINFO(ctypes.Structure):
+        class LASTINPUTINFO(ctypes.Structure):  # type: ignore
             _fields_ = [
-                ("cbSize", ctypes.c_uint),
-                ("dwTime", ctypes.c_uint)
+                ("cbSize", ctypes.c_uint),  # type: ignore
+                ("dwTime", ctypes.c_uint)  # type: ignore
             ]
         
         self.LASTINPUTINFO = LASTINPUTINFO
-        self.LASTINPUTINFO.cbSize = ctypes.sizeof(LASTINPUTINFO)
+        self.LASTINPUTINFO.cbSize = ctypes.sizeof(LASTINPUTINFO)  # type: ignore
     
-    def _setup_macos(self):
-        """Setup macOS-specific components"""
-        # macOS uses Core Graphics for idle detection
-        pass
-    
-    def _setup_linux(self):
-        """Setup Linux-specific components"""
-        try:
-            self.display = display.Display()
-            self.screen = self.display.screen()
-            self.root = self.screen.root
-            self.logger.info("X11 display initialized successfully")
-        except Exception as e:
-            self.logger.error(f"Failed to initialize X11 display: {e}")
-            raise
+    # macOS/Linux setup methods disabled for MVP
+    # TODO: Re-enable when implementing cross-platform support
+    # def _setup_macos(self):
+    #     """Setup macOS-specific components"""
+    #     # macOS uses Core Graphics for idle detection
+    #     pass
+    # 
+    # def _setup_linux(self):
+    #     """Setup Linux-specific components"""
+    #     try:
+    #         self.display = display.Display()
+    #         self.screen = self.display.screen()
+    #         self.root = self.screen.root
+    #         self.logger.info("X11 display initialized successfully")
+    #     except Exception as e:
+    #         self.logger.error(f"Failed to initialize X11 display: {e}")
+    #         raise
     
 
     
     def _get_last_input_time_windows(self) -> Optional[float]:
-        """Get last input time on Windows"""
+        """Get last input time on Windows using GetLastInputInfo API"""
         try:
             last_input_info = self.LASTINPUTINFO()
-            if self.user32.GetLastInputInfo(ctypes.byref(last_input_info)):
+            if self.user32.GetLastInputInfo(ctypes.byref(last_input_info)):  # type: ignore
                 # Convert to seconds since boot
                 tick_count = self.kernel32.GetTickCount()
                 idle_time = (tick_count - last_input_info.dwTime) / 1000.0
@@ -152,36 +160,36 @@ class IdleMonitor:
             self.logger.error(f"Error getting Windows last input time: {e}")
             return None
     
-    def _get_last_input_time_macos(self) -> Optional[float]:
-        """Get last input time on macOS"""
-        try:
-            # Use Core Graphics to get last input time
-            # This is a simplified implementation
-            # For production, you might want to use IOKit for more accurate results
-            return None  # Placeholder - would need more complex implementation
-        except Exception as e:
-            self.logger.error(f"Error getting macOS last input time: {e}")
-            return None
-    
-    def _get_last_input_time_linux(self) -> Optional[float]:
-        """Get last input time on Linux"""
-        try:
-            # Check for mouse and keyboard activity using X11
-            # This is a simplified implementation
-            return None  # Placeholder - would need more complex implementation
-        except Exception as e:
-            self.logger.error(f"Error getting Linux last input time: {e}")
-            return None
+    # macOS/Linux methods disabled for MVP
+    # TODO: Re-enable when implementing cross-platform support
+    # def _get_last_input_time_macos(self) -> Optional[float]:
+    #     """Get last input time on macOS"""
+    #     try:
+    #         # Use Core Graphics to get last input time
+    #         # This is a simplified implementation
+    #         # For production, you might want to use IOKit for more accurate results
+    #         return None  # Placeholder - would need more complex implementation
+    #     except Exception as e:
+    #         self.logger.error(f"Error getting macOS last input time: {e}")
+    #         return None
+    # 
+    # def _get_last_input_time_linux(self) -> Optional[float]:
+    #     """Get last input time on Linux"""
+    #     try:
+    #         # Check for mouse and keyboard activity using X11
+    #         # This is a simplified implementation
+    #         return None  # Placeholder - would need more complex implementation
+    #     except Exception as e:
+    #         self.logger.error(f"Error getting Linux last input time: {e}")
+    #         return None
     
     def _get_last_input_time(self) -> Optional[float]:
-        """Get last input time based on platform"""
+        """Get last input time (Windows only for MVP)"""
         if self.system == "Windows":
             return self._get_last_input_time_windows()
-        elif self.system == "Darwin":
-            return self._get_last_input_time_macos()
-        elif self.system == "Linux":
-            return self._get_last_input_time_linux()
         else:
+            # Non-Windows platforms not supported in MVP
+            self.logger.warning(f"Idle time detection not supported on {self.system}")
             return None
     
     def _check_activity(self) -> bool:
@@ -340,10 +348,14 @@ class IdleMonitor:
                     if self.is_idle:
                         # User just became active after being idle
                         try:
-                            idle_end = datetime.now()
-                            duration = (idle_end - self.current_idle_start).total_seconds()
-                            
-                            self._log_idle_period(self.current_idle_start, idle_end, duration)
+                            idle_end_ts = int(time.time())
+                            duration = 0.0
+                            if self.current_idle_start:
+                                duration = float(idle_end_ts - self.current_idle_start)
+                                idle_start_dt = datetime.fromtimestamp(self.current_idle_start)
+                                idle_end_dt = datetime.fromtimestamp(idle_end_ts)
+                                
+                                self._log_idle_period(idle_start_dt, idle_end_dt, duration)
                             
                             self.is_idle = False
                             self.current_idle_start = None
@@ -367,7 +379,7 @@ class IdleMonitor:
                     if not self.is_idle:
                         # User just became idle
                         self.is_idle = True
-                        self.current_idle_start = datetime.now()
+                        self.current_idle_start = int(time.time())
                         self.logger.info(f"User became idle (timeout: {self.timeout_seconds}s)")
                         
                         # Emit WebSocket event for idle status update
@@ -377,7 +389,7 @@ class IdleMonitor:
                             if event_manager:
                                 event_manager.emit_idle_status({
                                     "is_idle": True,
-                                    "idle_start": int(self.current_idle_start.timestamp()),
+                                    "idle_start": self.current_idle_start,
                                     "reason": "user_inactivity"
                                 })
                         except Exception as ws_error:
@@ -439,9 +451,11 @@ class IdleMonitor:
             # Log final idle period if user is currently idle
             if self.is_idle and self.current_idle_start:
                 try:
-                    idle_end = datetime.now()
-                    duration = (idle_end - self.current_idle_start).total_seconds()
-                    self._log_idle_period(self.current_idle_start, idle_end, duration)
+                    idle_end_ts = int(time.time())
+                    duration = idle_end_ts - self.current_idle_start
+                    idle_start_dt = datetime.fromtimestamp(self.current_idle_start)
+                    idle_end_dt = datetime.fromtimestamp(idle_end_ts)
+                    self._log_idle_period(idle_start_dt, idle_end_dt, float(duration))
                 except Exception as e:
                     self.logger.error(f"Error logging final idle period: {e}")
             
@@ -556,7 +570,6 @@ def main():
     args = parser.parse_args()
     
     monitor = IdleMonitor(
-        db_path=args.db,
         timeout_seconds=args.timeout,
         check_interval=args.interval
     )
