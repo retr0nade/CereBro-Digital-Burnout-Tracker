@@ -1,22 +1,22 @@
 export const createToastStore = () => {
-  let listeners = [];
-  let queue = [];
-  const notify = (type, message) => {
-    const item = { id: Date.now() + Math.random(), type, message };
-    queue.push(item);
-    listeners.forEach(l => l(queue));
-    setTimeout(() => dismiss(item.id), 3000);
-  };
-  const dismiss = (id) => {
-    queue = queue.filter(q => q.id !== id);
-    listeners.forEach(l => l(queue));
-  };
-  const subscribe = (cb) => {
-    listeners.push(cb);
-    cb(queue);
-    return () => { listeners = listeners.filter(l => l !== cb); };
-  };
-  return { notify, dismiss, subscribe };
+    let listeners = [];
+    let queue = [];
+    const notify = (type, message) => {
+        const item = { id: Date.now() + Math.random(), type, message };
+        queue.push(item);
+        listeners.forEach(l => l(queue));
+        setTimeout(() => dismiss(item.id), 3000);
+    };
+    const dismiss = (id) => {
+        queue = queue.filter(q => q.id !== id);
+        listeners.forEach(l => l(queue));
+    };
+    const subscribe = (cb) => {
+        listeners.push(cb);
+        cb(queue);
+        return () => { listeners = listeners.filter(l => l !== cb); };
+    };
+    return { notify, dismiss, subscribe };
 };
 
 export const toast = createToastStore();
@@ -34,23 +34,23 @@ export const EVENT_TYPES = {
 const eventHandlers = {
     [EVENT_TYPES.ACTIVITY_UPDATE]: (data) => {
         // Handle activity update
-        console.log('Activity update received:', data);
+        // console.log('Activity update received:', data);
     },
     [EVENT_TYPES.IDLE_UPDATE]: (data) => {
         // Handle idle update
-        console.log('Idle update received:', data);
+        // console.log('Idle update received:', data);
     },
     [EVENT_TYPES.SCREEN_TIME_UPDATE]: (data) => {
         // Handle screen time update
-        console.log('Screen time update received:', data);
+        // console.log('Screen time update received:', data);
     },
     [EVENT_TYPES.FOCUS_SESSION_UPDATE]: (data) => {
         // Handle focus session update
-        console.log('Focus session update received:', data);
+        // console.log('Focus session update received:', data);
     },
     [EVENT_TYPES.BREAK_UPDATE]: (data) => {
         // Handle break update
-        console.log('Break update received:', data);
+        // console.log('Break update received:', data);
     },
 };
 

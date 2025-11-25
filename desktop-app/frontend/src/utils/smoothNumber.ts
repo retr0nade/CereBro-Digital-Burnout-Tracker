@@ -6,28 +6,28 @@ import { useEffect, useState } from 'react';
  * to reduce visual jitter when data streams quickly
  */
 export function useSmoothedNumber(
-  value: number, 
-  stiffness: number = 120, 
+  value: number,
+  stiffness: number = 120,
   damping: number = 18
 ): number {
   // Create a motion value to store the target value
   const motionValue = useMotionValue(value);
-  
+
   // Create a spring that will smoothly animate to the target
   const spring = useSpring(motionValue, {
     stiffness,
     damping,
     mass: 1,
   });
-  
+
   // Transform the spring value to a rounded number for display
   const roundedValue = useTransform(spring, (latest) => Math.round(latest));
-  
+
   // Update the motion value when the input value changes
   useEffect(() => {
     motionValue.set(value);
   }, [value, motionValue]);
-  
+
   // Return the current spring value, rounded
   return Math.round(spring.get());
 }
@@ -38,16 +38,28 @@ export function useSmoothedNumber(
  */
 export function useThrottledValue<T>(value: T, delay: number = 250): T {
   const [throttledValue, setThrottledValue] = useState<T>(value);
-  
+
   useEffect(() => {
     const handler = setTimeout(() => {
       setThrottledValue(value);
     }, delay);
-    
+
     return () => {
       clearTimeout(handler);
     };
   }, [value, delay]);
-  
+
   return throttledValue;
+}
+
+/**
+ * Creates a function that limits an array to a specific window size
+ * taking the most recent elements
+ */
+export function createRollingWindow(windowSize: number) {
+  return function <T>(data: T[]): T[] {
+    if (!Array.isArray(data)) return [];
+    if (data.length <= windowSize) return data;
+    return data.slice(data.length - windowSize);
+  };
 }

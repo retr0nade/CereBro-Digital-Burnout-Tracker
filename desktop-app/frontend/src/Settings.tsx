@@ -1,60 +1,43 @@
 import React, { useState, useEffect } from 'react';
+import { config } from './config';
+import { Save, RefreshCw, AlertCircle, Check, RotateCcw } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { 
-  Save, 
-  RotateCcw
-} from 'lucide-react';
-import { Switch } from './ui/Switch';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/Select';
-import { Slider } from './ui/Slider';
 import GlassCard from './ui/GlassCard';
 import SectionHeader from './ui/SectionHeader';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from './ui/Select';
+import { Slider } from './ui/Slider';
+import { Switch } from './ui/Switch';
 import LivePreview from './components/LivePreview';
-import { toast } from './services/eventHandlers';
 
 interface Settings {
-  // Theme & UI
-  theme: 'dark' | 'light';
+  theme: 'dark' | 'light' | 'system';
   reduceMotion: boolean;
-  
-  // Data Retention
   dataRetentionDays: number;
   autoExportEnabled: boolean;
   exportFormat: 'csv' | 'json';
-  exportFrequency: number; // hours
-  
-  // Notifications
+  exportFrequency: number;
   notificationsEnabled: boolean;
   breakReminders: boolean;
   focusSessionAlerts: boolean;
   idleNotifications: boolean;
-  
-  // Performance
-  idleTimeout: number; // minutes
-  focusSessionLength: number; // minutes
-  breakDuration: number; // minutes
-  breakInterval: number; // minutes
+  idleTimeout: number;
+  focusSessionLength: number;
+  breakDuration: number;
+  breakInterval: number;
 }
 
 const Settings: React.FC = () => {
   const [settings, setSettings] = useState<Settings>({
-    // Theme & UI
     theme: 'dark',
     reduceMotion: false,
-    
-    // Data Retention
     dataRetentionDays: 30,
     autoExportEnabled: false,
     exportFormat: 'csv',
     exportFrequency: 24,
-    
-    // Notifications
     notificationsEnabled: true,
     breakReminders: true,
     focusSessionAlerts: true,
     idleNotifications: false,
-    
-    // Performance
     idleTimeout: 5,
     focusSessionLength: 25,
     breakDuration: 5,
@@ -63,32 +46,31 @@ const Settings: React.FC = () => {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
   useEffect(() => {
-    loadSettings();
+    fetchSettings();
   }, []);
 
-  const loadSettings = async () => {
+  const fetchSettings = async () => {
     try {
-      const response = await fetch('http://localhost:5005/api/config');
+      const response = await fetch(`${config.API_URL}/api/config`);
       if (response.ok) {
-        const config = await response.json();
-        
-        // Map backend config to frontend settings
+        const data = await response.json();
         setSettings(prev => ({
           ...prev,
-          idleTimeout: config.services?.idle_monitor?.timeout_seconds / 60 || 5,
-          focusSessionLength: config.services?.focus_timer?.default_session_length / 60 || 25,
-          breakReminders: config.services?.break_monitor?.enabled || true,
-          breakInterval: config.services?.break_monitor?.min_break_duration / 60 || 60,
-          breakDuration: config.services?.break_monitor?.max_break_duration / 60 || 15
+          idleTimeout: data.services?.idle_monitor?.timeout_seconds / 60 || 5,
+          focusSessionLength: data.services?.focus_timer?.default_session_length / 60 || 25,
+          breakReminders: data.services?.break_monitor?.enabled || true,
+          breakInterval: data.services?.break_monitor?.min_break_duration / 60 || 60,
+          breakDuration: data.services?.break_monitor?.max_break_duration / 60 || 15
         }));
       } else {
         throw new Error('Failed to load settings');
       }
     } catch (error) {
-      console.error('Error loading settings:', error);
-      toast.notify('error', 'Failed to load settings');
+      // console.error('Error loading settings:', error);
+      setMessage({ type: 'error', text: 'Failed to load settings' });
     } finally {
       setLoading(false);
     }
@@ -115,7 +97,7 @@ const Settings: React.FC = () => {
         }
       };
 
-      const response = await fetch('http://localhost:5005/api/config', {
+      const response = await fetch(`${config.API_URL}/api/config`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -124,14 +106,14 @@ const Settings: React.FC = () => {
       });
 
       if (response.ok) {
-        toast.notify('success', 'Settings saved successfully!');
+        setMessage({ type: 'success', text: 'Settings saved successfully!' });
       } else {
         const error = await response.json();
         throw new Error(error.error || 'Failed to save settings');
       }
     } catch (error) {
-      console.error('Error saving settings:', error);
-      toast.notify('error', `Failed to save settings: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      // console.error('Error saving settings:', error);
+      setMessage({ type: 'error', text: `Failed to save settings: ${error instanceof Error ? error.message : 'Unknown error'}` });
     } finally {
       setSaving(false);
     }
@@ -142,11 +124,11 @@ const Settings: React.FC = () => {
       const newSettings = { ...prev };
       const keys = path.split('.');
       let current: any = newSettings;
-      
+
       for (let i = 0; i < keys.length - 1; i++) {
         current = current[keys[i]];
       }
-      
+
       current[keys[keys.length - 1]] = value;
       return newSettings;
     });
@@ -179,7 +161,7 @@ const Settings: React.FC = () => {
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            onClick={loadSettings}
+            onClick={fetchSettings}
             disabled={saving}
             className="flex items-center gap-2 px-4 py-2 rounded-lg bg-neutral-600/20 text-text-muted hover:bg-neutral-600/30 border border-neutral-600/40 transition-colors"
           >
@@ -212,15 +194,15 @@ const Settings: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column - Settings */}
         <div className="lg:col-span-2 space-y-6">
-          
-                     {/* Theme Section */}
-           <GlassCard>
-             <SectionHeader
-               title="Theme & Appearance"
-               subtitle="Customize the visual appearance"
-               tooltip="Configure theme, animations, and visual preferences"
-               className="mb-4"
-             />
+
+          {/* Theme Section */}
+          <GlassCard>
+            <SectionHeader
+              title="Theme & Appearance"
+              subtitle="Customize the visual appearance"
+              tooltip="Configure theme, animations, and visual preferences"
+              className="mb-4"
+            />
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
@@ -237,7 +219,7 @@ const Settings: React.FC = () => {
                   </SelectContent>
                 </Select>
               </div>
-              
+
               <div className="flex items-center justify-between">
                 <div>
                   <label className="text-sm font-medium text-text">Reduce Motion</label>
@@ -251,14 +233,14 @@ const Settings: React.FC = () => {
             </div>
           </GlassCard>
 
-                     {/* Data Retention Section */}
-           <GlassCard>
-             <SectionHeader
-               title="Data Retention"
-               subtitle="Manage data storage and exports"
-               tooltip="Configure how long data is kept and automatic export settings"
-               className="mb-4"
-             />
+          {/* Data Retention Section */}
+          <GlassCard>
+            <SectionHeader
+              title="Data Retention"
+              subtitle="Manage data storage and exports"
+              tooltip="Configure how long data is kept and automatic export settings"
+              className="mb-4"
+            />
             <div className="space-y-4">
               <div>
                 <label className="text-sm font-medium text-text">Data Retention Period</label>
@@ -277,7 +259,7 @@ const Settings: React.FC = () => {
                   <span>1 year</span>
                 </div>
               </div>
-              
+
               <div className="flex items-center justify-between">
                 <div>
                   <label className="text-sm font-medium text-text">Auto Export</label>
@@ -288,7 +270,7 @@ const Settings: React.FC = () => {
                   onCheckedChange={(checked) => handleInputChange('autoExportEnabled', checked)}
                 />
               </div>
-              
+
               {settings.autoExportEnabled && (
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -322,14 +304,14 @@ const Settings: React.FC = () => {
             </div>
           </GlassCard>
 
-                     {/* Notifications Section */}
-           <GlassCard>
-             <SectionHeader
-               title="Notifications"
-               subtitle="Configure alert preferences"
-               tooltip="Manage when and how you receive notifications"
-               className="mb-4"
-             />
+          {/* Notifications Section */}
+          <GlassCard>
+            <SectionHeader
+              title="Notifications"
+              subtitle="Configure alert preferences"
+              tooltip="Manage when and how you receive notifications"
+              className="mb-4"
+            />
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
@@ -341,7 +323,7 @@ const Settings: React.FC = () => {
                   onCheckedChange={(checked) => handleInputChange('notificationsEnabled', checked)}
                 />
               </div>
-              
+
               {settings.notificationsEnabled && (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
@@ -354,7 +336,7 @@ const Settings: React.FC = () => {
                       onCheckedChange={(checked) => handleInputChange('breakReminders', checked)}
                     />
                   </div>
-                  
+
                   <div className="flex items-center justify-between">
                     <div>
                       <label className="text-sm font-medium text-text">Focus Session Alerts</label>
@@ -365,7 +347,7 @@ const Settings: React.FC = () => {
                       onCheckedChange={(checked) => handleInputChange('focusSessionAlerts', checked)}
                     />
                   </div>
-                  
+
                   <div className="flex items-center justify-between">
                     <div>
                       <label className="text-sm font-medium text-text">Idle Notifications</label>
@@ -381,14 +363,14 @@ const Settings: React.FC = () => {
             </div>
           </GlassCard>
 
-                     {/* Performance Section */}
-           <GlassCard>
-             <SectionHeader
-               title="Performance & Timing"
-               subtitle="Configure tracking behavior"
-               tooltip="Adjust timing settings for idle detection, focus sessions, and breaks"
-               className="mb-4"
-             />
+          {/* Performance Section */}
+          <GlassCard>
+            <SectionHeader
+              title="Performance & Timing"
+              subtitle="Configure tracking behavior"
+              tooltip="Adjust timing settings for idle detection, focus sessions, and breaks"
+              className="mb-4"
+            />
             <div className="space-y-4">
               <div>
                 <label className="text-sm font-medium text-text">Idle Timeout</label>
@@ -407,7 +389,7 @@ const Settings: React.FC = () => {
                   <span>30 min</span>
                 </div>
               </div>
-              
+
               <div>
                 <label className="text-sm font-medium text-text">Focus Session Length</label>
                 <p className="text-xs text-text-muted mb-2">Default duration for focus sessions</p>
@@ -425,7 +407,7 @@ const Settings: React.FC = () => {
                   <span>2 hours</span>
                 </div>
               </div>
-              
+
               {settings.breakReminders && (
                 <>
                   <div>
@@ -445,7 +427,7 @@ const Settings: React.FC = () => {
                       <span>4 hours</span>
                     </div>
                   </div>
-                  
+
                   <div>
                     <label className="text-sm font-medium text-text">Break Duration</label>
                     <p className="text-xs text-text-muted mb-2">Recommended break length</p>

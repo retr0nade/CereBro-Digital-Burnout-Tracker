@@ -3,29 +3,29 @@ import { ResponsiveLine } from '@nivo/line';
 import { ResponsivePie } from '@nivo/pie';
 import { motion } from 'framer-motion';
 import webSocketService, { WebSocketEvent, WebSocketStatus } from './WebSocketService';
-import { useSmoothedNumber, useThrottledValue } from './utils/smoothNumber';
+import { useSmoothedNumber, useThrottledValue, createRollingWindow } from './utils/smoothNumber';
 import ActivityTimeline from './components/ActivityTimeline';
 import SectionHeader from './ui/SectionHeader';
-import { EmptyStateBox } from './ui/InfoBox';
-import MetricTile from './ui/MetricTile';
-import GlassCard from './ui/GlassCard';
-import ChartCard from './ui/ChartCard';
-import { BarChart3, MousePointer, Clock, Timer, Activity } from 'lucide-react';
-import { createRollingWindow, useRAFBatching, useRenderTracker } from './utils/performance';
-import { useScreenshotMode, getScreenshotSeedData } from './utils/screenshotMode';
-import { 
-  useAnalytics, 
-  selectRealtime, 
-  selectCounters, 
+import {
+  useAnalytics,
+  selectRealtime,
+  selectCounters,
   useAnalyticsActions,
-  type Point 
+  type Point
 } from './state/analyticsStore';
 import { focusScore, formatMinutes } from './utils/derive';
 import WindowSelect from './components/WindowSelect';
+import { config } from './config';
+import { useScreenshotMode, getScreenshotSeedData } from './utils/screenshotMode';
+import ChartCard from './ui/ChartCard';
+import MetricTile from './ui/MetricTile';
+import { useRAFBatching, useRenderTracker } from './utils/performance';
+import { Clock, MousePointer, Activity, BarChart3 } from 'lucide-react';
 
 interface RealTimeMetrics {
   appUsage: Array<{
     app_name: string;
+
     duration: number;
     timestamp: number;
   }>;
@@ -87,10 +87,10 @@ export default function RealTimeDashboard() {
   const rt = useAnalytics(selectRealtime);
   const counters = useAnalytics(selectCounters);
   const actions = useAnalyticsActions();
-  
+
   // Get current window setting from store
   const rtWindowMinutes = useAnalytics(state => state.rtWindowMinutes);
-  
+
   // Local state for UI concerns only
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -100,11 +100,11 @@ export default function RealTimeDashboard() {
   // Performance optimizations
   const rafBatcher = useRAFBatching();
   const renderCount = useRenderTracker('RealTimeDashboard');
-  
+
   // Screenshot mode
   const screenshotMode = useScreenshotMode();
   const seedData = getScreenshotSeedData();
-  
+
   // Create rolling window functions for different data types
   const rollingWindow72 = createRollingWindow(72); // 72 points for 6 hours at 5-min intervals
   const rollingWindow48 = createRollingWindow(48); // 48 points for 4 hours at 5-min intervals
@@ -122,9 +122,9 @@ export default function RealTimeDashboard() {
     if (screenshotMode.useSeedData) {
       return seedData.activityTimelineEvents;
     }
-    
+
     const events: any[] = [];
-    
+
     // Add real-time data points as events
     throttledRealtimeData.forEach((point: Point, index) => {
       events.push({
@@ -134,19 +134,11 @@ export default function RealTimeDashboard() {
         timestamp: point.t,
         type: 'input' as const
       });
+      return events;
     });
 
-    // Sort by timestamp (newest first) and limit to last 50 events
-    return events
-      .sort((a, b) => b.timestamp - a.timestamp)
-      .slice(0, 50);
-  }, [throttledRealtimeData, screenshotMode.useSeedData, seedData.activityTimelineEvents]);
-
-  const handleWindowChange = (minutes: number) => {
-    // Note: rtWindowMinutes is used for display only
-    // The actual rolling window is handled by appendRealtime action
-    console.log(`Rolling window changed to ${minutes} minutes`);
-  };
+    return events;
+  }, [throttledRealtimeData, screenshotMode.useSeedData, seedData]);
 
   const fetchData = async () => {
     try {
@@ -168,12 +160,12 @@ export default function RealTimeDashboard() {
           setBackendConnected(true);
           return;
         } catch (tauriError) {
-          console.log('Tauri command failed, trying direct HTTP...');
+          // Tauri command failed, trying direct HTTP...
         }
       }
 
       // Fallback to direct HTTP
-      const response = await fetch('http://localhost:5005/api/metrics');
+      const response = await fetch(`${config.API_URL}/api/metrics`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -191,7 +183,7 @@ export default function RealTimeDashboard() {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch data';
       setError(errorMessage);
       setBackendConnected(false);
-      console.error('Dashboard fetch error:', err);
+      // console.error('Dashboard fetch error:', err);
     } finally {
       setLoading(false);
     }
@@ -199,7 +191,6 @@ export default function RealTimeDashboard() {
 
   // WebSocket event handlers with RAF batching
   const handleAppUsageUpdate = useCallback((event: WebSocketEvent) => {
-    console.log('App usage update received:', event.data);
     rafBatcher.schedule(() => {
       // Add real-time point to store
       actions.appendRealtime({
@@ -213,7 +204,6 @@ export default function RealTimeDashboard() {
   }, [rafBatcher, actions]);
 
   const handleIdleStatus = useCallback((event: WebSocketEvent) => {
-    console.log('Idle status update received:', event.data);
     rafBatcher.schedule(() => {
       // Add real-time point to store
       actions.appendRealtime({
@@ -227,7 +217,6 @@ export default function RealTimeDashboard() {
   }, [rafBatcher, actions]);
 
   const handleInputActivity = useCallback((event: WebSocketEvent) => {
-    console.log('Input activity update received:', event.data);
     rafBatcher.schedule(() => {
       // Add real-time point to store
       actions.appendRealtime({
@@ -240,7 +229,6 @@ export default function RealTimeDashboard() {
   }, [rafBatcher, actions]);
 
   const handleFocusSessionUpdate = useCallback((event: WebSocketEvent) => {
-    console.log('Focus session update received:', event.data);
     rafBatcher.schedule(() => {
       // Add real-time point to store
       actions.appendRealtime({
@@ -252,7 +240,6 @@ export default function RealTimeDashboard() {
   }, [rafBatcher, actions]);
 
   const handleBreakUpdate = useCallback((event: WebSocketEvent) => {
-    console.log('Break update received:', event.data);
     rafBatcher.schedule(() => {
       // Add real-time point to store
       actions.appendRealtime({
@@ -282,7 +269,7 @@ export default function RealTimeDashboard() {
     webSocketService.subscribe('break_update', handleBreakUpdate);
 
     // Try to connect
-    webSocketService.connect().catch(console.error);
+    webSocketService.connect().catch(() => { });
 
     return () => {
       unsubscribeStatus();
@@ -315,19 +302,19 @@ export default function RealTimeDashboard() {
           <h2 className="text-xl font-bold text-red-400 mb-2">Connection Error</h2>
           <p className="text-red-300">{error}</p>
           <p className="text-sm text-red-400 mt-2">
-            {backendConnected 
+            {backendConnected
               ? 'Make sure the backend server is running on port 5005'
               : 'Backend service is not available'
             }
           </p>
-                          <motion.button 
-                  onClick={fetchData} 
-                  className="btn btn-danger mt-4 focus-ring"
-                  whileHover={{ y: -2 }}
-                  whileTap={{ y: 0 }}
-                >
-                  Retry
-                </motion.button>
+          <motion.button
+            onClick={fetchData}
+            className="btn btn-danger mt-4 focus-ring"
+            whileHover={{ y: -2 }}
+            whileTap={{ y: 0 }}
+          >
+            Retry
+          </motion.button>
         </div>
       </div>
     );
@@ -346,7 +333,7 @@ export default function RealTimeDashboard() {
             <div className="space-y-2">
               <h3 className="text-lg font-semibold text-text">Real-time tracking starting up</h3>
               <p className="text-text-muted max-w-md">
-                We're initializing your live analytics dashboard. Make sure the backend service is running and keep the tracker active. 
+                We're initializing your live analytics dashboard. Make sure the backend service is running and keep the tracker active.
                 Your real-time insights will appear here shortly.
               </p>
               <div className="flex items-center justify-center gap-4 pt-2">
@@ -392,19 +379,22 @@ export default function RealTimeDashboard() {
     value: point.totalInputs || 0
   }));
 
+  const handleWindowChange = (minutes: number) => {
+    actions.setRtWindowMinutes(minutes);
+  };
+
   return (
     <div className="max-w-7xl mx-auto mt-4 p-4">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-[22px] md:text-2xl font-semibold tracking-[-0.01em]">Real-Time Dashboard</h1>
         <div className="flex items-center gap-4">
-          <WindowSelect 
-            value={rtWindowMinutes} 
+          <WindowSelect
+            value={rtWindowMinutes}
             onChange={handleWindowChange}
           />
-          <div className={`px-3 py-1.5 rounded text-dashboard-sm ${
-            backendConnected ? 'bg-green-500/20 text-green-300 border border-green-500/40' : 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/40'
-          }`}>
+          <div className={`px-3 py-1.5 rounded text-dashboard-sm ${backendConnected ? 'bg-green-500/20 text-green-300 border border-green-500/40' : 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/40'
+            }`}>
             {backendConnected ? 'Connected (Tauri)' : 'Connected via HTTP'}
           </div>
         </div>
@@ -412,7 +402,7 @@ export default function RealTimeDashboard() {
 
       {/* 12-Column Grid Layout */}
       <div className="grid grid-cols-12 gap-6">
-        
+
         {/* Row 1: KPI Metrics - Four Cards */}
         <div className="col-span-12 sm:col-span-6 xl:col-span-3">
           <MetricTile
@@ -505,8 +495,8 @@ export default function RealTimeDashboard() {
                     {slice.points.map((point) => (
                       <div key={point.id} className="flex items-center justify-between gap-3 mb-1">
                         <div className="flex items-center gap-2">
-                          <div 
-                            className="w-3 h-3 rounded-full" 
+                          <div
+                            className="w-3 h-3 rounded-full"
                             style={{ backgroundColor: point.color }}
                           />
                           <span className="text-sm text-text-muted">{point.serieId}</span>
@@ -563,7 +553,7 @@ export default function RealTimeDashboard() {
             )}
           </ChartCard>
         </div>
-        
+
         <div className="col-span-12 md:col-span-6 xl:col-span-5">
           <ChartCard
             title="Live App Usage"
@@ -655,7 +645,7 @@ export default function RealTimeDashboard() {
             tooltip="Live feed of your computer activity with virtualized timeline for performance."
             minHeight={400}
           >
-            <ActivityTimeline 
+            <ActivityTimeline
               events={timelineEvents}
               maxHeight={400}
             />

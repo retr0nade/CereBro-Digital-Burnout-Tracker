@@ -280,17 +280,6 @@ class InputLogger:
             except Exception as e:
                 error_msg = f"Critical error in input logger main loop: {e}"
                 self.logger.error(error_msg, exc_info=True)
-                
-                # Log to cerebro.log for service manager monitoring
-                try:
-                    with open('cerebro.log', 'a') as f:
-                        f.write(f"{datetime.now().isoformat()} - INPUT_LOGGER - CRITICAL ERROR: {error_msg}\n")
-                except:
-                    pass  # Don't let logging errors crash the service
-                
-                # Brief pause before retrying
-                time.sleep(5)
-    
     def start(self):
         """Start input logging"""
         if self.is_running:

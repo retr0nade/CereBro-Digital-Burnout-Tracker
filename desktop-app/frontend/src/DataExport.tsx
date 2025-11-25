@@ -4,6 +4,7 @@ import { Calendar, Download, FileText, Shield, Clock, BarChart3 } from 'lucide-r
 import GlassCard from './ui/GlassCard';
 import InfoBox from './ui/InfoBox';
 import { toast } from './services/eventHandlers';
+import { config } from './config';
 
 interface ExportPreset {
   id: string;
@@ -39,10 +40,10 @@ const DataExport: React.FC = () => {
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
-    
+
     const weekStart = new Date(today);
     weekStart.setDate(weekStart.getDate() - weekStart.getDay());
-    
+
     return [
       {
         id: 'today',
@@ -111,21 +112,20 @@ const DataExport: React.FC = () => {
           endDate = preset.endDate;
         }
 
-        // Call the backend API to get real summary data
         const params = new URLSearchParams({
           startDate: startDate.toISOString(),
           endDate: endDate.toISOString(),
           tables: 'all'
         });
 
-        const response = await fetch(`http://localhost:5005/api/export/summary?${params}`);
-        
+        const response = await fetch(`${config.API_URL}/api/export/summary?${params}`);
+
         if (!response.ok) {
           throw new Error(`Failed to get summary: ${response.statusText}`);
         }
 
         const data = await response.json();
-        
+
         if (data.status === 'success') {
           setSummary({
             rows: data.summary.rows,
@@ -137,7 +137,7 @@ const DataExport: React.FC = () => {
           throw new Error(data.error || 'Failed to get summary data');
         }
       } catch (error) {
-        console.error('Failed to calculate summary:', error);
+        // console.error('Failed to calculate summary:', error);
         // Fallback to mock data if API fails
         const preset = presets.find(p => p.id === selectedPreset);
         if (preset && selectedPreset !== 'custom') {
@@ -146,9 +146,9 @@ const DataExport: React.FC = () => {
             day: 'numeric',
             year: 'numeric'
           });
-          
+
           const dateRange = `${formatDate(preset.startDate)} - ${formatDate(preset.endDate)}`;
-          
+
           setSummary({
             rows: Math.floor(Math.random() * 10000) + 100,
             dateRange,
@@ -197,8 +197,8 @@ const DataExport: React.FC = () => {
         tables: 'all'
       });
 
-      const response = await fetch(`http://localhost:5005/api/export/${format}?${params}`);
-      
+      const response = await fetch(`${config.API_URL}/api/export/${format}?${params}`);
+
       if (!response.ok) {
         throw new Error(`Export failed: ${response.statusText}`);
       }
@@ -206,7 +206,7 @@ const DataExport: React.FC = () => {
       // Get filename from response headers or generate one
       const contentDisposition = response.headers.get('Content-Disposition');
       let filename = `cerebro_export_${format}_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.${format}`;
-      
+
       if (contentDisposition) {
         const filenameMatch = contentDisposition.match(/filename="(.+)"/);
         if (filenameMatch) {
@@ -229,7 +229,7 @@ const DataExport: React.FC = () => {
       toast.notify('success', `${format.toUpperCase()} export completed successfully!`);
 
     } catch (error) {
-      console.error('Export failed:', error);
+      // console.error('Export failed:', error);
       toast.notify('error', `Export failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setExporting(false);
@@ -267,11 +267,10 @@ const DataExport: React.FC = () => {
                 <motion.button
                   key={preset.id}
                   onClick={() => setSelectedPreset(preset.id)}
-                  className={`w-full p-4 rounded-xl border transition-all duration-200 text-left focus-ring ${
-                    selectedPreset === preset.id
-                      ? 'bg-brand/10 border-brand/30 text-brand'
-                      : 'bg-surface/50 border-white/10 hover:bg-surface/70 hover:border-white/15'
-                  }`}
+                  className={`w-full p-4 rounded-xl border transition-all duration-200 text-left focus-ring ${selectedPreset === preset.id
+                    ? 'bg-brand/10 border-brand/30 text-brand'
+                    : 'bg-surface/50 border-white/10 hover:bg-surface/70 hover:border-white/15'
+                    }`}
                   whileHover={{ y: -2 }}
                   whileTap={{ y: 0 }}
                 >
@@ -302,25 +301,25 @@ const DataExport: React.FC = () => {
                     <label className="block text-sm font-medium text-text-muted mb-1">
                       Start Date
                     </label>
-                                         <input
-                       type="date"
-                       value={customStartDate}
-                       onChange={(e) => setCustomStartDate(e.target.value)}
-                       className="w-full px-3 py-2 bg-surface/50 border border-border rounded-lg text-text focus:outline-none focus:ring-2 focus:ring-brand/50"
-                       aria-label="Start date for custom export range"
-                     />
+                    <input
+                      type="date"
+                      value={customStartDate}
+                      onChange={(e) => setCustomStartDate(e.target.value)}
+                      className="w-full px-3 py-2 bg-surface/50 border border-border rounded-lg text-text focus:outline-none focus:ring-2 focus:ring-brand/50"
+                      aria-label="Start date for custom export range"
+                    />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-text-muted mb-1">
                       End Date
                     </label>
-                                         <input
-                       type="date"
-                       value={customEndDate}
-                       onChange={(e) => setCustomEndDate(e.target.value)}
-                       className="w-full px-3 py-2 bg-surface/50 border border-border rounded-lg text-text focus:outline-none focus:ring-2 focus:ring-brand/50"
-                       aria-label="End date for custom export range"
-                     />
+                    <input
+                      type="date"
+                      value={customEndDate}
+                      onChange={(e) => setCustomEndDate(e.target.value)}
+                      className="w-full px-3 py-2 bg-surface/50 border border-border rounded-lg text-text focus:outline-none focus:ring-2 focus:ring-brand/50"
+                      aria-label="End date for custom export range"
+                    />
                   </div>
                 </div>
               </motion.div>
@@ -358,7 +357,7 @@ const DataExport: React.FC = () => {
                 </div>
                 <p className="text-lg font-semibold text-text">{summary.dateRange || 'Select preset'}</p>
               </div>
-              
+
               <div className="bg-surface/30 rounded-lg p-4 border border-border">
                 <div className="flex items-center gap-2 mb-2">
                   <FileText className="w-4 h-4 text-text-muted" />
@@ -366,7 +365,7 @@ const DataExport: React.FC = () => {
                 </div>
                 <p className="text-lg font-semibold text-text">{summary.rows.toLocaleString()}</p>
               </div>
-              
+
               <div className="bg-surface/30 rounded-lg p-4 border border-border">
                 <div className="flex items-center gap-2 mb-2">
                   <Download className="w-4 h-4 text-text-muted" />
@@ -378,19 +377,18 @@ const DataExport: React.FC = () => {
 
             {/* Export Buttons */}
             <div className="space-y-3">
-                             <motion.button
-                 onClick={() => handleExport('csv')}
-                 disabled={exporting || !summary.dateRange}
-                 className={`w-full px-6 py-4 rounded-xl font-medium transition-all duration-200 flex items-center justify-center gap-3 focus-ring ${
-                   exporting && exportType === 'csv'
-                     ? 'bg-surface/50 text-text-muted cursor-not-allowed'
-                     : 'bg-brand hover:bg-brand/90 text-white hover:shadow-lg'
-                 }`}
-                 whileHover={{ y: -2 }}
-                 whileTap={{ y: 0 }}
-                 aria-label="Export data as CSV file"
-                 aria-describedby={exporting && exportType === 'csv' ? 'export-status' : undefined}
-               >
+              <motion.button
+                onClick={() => handleExport('csv')}
+                disabled={exporting || !summary.dateRange}
+                className={`w-full px-6 py-4 rounded-xl font-medium transition-all duration-200 flex items-center justify-center gap-3 focus-ring ${exporting && exportType === 'csv'
+                  ? 'bg-surface/50 text-text-muted cursor-not-allowed'
+                  : 'bg-brand hover:bg-brand/90 text-white hover:shadow-lg'
+                  }`}
+                whileHover={{ y: -2 }}
+                whileTap={{ y: 0 }}
+                aria-label="Export data as CSV file"
+                aria-describedby={exporting && exportType === 'csv' ? 'export-status' : undefined}
+              >
                 {exporting && exportType === 'csv' ? (
                   <>
                     <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
@@ -404,19 +402,18 @@ const DataExport: React.FC = () => {
                 )}
               </motion.button>
 
-                             <motion.button
-                 onClick={() => handleExport('pdf')}
-                 disabled={exporting || !summary.dateRange}
-                 className={`w-full px-6 py-4 rounded-xl font-medium transition-all duration-200 flex items-center justify-center gap-3 focus-ring ${
-                   exporting && exportType === 'pdf'
-                     ? 'bg-surface/50 text-text-muted cursor-not-allowed'
-                     : 'bg-surface/50 hover:bg-surface/70 text-text border border-white/10 hover:border-white/15 hover:shadow-lg'
-                 }`}
-                 whileHover={{ y: -2 }}
-                 whileTap={{ y: 0 }}
-                 aria-label="Export data as PDF file"
-                 aria-describedby={exporting && exportType === 'pdf' ? 'export-status' : undefined}
-               >
+              <motion.button
+                onClick={() => handleExport('pdf')}
+                disabled={exporting || !summary.dateRange}
+                className={`w-full px-6 py-4 rounded-xl font-medium transition-all duration-200 flex items-center justify-center gap-3 focus-ring ${exporting && exportType === 'pdf'
+                  ? 'bg-surface/50 text-text-muted cursor-not-allowed'
+                  : 'bg-surface/50 hover:bg-surface/70 text-text border border-white/10 hover:border-white/15 hover:shadow-lg'
+                  }`}
+                whileHover={{ y: -2 }}
+                whileTap={{ y: 0 }}
+                aria-label="Export data as PDF file"
+                aria-describedby={exporting && exportType === 'pdf' ? 'export-status' : undefined}
+              >
                 {exporting && exportType === 'pdf' ? (
                   <>
                     <div className="w-5 h-5 border-2 border-text-muted/30 border-t-text-muted rounded-full animate-spin"></div>
@@ -429,19 +426,19 @@ const DataExport: React.FC = () => {
                   </>
                 )}
               </motion.button>
-                         </div>
+            </div>
 
-             {/* Export Status */}
-             {exporting && (
-               <div id="export-status" className="mt-4 p-3 bg-surface/30 rounded-lg border border-border" role="status" aria-live="polite">
-                 <div className="flex items-center gap-2 text-sm text-text-muted">
-                   <div className="w-4 h-4 border-2 border-text-muted/30 border-t-text-muted rounded-full animate-spin"></div>
-                   <span>Exporting {exportType?.toUpperCase()} file...</span>
-                 </div>
-               </div>
-             )}
+            {/* Export Status */}
+            {exporting && (
+              <div id="export-status" className="mt-4 p-3 bg-surface/30 rounded-lg border border-border" role="status" aria-live="polite">
+                <div className="flex items-center gap-2 text-sm text-text-muted">
+                  <div className="w-4 h-4 border-2 border-text-muted/30 border-t-text-muted rounded-full animate-spin"></div>
+                  <span>Exporting {exportType?.toUpperCase()} file...</span>
+                </div>
+              </div>
+            )}
 
-             {/* Data Tables Info */}
+            {/* Data Tables Info */}
             {summary.tables.length > 0 && (
               <div className="mt-6 p-4 bg-surface/20 rounded-lg border border-border">
                 <h4 className="font-medium text-text mb-2">Included Data Tables</h4>

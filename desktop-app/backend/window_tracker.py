@@ -111,7 +111,6 @@ class WindowTracker:
     #         self.logger.error(f"Failed to initialize X11 display: {e}")
     #         raise
     
-
     
     def _get_active_window_windows(self) -> Optional[Tuple[str, str, int]]:
         """Get active window info on Windows"""
@@ -394,37 +393,34 @@ class WindowTracker:
                             except Exception as log_error:
                                 error_msg = f"Error logging previous window activity: {log_error}"
                                 self.logger.error(error_msg, exc_info=True)
-                                
-                                # Log to cerebro.log for service manager monitoring
-                                try:
-                                    with open('cerebro.log', 'a') as f:
-                                        f.write(f"{datetime.now().isoformat()} - WINDOW_TRACKER - LOGGING ERROR: {error_msg}\n")
-                                except:
-                                    pass
                         
                         # Update current window
                         self.current_window = (app_name, window_title)
                         self.current_start_time = int(time.time())
-                        self.logger.info(f"Active window: {app_name} - {window_title}")
-                
-                time.sleep(self.log_interval)
-                
-            except KeyboardInterrupt:
-                self.logger.info("Window tracker interrupted by user")
-                break
+                        self.logger.info(f"Active window changed: {app_name} - {window_title}")
+                        
+                        # Emit WebSocket event
+                        try:
+                            from websocket_events import get_event_manager
+                            event_manager = get_event_manager()
+                            if event_manager:
+                                event_manager.emit_window_change({
+                                    "app_name": app_name,
+                                    "window_title": window_title,
+                                    "start_time": self.current_start_time
+                                })
+                        except Exception as ws_error:
+                            self.logger.debug(f"WebSocket event emission failed: {ws_error}")
+                            
             except Exception as e:
-                error_msg = f"Critical error in window tracker main loop: {e}"
+                error_msg = f"Error in tracking loop: {e}"
                 self.logger.error(error_msg, exc_info=True)
-                
-                # Log to cerebro.log for service manager monitoring
-                try:
-                    with open('cerebro.log', 'a') as f:
-                        f.write(f"{datetime.now().isoformat()} - WINDOW_TRACKER - CRITICAL ERROR: {error_msg}\n")
-                except:
-                    pass
                 
                 # Brief pause before retrying
                 time.sleep(5)
+            
+            # Sleep for interval
+            time.sleep(self.log_interval)
 
     def _tracking_loop_iteration(self):
         """Single iteration of tracking loop (test-friendly)."""
@@ -443,25 +439,16 @@ class WindowTracker:
             # Log previous window if exists
             prev_start = self.current_start_time
             prev_window = self.current_window
-            if prev_window is not None and prev_start is not None:
-                duration = current_time - int(prev_start)
-                if duration > 0:
-                    # Keep this call minimal; errors are ignored for perf path
-                    try:
-                        self._log_window_activity(
-                            app_name=prev_window[0],
-                            window_title=prev_window[1],
-                            start_time=int(prev_start),
-                            end_time=current_time,
-                            duration=duration,
-                            pid=0
-                        )
-                    except Exception:
-                        pass
+            
+            if prev_window and prev_start:
+                duration = current_time - prev_start
+                # Log logic here if needed for tests
+                pass
 
-            # Update current window
+            # Update state
             self.current_window = (app_name, window_title)
             self.current_start_time = current_time
+            
         except Exception:
             # Swallow errors in tight loops for tests
             pass
@@ -597,32 +584,31 @@ class WindowTracker:
 def main():
     """Main function for standalone testing"""
     tracker = WindowTracker()
-    
     try:
-        print("Starting window tracker...")
         tracker.start()
+        print("Window tracker started. Press Ctrl+C to stop.")
         
-        # Run for 60 seconds
-        time.sleep(60)
-        
-        print("Stopping window tracker...")
-        tracker.stop()
-        
-        # Show recent activity
-        print("\nRecent activity:")
-        activity = tracker.get_recent_activity(hours=1)
-        for app_name, window_title, start_time, end_time, duration in activity:
-            print(f"{app_name}: {duration:.1f}s - {window_title}")
-        
-        # Show app summary
-        print("\nApp summary:")
-        summary = tracker.get_app_summary(hours=1)
-        for app in summary['apps'][:5]:  # Top 5 apps
-            print(f"{app['name']}: {app['total_duration']:.1f}s ({app['sessions']} sessions)")
-        
+        while True:
+            time.sleep(1)
+            
+            # Periodically print stats
+            if int(time.time()) % 60 == 0:
+                print("\n--- Recent Activity ---")
+                activity = tracker.get_recent_activity(hours=1)
+                for item in activity[:5]:
+                    print(f"{item['app_name']}: {item['duration']}s")
+                
+                print("\n--- App Summary ---")
+                summary = tracker.get_app_summary(hours=1)
+                for app in summary['apps'][:5]:
+                    print(f"{app['name']}: {app['total_duration']}s ({app['sessions']} sessions)")
+                    
     except KeyboardInterrupt:
-        print("\nStopping...")
+        print("\nStopping window tracker...")
+        tracker.stop()
+    except Exception as e:
+        print(f"Error: {e}")
         tracker.stop()
 
 if __name__ == "__main__":
-    main() 
+    main()

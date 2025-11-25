@@ -2,22 +2,22 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 // Types
-export type Point = { 
-  t: number; 
-  focus?: number; 
-  distract?: number; 
-  idle?: number; 
+export type Point = {
+  t: number;
+  focus?: number;
+  distract?: number;
+  idle?: number;
   totalInputs?: number;
 };
 
-export type AppSlice = { 
-  name: string; 
-  minutes: number; 
+export type AppSlice = {
+  name: string;
+  minutes: number;
 };
 
-export type Connection = { 
-  backend: boolean; 
-  ws: boolean; 
+export type Connection = {
+  backend: boolean;
+  ws: boolean;
 };
 
 export type DashRange = {
@@ -53,6 +53,7 @@ interface AnalyticsState {
     setCounters: (partial: Partial<Counters>) => void;
     setConnection: (partial: Partial<Connection>) => void;
     setDashRange: (range: Partial<DashRange>) => void;
+    setRtWindowMinutes: (minutes: number) => void;
     resetRealtime: () => void;
   };
 }
@@ -88,12 +89,12 @@ export const useAnalytics = create<AnalyticsState>()(
           set((state) => {
             const { rtWindowMinutes } = state;
             const cutoff = Date.now() - rtWindowMinutes * 60 * 1000;
-            
+
             // Add new point and filter old ones
             const newRealtime = [...state.timeseries.realtime, p].filter(
               point => point.t >= cutoff
             );
-            
+
             // Compute totalMinutes from minute deltas if data is available
             let totalMinutes = state.counters.totalMinutes;
             if (newRealtime.length > 1) {
@@ -105,7 +106,7 @@ export const useAnalytics = create<AnalyticsState>()(
                 totalMinutes += deltaMinutes;
               }
             }
-            
+
             return {
               timeseries: {
                 ...state.timeseries,
@@ -166,6 +167,10 @@ export const useAnalytics = create<AnalyticsState>()(
               ...range
             }
           }));
+        },
+
+        setRtWindowMinutes: (minutes: number) => {
+          set({ rtWindowMinutes: minutes });
         },
 
         resetRealtime: () => {

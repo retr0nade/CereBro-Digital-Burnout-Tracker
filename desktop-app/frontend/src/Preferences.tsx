@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { config } from './config';
 
 interface Preferences {
   track_apps: boolean;
@@ -27,38 +28,37 @@ export default function Preferences() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-
   useEffect(() => {
+    const fetchPreferences = async () => {
+      try {
+        const response = await fetch(`${config.API_URL}/api/preferences`);
+        if (response.ok) {
+          const data = await response.json();
+          setPreferences({ ...preferences, ...data });
+        }
+      } catch (error) {
+        // console.error('Failed to fetch preferences:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     fetchPreferences();
   }, []);
-
-  const fetchPreferences = async () => {
-    try {
-      const response = await fetch('http://localhost:5005/api/preferences');
-      if (response.ok) {
-        const data = await response.json();
-        setPreferences({ ...preferences, ...data });
-      }
-    } catch (error) {
-      console.error('Failed to fetch preferences:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const savePreferences = async () => {
     setSaving(true);
     setMessage(null);
-    
+
     try {
-      const response = await fetch('http://localhost:5005/api/preferences', {
+      const response = await fetch(`${config.API_URL}/api/preferences`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(preferences),
       });
-      
+
       if (response.ok) {
         setMessage('Preferences saved successfully!');
         setTimeout(() => setMessage(null), 3000);
@@ -67,7 +67,7 @@ export default function Preferences() {
       }
     } catch (error) {
       setMessage('Error saving preferences');
-      console.error('Save preferences error:', error);
+      // console.error('Save preferences error:', error);
     } finally {
       setSaving(false);
     }
@@ -114,19 +114,18 @@ export default function Preferences() {
   return (
     <div className="max-w-2xl mx-auto mt-8 p-6">
       <h1 className="text-3xl font-bold mb-6 text-center">Preferences</h1>
-      
+
       {message && (
-        <div className={`mb-6 p-4 rounded-lg ${
-          message.includes('success') 
-            ? 'bg-green-500 bg-opacity-20 border border-green-500 text-green-300'
-            : 'bg-red-500 bg-opacity-20 border border-red-500 text-red-300'
-        }`}>
+        <div className={`mb-6 p-4 rounded-lg ${message.includes('success')
+          ? 'bg-green-500 bg-opacity-20 border border-green-500 text-green-300'
+          : 'bg-red-500 bg-opacity-20 border border-red-500 text-red-300'
+          }`}>
           {message}
         </div>
       )}
 
       <div className="bg-white bg-opacity-10 rounded-xl p-6 shadow-lg space-y-6">
-        
+
         {/* Monitoring Settings */}
         <div>
           <h2 className="text-xl font-bold mb-4">Monitoring Settings</h2>
@@ -138,13 +137,11 @@ export default function Preferences() {
               </div>
               <button
                 onClick={() => handleToggle('track_apps')}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  preferences.track_apps ? 'bg-blue-600' : 'bg-gray-600'
-                }`}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${preferences.track_apps ? 'bg-blue-600' : 'bg-gray-600'
+                  }`}
               >
-                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  preferences.track_apps ? 'translate-x-6' : 'translate-x-1'
-                }`} />
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${preferences.track_apps ? 'translate-x-6' : 'translate-x-1'
+                  }`} />
               </button>
             </div>
 
@@ -155,13 +152,11 @@ export default function Preferences() {
               </div>
               <button
                 onClick={() => handleToggle('track_idle')}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  preferences.track_idle ? 'bg-blue-600' : 'bg-gray-600'
-                }`}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${preferences.track_idle ? 'bg-blue-600' : 'bg-gray-600'
+                  }`}
               >
-                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  preferences.track_idle ? 'translate-x-6' : 'translate-x-1'
-                }`} />
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${preferences.track_idle ? 'translate-x-6' : 'translate-x-1'
+                  }`} />
               </button>
             </div>
 
@@ -172,13 +167,11 @@ export default function Preferences() {
               </div>
               <button
                 onClick={() => handleToggle('track_input')}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  preferences.track_input ? 'bg-blue-600' : 'bg-gray-600'
-                }`}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${preferences.track_input ? 'bg-blue-600' : 'bg-gray-600'
+                  }`}
               >
-                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  preferences.track_input ? 'translate-x-6' : 'translate-x-1'
-                }`} />
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${preferences.track_input ? 'translate-x-6' : 'translate-x-1'
+                  }`} />
               </button>
             </div>
 
@@ -189,13 +182,11 @@ export default function Preferences() {
               </div>
               <button
                 onClick={() => handleToggle('track_audio')}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  preferences.track_audio ? 'bg-blue-600' : 'bg-gray-600'
-                }`}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${preferences.track_audio ? 'bg-blue-600' : 'bg-gray-600'
+                  }`}
               >
-                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  preferences.track_audio ? 'translate-x-6' : 'translate-x-1'
-                }`} />
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${preferences.track_audio ? 'translate-x-6' : 'translate-x-1'
+                  }`} />
               </button>
             </div>
 
@@ -206,13 +197,11 @@ export default function Preferences() {
               </div>
               <button
                 onClick={() => handleToggle('track_screenshots')}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  preferences.track_screenshots ? 'bg-blue-600' : 'bg-gray-600'
-                }`}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${preferences.track_screenshots ? 'bg-blue-600' : 'bg-gray-600'
+                  }`}
               >
-                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  preferences.track_screenshots ? 'translate-x-6' : 'translate-x-1'
-                }`} />
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${preferences.track_screenshots ? 'translate-x-6' : 'translate-x-1'
+                  }`} />
               </button>
             </div>
           </div>
@@ -248,13 +237,11 @@ export default function Preferences() {
               </div>
               <button
                 onClick={() => handleToggle('focus_reminders')}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  preferences.focus_reminders ? 'bg-green-600' : 'bg-gray-600'
-                }`}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${preferences.focus_reminders ? 'bg-green-600' : 'bg-gray-600'
+                  }`}
               >
-                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  preferences.focus_reminders ? 'translate-x-6' : 'translate-x-1'
-                }`} />
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${preferences.focus_reminders ? 'translate-x-6' : 'translate-x-1'
+                  }`} />
               </button>
             </div>
 
@@ -265,13 +252,11 @@ export default function Preferences() {
               </div>
               <button
                 onClick={() => handleToggle('break_suggestions')}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  preferences.break_suggestions ? 'bg-green-600' : 'bg-gray-600'
-                }`}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${preferences.break_suggestions ? 'bg-green-600' : 'bg-gray-600'
+                  }`}
               >
-                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  preferences.break_suggestions ? 'translate-x-6' : 'translate-x-1'
-                }`} />
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${preferences.break_suggestions ? 'translate-x-6' : 'translate-x-1'
+                  }`} />
               </button>
             </div>
           </div>
@@ -285,11 +270,10 @@ export default function Preferences() {
               <button
                 key={theme}
                 onClick={() => handleThemeChange(theme)}
-                className={`p-3 rounded-lg border-2 transition-colors ${
-                  preferences.theme === theme
-                    ? 'border-blue-500 bg-blue-500 bg-opacity-20'
-                    : 'border-gray-600 hover:border-gray-500'
-                }`}
+                className={`p-3 rounded-lg border-2 transition-colors ${preferences.theme === theme
+                  ? 'border-blue-500 bg-blue-500 bg-opacity-20'
+                  : 'border-gray-600 hover:border-gray-500'
+                  }`}
               >
                 <div className="text-sm font-medium capitalize">{theme}</div>
               </button>

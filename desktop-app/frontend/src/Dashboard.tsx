@@ -10,17 +10,18 @@ import { FocusVsDistractionLine, IdleBreakBar, DonutAppUsage } from './charts';
 import { useThrottledValue } from './utils/smoothNumber';
 import ActivityTimeline from './components/ActivityTimeline';
 import { useScreenshotMode, useScreenshotData, getScreenshotSeedData } from './utils/screenshotMode';
-import { 
-  useAnalytics, 
-  selectDashboardSeries, 
-  selectCounters, 
-  selectApps, 
+import {
+  useAnalytics,
+  selectDashboardSeries,
+  selectCounters,
+  selectApps,
   useAnalyticsActions,
   type Point,
-  type AppSlice 
+  type AppSlice
 } from './state/analyticsStore';
 import { focusScore, formatMinutes } from './utils/derive';
 import RangeControl from './components/RangeControl';
+import { config } from './config';
 
 interface MetricsData {
   recent_usage: any[];
@@ -104,7 +105,7 @@ const getAppSwitchesTone = (switches: number): 'default' | 'ok' | 'warn' | 'dang
 const getInsightStatus = (suggestions: InsightSuggestion[]): 'ok' | 'warn' | 'danger' => {
   const hasError = suggestions.some(s => s.severity === 'error');
   const hasWarning = suggestions.some(s => s.severity === 'warning');
-  
+
   if (hasError) return 'danger';
   if (hasWarning) return 'warn';
   return 'ok';
@@ -125,7 +126,7 @@ const convertUsageToAppSlices = (usage: any[]): AppSlice[] => {
     const appName = item[0] || 'Unknown';
     appData[appName] = (appData[appName] || 0) + (item[3] || 0);
   });
-  
+
   return Object.entries(appData).map(([name, minutes]) => ({
     name,
     minutes: Math.round(minutes / 60) // Convert to minutes
@@ -139,70 +140,69 @@ export default function Dashboard() {
   const apps = useAnalytics(selectApps);
   const dashRange = useAnalytics(state => state.dashRange);
   const actions = useAnalyticsActions();
-  
+
   // Local state for UI concerns only
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [backendConnected, setBackendConnected] = useState(false);
   const [insights, setInsights] = useState<InsightsData | null>(null);
-  
+
   // Screenshot mode
   const screenshotMode = useScreenshotMode();
   const seedData = getScreenshotSeedData();
 
   const loadAggregatedHistory = async (range: typeof dashRange) => {
-    try {
-      setLoading(true);
-      setError(null);
+    setLoading(true);
+    setError(null);
 
-      // Try Tauri command first
-      if (window.__TAURI__) {
-        try {
-          const result = await window.__TAURI__.invoke('get_system_metrics');
-          // Update store with fetched data
-          actions.setDashboardSeries(convertMetricsToPoints(result.recent_usage || []));
-          actions.setApps(convertUsageToAppSlices(result.recent_usage || []));
-          actions.setCounters({
-            focusMinutes: Math.round((result.metrics_summary?.total_app_time || 0) / 60),
-            distractMinutes: Math.round((result.metrics_summary?.total_app_time || 0) / 60 * 0.3),
-            appSwitches: result.metrics_summary?.app_switches || 0,
-            idleEvents: result.metrics_summary?.idle_events || 0,
-            totalMinutes: Math.round((result.metrics_summary?.total_app_time || 0) / 60)
-          });
-          setBackendConnected(true);
-          return;
-        } catch (tauriError) {
-          console.log('Tauri command failed, trying direct HTTP...');
-        }
+    // Try Tauri command first
+    if (window.__TAURI__) {
+      try {
+        const result = await window.__TAURI__.invoke('get_system_metrics');
+        // Update store with fetched data
+        actions.setDashboardSeries(convertMetricsToPoints(result.recent_usage || []));
+        actions.setApps(convertUsageToAppSlices(result.recent_usage || []));
+        actions.setCounters({
+          focusMinutes: Math.round((result.metrics_summary?.total_app_time || 0) / 60),
+          distractMinutes: Math.round((result.metrics_summary?.total_app_time || 0) / 60 * 0.3),
+          appSwitches: result.metrics_summary?.app_switches || 0,
+          idleEvents: result.metrics_summary?.idle_events || 0,
+          totalMinutes: Math.round((result.metrics_summary?.total_app_time || 0) / 60)
+        });
+        setBackendConnected(true);
+        setLoading(false);
+        return;
+      } catch (err) {
+        // Fallback to web if Tauri fails
       }
+    }
 
-      // Determine which endpoint to use based on range
-      let endpoint = 'http://localhost:5005/api/metrics';
+    try {
+      let endpoint = `${config.API_URL}/api/metrics`;
       let params = '';
-      
+
       if (range.preset === 'week') {
-        endpoint = 'http://localhost:5005/api/analytics';
+        endpoint = `${config.API_URL}/api/analytics`;
         params = '?days=7';
       } else if (range.preset === 'month') {
-        endpoint = 'http://localhost:5005/api/analytics';
+        endpoint = `${config.API_URL}/api/analytics`;
         params = '?days=30';
       }
-      // For 'today' or custom ranges, use the basic metrics endpoint
 
       const response = await fetch(endpoint + params);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      const result = await response.json();
-      
+      const apiResult = await response.json();
+
       // Handle different response formats
       let usageData: any[] = [];
       let metricsSummary: MetricsSummary = {};
-      
+
       if (endpoint.includes('/analytics')) {
         // Analytics endpoint returns different structure
-        const analyticsResult = result as AnalyticsData;
-        usageData = analyticsResult.analytics_data ? 
+        const analyticsResult = apiResult as AnalyticsData;
+        usageData = analyticsResult.analytics_data ?
           Object.values(analyticsResult.analytics_data).flatMap(day => Object.values(day.app_stats || {})) : [];
         metricsSummary = {
           total_app_time: analyticsResult.total_records * 60, // Rough estimate
@@ -211,11 +211,11 @@ export default function Dashboard() {
         };
       } else {
         // Basic metrics endpoint
-        const metricsResult = result as MetricsData;
+        const metricsResult = apiResult as MetricsData;
         usageData = metricsResult.recent_usage || [];
         metricsSummary = metricsResult.metrics_summary || {};
       }
-      
+
       // Update store with fetched data
       actions.setDashboardSeries(convertMetricsToPoints(usageData));
       actions.setApps(convertUsageToAppSlices(usageData));
@@ -231,7 +231,7 @@ export default function Dashboard() {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch data';
       setError(errorMessage);
       setBackendConnected(false);
-      console.error('Dashboard fetch error:', err);
+      // console.error('Dashboard fetch error:', err);
     } finally {
       setLoading(false);
     }
@@ -244,13 +244,13 @@ export default function Dashboard() {
 
   const fetchInsights = async () => {
     try {
-      const response = await fetch('http://localhost:5005/api/insights');
+      const response = await fetch(`${config.API_URL}/api/insights`);
       if (!response.ok) return;
       const result = await response.json();
       setInsights(result);
     } catch (e) {
       // Soft-fail insights fetch
-      console.debug('Insights fetch failed');
+      // console.debug('Insights fetch failed');
     }
   };
 
@@ -272,7 +272,7 @@ export default function Dashboard() {
   // Convert store data to ActivityTimeline format
   const timelineEvents = useMemo(() => {
     const events: any[] = [];
-    
+
     // Add app usage events from store data
     throttledApps.forEach((app: AppSlice, index: number) => {
       events.push({
@@ -292,7 +292,7 @@ export default function Dashboard() {
   // Prepare chart data from store
   const prepareScreenTimeData = () => {
     if (!throttledDashboardData || throttledDashboardData.length === 0) return [];
-    
+
     // Group usage by hour
     const hourlyData: { [key: string]: number } = {};
     throttledDashboardData.forEach((point: Point) => {
@@ -312,7 +312,7 @@ export default function Dashboard() {
 
   const prepareAppUsageData = () => {
     if (!throttledApps || throttledApps.length === 0) return [];
-    
+
     // Convert store apps to DonutAppUsage format
     return throttledApps
       .map((app: AppSlice) => ({
@@ -325,7 +325,7 @@ export default function Dashboard() {
 
   const prepareFocusDistractionData = (): Point[] => {
     if (!throttledDashboardData || throttledDashboardData.length === 0) return [];
-    
+
     // Convert dashboard data to Point format for charts
     return throttledDashboardData.map(point => ({
       t: point.t,
@@ -336,7 +336,7 @@ export default function Dashboard() {
 
   const prepareIdleBreakData = (): Point[] => {
     if (!throttledDashboardData || throttledDashboardData.length === 0) return [];
-    
+
     // Convert dashboard data to Point format for charts
     return throttledDashboardData.map(point => ({
       t: point.t,
@@ -368,12 +368,12 @@ export default function Dashboard() {
           <h2 className="text-xl font-bold text-red-400 mb-2">Connection Error</h2>
           <p className="text-red-300">{error}</p>
           <p className="text-sm text-red-400 mt-2">
-            {backendConnected 
+            {backendConnected
               ? 'Make sure the backend server is running on port 5005'
               : 'Backend service is not available'
             }
           </p>
-          <button 
+          <button
             onClick={() => loadAggregatedHistory(dashRange)}
             className="btn btn-danger mt-4"
           >
@@ -397,7 +397,7 @@ export default function Dashboard() {
             <div className="space-y-2">
               <h3 className="text-lg font-semibold text-text">Welcome to your dashboard!</h3>
               <p className="text-text-muted max-w-md">
-                We're setting up your personalized analytics. Make sure the backend service is running and keep the tracker active. 
+                We're setting up your personalized analytics. Make sure the backend service is running and keep the tracker active.
                 Your insights will appear here once we start collecting data.
               </p>
               <div className="flex items-center justify-center gap-4 pt-2">
@@ -423,13 +423,12 @@ export default function Dashboard() {
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-[22px] md:text-2xl font-semibold tracking-[-0.01em]">Dashboard</h1>
         <div className="flex items-center gap-4">
-          <RangeControl 
-            value={dashRange} 
+          <RangeControl
+            value={dashRange}
             onChange={handleRangeChange}
           />
-          <div className={`px-3 py-1.5 rounded text-dashboard-sm ${
-            backendConnected ? 'bg-green-500/20 text-green-300 border border-green-500/40' : 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/40'
-          }`}>
+          <div className={`px-3 py-1.5 rounded text-dashboard-sm ${backendConnected ? 'bg-green-500/20 text-green-300 border border-green-500/40' : 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/40'
+            }`}>
             {backendConnected ? 'Connected (Tauri)' : 'Connected via HTTP'}
           </div>
         </div>
@@ -437,7 +436,7 @@ export default function Dashboard() {
 
       {/* 12-Column Grid Layout */}
       <div className="grid grid-cols-12 gap-6">
-        
+
         {/* Row 1: AI Insights Banner - Full Width */}
         {insights?.suggestions && insights.suggestions.length > 0 && (
           <div className="col-span-12">
@@ -529,7 +528,7 @@ export default function Dashboard() {
             )}
           </ChartCard>
         </div>
-        
+
         <div className="col-span-12 md:col-span-6 xl:col-span-5">
           <ChartCard
             title="App Usage Distribution"
@@ -594,7 +593,7 @@ export default function Dashboard() {
             )}
           </ChartCard>
         </div>
-        
+
         <div className="col-span-12 md:col-span-6 xl:col-span-5">
           <ChartCard
             title="Idle & Break Frequency"
@@ -650,7 +649,7 @@ export default function Dashboard() {
                     <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                     <div className="flex-1">
                       <p className="text-sm text-text">
-                        Focus score of <strong>{focusScore(counters.focusMinutes, counters.distractMinutes)}%</strong> 
+                        Focus score of <strong>{focusScore(counters.focusMinutes, counters.distractMinutes)}%</strong>
                         {focusScore(counters.focusMinutes, counters.distractMinutes) > 70 ? ' - Great focus!' : ' - Room for improvement'}
                       </p>
                     </div>

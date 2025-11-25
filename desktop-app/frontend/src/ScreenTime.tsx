@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ResponsivePie } from '@nivo/pie';
 import { ResponsiveBar } from '@nivo/bar';
+import { config } from './config';
 
 interface ScreenTimeData {
   daily_stats: Record<string, {
@@ -17,35 +18,34 @@ export default function ScreenTime() {
   const [error, setError] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string>('');
 
-  useEffect(() => {
-    fetchScreenTimeData();
-  }, []);
-
   const fetchScreenTimeData = async () => {
     try {
       setLoading(true);
-      setError(null);
-
-      const response = await fetch('http://localhost:5005/api/analytics');
+      const response = await fetch(`${config.API_URL}/api/screentime`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       const result = await response.json();
       setData(result);
-      
+
       // Set the most recent date as default
       if (result.daily_stats && Object.keys(result.daily_stats).length > 0) {
         const dates = Object.keys(result.daily_stats).sort();
         setSelectedDate(dates[dates.length - 1]);
       }
+      setError(null);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch screen time data';
       setError(errorMessage);
-      console.error('ScreenTime fetch error:', err);
+      // console.error('ScreenTime fetch error:', err);
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchScreenTimeData();
+  }, []);
 
   if (loading) {
     return (
@@ -66,7 +66,7 @@ export default function ScreenTime() {
         <div className="bg-red-500 bg-opacity-20 rounded-xl p-6 shadow-lg border border-red-500">
           <h2 className="text-xl font-bold text-red-400 mb-2">Connection Error</h2>
           <p className="text-red-300">{error}</p>
-          <button 
+          <button
             onClick={fetchScreenTimeData}
             className="mt-4 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
           >
@@ -90,7 +90,7 @@ export default function ScreenTime() {
             <div className="space-y-2">
               <h3 className="text-lg font-semibold text-text">Ready to track your screen time?</h3>
               <p className="text-text-muted max-w-md">
-                To start collecting screen time data, make sure the backend service is running and keep the tracker active. 
+                To start collecting screen time data, make sure the backend service is running and keep the tracker active.
                 Your daily usage patterns will appear here once we have enough data.
               </p>
               <div className="flex items-center justify-center gap-4 pt-2">
@@ -106,16 +106,16 @@ export default function ScreenTime() {
   }
 
   // Prepare pie chart data for app usage
-  const pieData = selectedDate && data.daily_stats[selectedDate] 
+  const pieData = selectedDate && data.daily_stats[selectedDate]
     ? Object.entries(data.daily_stats[selectedDate].apps)
-        .map(([app, count]) => ({
-          id: app,
-          label: app,
-          value: count as number,
-          color: `hsl(${Math.random() * 360}, 70%, 50%)`
-        }))
-        .sort((a, b) => (b.value as number) - (a.value as number))
-        .slice(0, 10) // Top 10 apps
+      .map(([app, count]) => ({
+        id: app,
+        label: app,
+        value: count as number,
+        color: `hsl(${Math.random() * 360}, 70%, 50%)`
+      }))
+      .sort((a, b) => (b.value as number) - (a.value as number))
+      .slice(0, 10) // Top 10 apps
     : [];
 
   // Prepare bar chart data for daily comparison
@@ -132,7 +132,7 @@ export default function ScreenTime() {
   return (
     <div className="max-w-6xl mx-auto mt-8 p-6">
       <h1 className="text-3xl font-bold mb-6 text-center">Screen Time Analytics</h1>
-      
+
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-6 shadow-lg">
@@ -141,14 +141,14 @@ export default function ScreenTime() {
             <div className="text-blue-100">Total Records</div>
           </div>
         </div>
-        
+
         <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-6 shadow-lg">
           <div className="text-center">
             <div className="text-4xl font-bold text-white">{data.idle_records}</div>
             <div className="text-purple-100">Idle Events</div>
           </div>
         </div>
-        
+
         <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-6 shadow-lg">
           <div className="text-center">
             <div className="text-4xl font-bold text-white">{Object.keys(data.daily_stats).length}</div>
@@ -309,10 +309,10 @@ export default function ScreenTime() {
                   <div className="flex items-center space-x-4">
                     <span className="text-sm text-gray-400">{count} sessions</span>
                     <div className="w-24 bg-gray-700 rounded-full h-2">
-                      <div 
+                      <div
                         className="bg-pink-500 h-2 rounded-full"
-                        style={{ 
-                          width: `${(count as number / Math.max(...Object.values(data.daily_stats[selectedDate].apps).map(v => v as number))) * 100}%` 
+                        style={{
+                          width: `${(count as number / Math.max(...Object.values(data.daily_stats[selectedDate].apps).map(v => v as number))) * 100}%`
                         }}
                       />
                     </div>

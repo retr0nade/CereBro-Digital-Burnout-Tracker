@@ -1,6 +1,5 @@
 import { io } from 'socket.io-client';
-
-const SOCKET_URL = 'http://localhost:5000';
+import { SOCKET_URL } from '../config';
 
 export const socket = io(SOCKET_URL, {
     autoConnect: true,
@@ -11,22 +10,22 @@ export const socket = io(SOCKET_URL, {
 
 // Event listeners
 socket.on('connect', () => {
-    console.log('Connected to WebSocket server');
+    // console.log('Connected to WebSocket server');
 });
 
 socket.on('disconnect', () => {
-    console.log('Disconnected from WebSocket server');
+    // console.log('Disconnected from WebSocket server');
 });
 
 socket.on('event', (eventData) => {
-    console.log('Received event:', eventData);
+    // console.log('Received event:', eventData);
     // You can dispatch this event to your state management system (Redux, Context, etc.)
     // or handle it directly in your components
 });
 
 // Error handling
 socket.on('connect_error', (error) => {
-    console.error('WebSocket connection error:', error);
+    // console.error('WebSocket connection error:', error);
 });
 
 export const disconnectSocket = () => {
