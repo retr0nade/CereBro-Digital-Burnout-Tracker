@@ -23,6 +23,7 @@ class WebSocketService {
   private setupSocket() {
     try {
       this.socket = io(SOCKET_URL, {
+        transports: ['websocket'],
         autoConnect: true,
         reconnection: true,
         reconnectionAttempts: 5,

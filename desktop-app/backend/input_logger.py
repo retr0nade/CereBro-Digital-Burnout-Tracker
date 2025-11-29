@@ -30,29 +30,40 @@ except ImportError:
 class InputLogger:
     """Cross-platform input activity logger"""
     
-    def __init__(self, log_interval: int = 60, 
+    def __init__(self, log_interval: int = 60, emit_interval: float = 1.0,
                  enable_keyboard: bool = True, enable_mouse: bool = True, cerebro_db: CerebroDB = None):
         """
         Initialize the input logger
         
         Args:
-            log_interval: How often to log data in seconds (default: 60)
+            log_interval: How often to log data to DB in seconds (default: 60)
+            emit_interval: How often to emit WebSocket events in seconds (default: 1.0)
             enable_keyboard: Whether to monitor keyboard input
             enable_mouse: Whether to monitor mouse input
             cerebro_db: Unified CerebroDB instance for logging
         """
         self.log_interval = log_interval
+        self.emit_interval = emit_interval
         self.enable_keyboard = enable_keyboard
         self.enable_mouse = enable_mouse
         self.cerebro_db = cerebro_db or CerebroDB("cerebro.db")
         self.is_running = False
         self.logger_thread = None
         
-        # Input counters
+        # Input counters (reset every emit_interval)
         self.keypress_count = 0
         self.mouse_click_count = 0
         self.mouse_scroll_count = 0
         self.mouse_move_count = 0
+        
+        # DB Accumulators (reset every log_interval)
+        self.db_accumulator = {
+            'keypress_count': 0,
+            'mouse_click_count': 0,
+            'mouse_scroll_count': 0,
+            'mouse_move_count': 0
+        }
+        self.last_db_log_time = 0
         
         # Thread safety
         self.counter_lock = threading.Lock()
@@ -75,15 +86,11 @@ class InputLogger:
         )
         self.logger = logging.getLogger(__name__)
         
-
-        
         # Setup input monitoring
         if PYNPUT_AVAILABLE:
             self._setup_input_monitoring()
         else:
             self.logger.warning("pynput not available - input monitoring disabled")
-    
-
     
     def _setup_input_monitoring(self):
         """Setup keyboard and mouse listeners"""
@@ -193,93 +200,104 @@ class InputLogger:
                     f.write(f"{datetime.now().isoformat()} - INPUT_LOGGER - MOUSEMOVE ERROR: {error_msg}\n")
             except:
                 pass
-    
-    def _log_input_activity(self):
-        """Log current input activity to database"""
+
+    def _process_interval(self):
+        """Process current interval: emit events and optionally log to DB"""
         try:
+            current_time = time.time()
+            
             with self.counter_lock:
-                # Get current counts
+                # Get current counts since last emit
                 keypresses = self.keypress_count
                 mouse_clicks = self.mouse_click_count
                 mouse_scrolls = self.mouse_scroll_count
                 mouse_moves = self.mouse_move_count
                 total_inputs = keypresses + mouse_clicks + mouse_scrolls
                 
-                # Reset counters
+                # Reset short-term counters
                 self.keypress_count = 0
                 self.mouse_click_count = 0
                 self.mouse_scroll_count = 0
                 self.mouse_move_count = 0
+                
+                # Add to DB accumulators
+                self.db_accumulator['keypress_count'] += keypresses
+                self.db_accumulator['mouse_click_count'] += mouse_clicks
+                self.db_accumulator['mouse_scroll_count'] += mouse_scrolls
+                self.db_accumulator['mouse_move_count'] += mouse_moves
             
-            # Log to unified cerebro database
+            # Emit WebSocket event (if there was activity or just heartbeat)
+            # Always emit to keep chart moving
             try:
-                self.cerebro_db.insert_input_activity(
-                    timestamp=int(time.time()),
-                    keypress_count=keypresses,
-                    mouse_click_count=mouse_clicks
-                )
-                
-                self.logger.info(f"Logged input activity: {keypresses} keys, {mouse_clicks} clicks, "
-                               f"{mouse_scrolls} scrolls, {mouse_moves} moves, {total_inputs} total")
-                
-                # Emit WebSocket event for input activity update
-                try:
-                    from websocket_events import get_event_manager
-                    event_manager = get_event_manager()
-                    if event_manager:
-                        event_manager.emit_input_activity({
-                            "timestamp": int(time.time()),
-                            "keypress_count": keypresses,
-                            "mouse_click_count": mouse_clicks,
-                            "mouse_scroll_count": mouse_scrolls,
-                            "mouse_move_count": mouse_moves,
-                            "total_inputs": total_inputs
-                        })
-                except Exception as ws_error:
-                    self.logger.debug(f"WebSocket event emission failed: {ws_error}")
-                
-            except Exception as db_error:
-                error_msg = f"Database error in input logger: {db_error}"
-                self.logger.error(error_msg, exc_info=True)
-                
-                # Log to cerebro.log for service manager monitoring
-                try:
-                    with open('cerebro.log', 'a') as f:
-                        f.write(f"{datetime.now().isoformat()} - INPUT_LOGGER - DATABASE ERROR: {error_msg}\n")
-                except:
-                    pass
-                
-                # Don't raise the exception - continue running
+                from websocket_events import get_event_manager
+                event_manager = get_event_manager()
+                if event_manager:
+                    event_manager.emit_input_activity({
+                        "timestamp": int(current_time),
+                        "keypress_count": keypresses,
+                        "mouse_click_count": mouse_clicks,
+                        "mouse_scroll_count": mouse_scrolls,
+                        "mouse_move_count": mouse_moves,
+                        "total_inputs": total_inputs
+                    })
+            except Exception as ws_error:
+                self.logger.debug(f"WebSocket event emission failed: {ws_error}")
+
+            # Check if it's time to log to DB
+            if current_time - self.last_db_log_time >= self.log_interval:
+                self._flush_to_db(current_time)
                 
         except Exception as e:
-            error_msg = f"Failed to log input activity: {e}"
-            self.logger.error(error_msg, exc_info=True)
+            self.logger.error(f"Error in process interval: {e}", exc_info=True)
+
+    def _flush_to_db(self, timestamp):
+        """Flush accumulated data to database"""
+        try:
+            acc = self.db_accumulator
+            total = acc['keypress_count'] + acc['mouse_click_count'] + acc['mouse_scroll_count']
             
-            # Log to cerebro.log for service manager monitoring
-            try:
-                with open('cerebro.log', 'a') as f:
-                    f.write(f"{datetime.now().isoformat()} - INPUT_LOGGER - LOGGING ERROR: {error_msg}\n")
-            except:
-                pass
-    
+            # Only log if there was activity (optional, but saves space)
+            # But for consistency we might want to log 0s? 
+            # Existing logic didn't check for 0. Let's log.
+            
+            self.cerebro_db.insert_input_activity(
+                timestamp=int(timestamp),
+                keypress_count=acc['keypress_count'],
+                mouse_click_count=acc['mouse_click_count']
+            )
+            
+            self.logger.info(f"Logged input activity to DB: {acc['keypress_count']} keys, {acc['mouse_click_count']} clicks")
+            
+            # Reset accumulators
+            self.db_accumulator = {
+                'keypress_count': 0,
+                'mouse_click_count': 0,
+                'mouse_scroll_count': 0,
+                'mouse_move_count': 0
+            }
+            self.last_db_log_time = timestamp
+            
+        except Exception as e:
+            self.logger.error(f"Database error in input logger: {e}", exc_info=True)
+
     def _logging_loop(self):
         """Main logging loop"""
-        self.logger.info("Input logging started")
+        self.logger.info(f"Input logging started (Emit: {self.emit_interval}s, Log: {self.log_interval}s)")
+        self.last_db_log_time = time.time()
         
         while self.is_running:
             try:
-                # Wait for the specified interval
-                time.sleep(self.log_interval)
+                time.sleep(self.emit_interval)
                 
-                if self.is_running:  # Check again in case we were stopped
-                    self._log_input_activity()
+                if self.is_running:
+                    self._process_interval()
                 
             except KeyboardInterrupt:
                 self.logger.info("Input logger interrupted by user")
                 break
             except Exception as e:
-                error_msg = f"Critical error in input logger main loop: {e}"
-                self.logger.error(error_msg, exc_info=True)
+                self.logger.error(f"Critical error in input logger main loop: {e}", exc_info=True)
+
     def start(self):
         """Start input logging"""
         if self.is_running:
@@ -339,7 +357,9 @@ class InputLogger:
             
             # Log final activity
             try:
-                self._log_input_activity()
+                # Flush any remaining data
+                self._process_interval()
+                self._flush_to_db(time.time())
             except Exception as e:
                 self.logger.error(f"Error logging final activity: {e}")
             
@@ -380,25 +400,9 @@ class InputLogger:
     def get_recent_activity(self, hours: int = 24) -> list:
         """Get recent input activity"""
         try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            
-            # Get activity from last N hours
-            cutoff_time = datetime.now() - timedelta(hours=hours)
-            
-            cursor.execute('''
-                SELECT timestamp, keypress_count, mouse_click_count, mouse_scroll_count,
-                       mouse_move_count, total_inputs, interval_seconds
-                FROM input_activity
-                WHERE timestamp >= ?
-                ORDER BY timestamp DESC
-            ''', (cutoff_time,))
-            
-            results = cursor.fetchall()
-            conn.close()
-            
-            return results
-            
+            if self.cerebro_db:
+                return self.cerebro_db.get_input_activity(limit=1000, start_time=int(time.time() - hours*3600))
+            return []
         except Exception as e:
             self.logger.error(f"Failed to get recent activity: {e}")
             return []
@@ -406,24 +410,23 @@ class InputLogger:
     def get_input_summary(self, hours: int = 24) -> Dict[str, Any]:
         """Get summary of input activity"""
         try:
-            conn = sqlite3.connect(self.db_path)
+            # Use self.cerebro_db.db_path if available
+            db_path = self.cerebro_db.db_path if self.cerebro_db else "cerebro.db"
+            conn = sqlite3.connect(db_path)
             cursor = conn.cursor()
             
-            cutoff_time = datetime.now() - timedelta(hours=hours)
+            cutoff_time = int(time.time() - hours*3600)
             
             cursor.execute('''
                 SELECT 
                     COUNT(*) as total_records,
                     SUM(keypress_count) as total_keypresses,
                     SUM(mouse_click_count) as total_clicks,
-                    SUM(mouse_scroll_count) as total_scrolls,
-                    SUM(mouse_move_count) as total_moves,
-                    SUM(total_inputs) as total_inputs,
+                    SUM(keypress_count + mouse_click_count) as total_inputs,
                     AVG(keypress_count) as avg_keypresses,
                     AVG(mouse_click_count) as avg_clicks,
-                    AVG(total_inputs) as avg_total_inputs,
-                    MAX(total_inputs) as max_inputs,
-                    MIN(total_inputs) as min_inputs
+                    MAX(keypress_count + mouse_click_count) as max_inputs,
+                    MIN(keypress_count + mouse_click_count) as min_inputs
                 FROM input_activity
                 WHERE timestamp >= ?
             ''', (cutoff_time,))
@@ -432,20 +435,16 @@ class InputLogger:
             conn.close()
             
             if result and result[0] > 0:
-                (total_records, total_keypresses, total_clicks, total_scrolls, 
-                 total_moves, total_inputs, avg_keypresses, avg_clicks, 
-                 avg_total_inputs, max_inputs, min_inputs) = result
+                (total_records, total_keypresses, total_clicks, total_inputs, 
+                 avg_keypresses, avg_clicks, max_inputs, min_inputs) = result
                 
                 return {
                     'total_records': total_records,
                     'total_keypresses': total_keypresses or 0,
                     'total_clicks': total_clicks or 0,
-                    'total_scrolls': total_scrolls or 0,
-                    'total_moves': total_moves or 0,
                     'total_inputs': total_inputs or 0,
                     'avg_keypresses': avg_keypresses or 0,
                     'avg_clicks': avg_clicks or 0,
-                    'avg_total_inputs': avg_total_inputs or 0,
                     'max_inputs': max_inputs or 0,
                     'min_inputs': min_inputs or 0,
                     'hours_analyzed': hours
@@ -455,12 +454,9 @@ class InputLogger:
                     'total_records': 0,
                     'total_keypresses': 0,
                     'total_clicks': 0,
-                    'total_scrolls': 0,
-                    'total_moves': 0,
                     'total_inputs': 0,
                     'avg_keypresses': 0,
                     'avg_clicks': 0,
-                    'avg_total_inputs': 0,
                     'max_inputs': 0,
                     'min_inputs': 0,
                     'hours_analyzed': hours
@@ -472,12 +468,9 @@ class InputLogger:
                 'total_records': 0,
                 'total_keypresses': 0,
                 'total_clicks': 0,
-                'total_scrolls': 0,
-                'total_moves': 0,
                 'total_inputs': 0,
                 'avg_keypresses': 0,
                 'avg_clicks': 0,
-                'avg_total_inputs': 0,
                 'max_inputs': 0,
                 'min_inputs': 0,
                 'hours_analyzed': hours
@@ -491,21 +484,16 @@ class InputLogger:
             input_activity = self.get_recent_activity(hours)
             
             with open(csv_path, 'w', newline='', encoding='utf-8') as csvfile:
-                fieldnames = ['timestamp', 'keypress_count', 'mouse_click_count', 
-                            'mouse_scroll_count', 'mouse_move_count', 'total_inputs', 
-                            'interval_seconds']
+                fieldnames = ['timestamp', 'keypress_count', 'mouse_click_count']
                 writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
                 
                 writer.writeheader()
-                for (timestamp, keypresses, clicks, scrolls, moves, total, interval) in input_activity:
+                for row in input_activity:
+                    # row is a dict-like object (sqlite3.Row)
                     writer.writerow({
-                        'timestamp': timestamp,
-                        'keypress_count': keypresses,
-                        'mouse_click_count': clicks,
-                        'mouse_scroll_count': scrolls,
-                        'mouse_move_count': moves,
-                        'total_inputs': total,
-                        'interval_seconds': interval
+                        'timestamp': row['timestamp'],
+                        'keypress_count': row['keypress_count'],
+                        'mouse_click_count': row['mouse_click_count']
                     })
             
             self.logger.info(f"Exported {len(input_activity)} input records to {csv_path}")
@@ -520,6 +508,8 @@ def main():
     parser = argparse.ArgumentParser(description='Input Activity Logger')
     parser.add_argument('--interval', type=int, default=60, 
                        help='Logging interval in seconds (default: 60)')
+    parser.add_argument('--emit-interval', type=float, default=1.0,
+                       help='Emit interval in seconds (default: 1.0)')
     parser.add_argument('--db', type=str, default='input_activity.db',
                        help='Database file path (default: input_activity.db)')
     parser.add_argument('--duration', type=int, default=300,
@@ -533,15 +523,20 @@ def main():
     
     args = parser.parse_args()
     
+    # Create a dummy cerebro_db for testing if needed, or pass None and let it create default
+    # But we want to use the db path from args
+    db = CerebroDB(args.db)
+    
     logger = InputLogger(
-        db_path=args.db,
         log_interval=args.interval,
+        emit_interval=args.emit_interval,
         enable_keyboard=not args.no_keyboard,
-        enable_mouse=not args.no_mouse
+        enable_mouse=not args.no_mouse,
+        cerebro_db=db
     )
     
     try:
-        print(f"Starting input logger with {args.interval}s interval...")
+        print(f"Starting input logger with {args.interval}s log interval, {args.emit_interval}s emit interval...")
         print(f"Keyboard monitoring: {'Enabled' if not args.no_keyboard else 'Disabled'}")
         print(f"Mouse monitoring: {'Enabled' if not args.no_mouse else 'Disabled'}")
         logger.start()
@@ -553,49 +548,41 @@ def main():
         logger.stop()
         
         # Show results
-        print("\n" + "=" * 50)
+        print("\\n" + "=" * 50)
         print("INPUT ACTIVITY:")
         activity = logger.get_recent_activity(hours=1)
         
         if activity:
-            for (timestamp, keypresses, clicks, scrolls, moves, total, interval) in activity:
-                print(f"• {timestamp}: {keypresses} keys, {clicks} clicks, "
-                      f"{scrolls} scrolls, {moves} moves, {total} total")
+            for row in activity:
+                print(f"• {row['timestamp']}: {row['keypress_count']} keys, {row['mouse_click_count']} clicks")
         else:
             print("No input activity recorded.")
         
-        print("\n" + "=" * 50)
+        print("\\n" + "=" * 50)
         print("INPUT SUMMARY:")
         summary = logger.get_input_summary(hours=1)
         
         print(f"Total records: {summary['total_records']}")
         print(f"Total keypresses: {summary['total_keypresses']}")
         print(f"Total clicks: {summary['total_clicks']}")
-        print(f"Total scrolls: {summary['total_scrolls']}")
-        print(f"Total moves: {summary['total_moves']}")
         print(f"Total inputs: {summary['total_inputs']}")
-        print(f"Average keypresses per interval: {summary['avg_keypresses']:.1f}")
-        print(f"Average clicks per interval: {summary['avg_clicks']:.1f}")
-        print(f"Average total inputs per interval: {summary['avg_total_inputs']:.1f}")
-        print(f"Max inputs in one interval: {summary['max_inputs']}")
-        print(f"Min inputs in one interval: {summary['min_inputs']}")
         
         # Export to CSV if requested
         if args.export_csv:
             logger.export_to_csv(args.export_csv, hours=1)
-            print(f"\nExported data to: {args.export_csv}")
+            print(f"\\nExported data to: {args.export_csv}")
         
-        print("\n" + "=" * 50)
+        print("\\n" + "=" * 50)
         print("Test completed successfully!")
         
     except KeyboardInterrupt:
-        print("\n\nStopping...")
+        print("\\n\\nStopping...")
         logger.stop()
         print("Test stopped by user.")
     
     except Exception as e:
-        print(f"\nTest failed with error: {e}")
+        print(f"\\nTest failed with error: {e}")
         logger.stop()
 
 if __name__ == "__main__":
-    main() 
+    main()

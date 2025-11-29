@@ -12,12 +12,13 @@ const PRESETS = [
   { label: 'Today', value: 'today' as const },
   { label: '7 Days', value: 'week' as const },
   { label: '30 Days', value: 'month' as const },
+  { label: 'Lifetime', value: 'lifetime' as const },
 ];
 
-export const RangeControl = React.memo<RangeControlProps>(({ 
-  value, 
-  onChange, 
-  className = '' 
+export const RangeControl = React.memo<RangeControlProps>(({
+  value,
+  onChange,
+  className = ''
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
@@ -42,6 +43,10 @@ export const RangeControl = React.memo<RangeControlProps>(({
         from = now - (30 * 24 * 60 * 60 * 1000);
         to = now;
         break;
+      case 'lifetime':
+        from = 0;
+        to = now;
+        break;
     }
 
     onChange({
@@ -63,16 +68,18 @@ export const RangeControl = React.memo<RangeControlProps>(({
 
   const formatRange = () => {
     if (!value.from || !value.to) return 'Select Range';
-    
+
     const fromDate = new Date(value.from);
     const toDate = new Date(value.to);
-    
+
     if (value.preset === 'today') {
       return 'Today';
     } else if (value.preset === 'week') {
       return 'Last 7 Days';
     } else if (value.preset === 'month') {
       return 'Last 30 Days';
+    } else if (value.preset === 'lifetime') {
+      return 'All Time';
     } else {
       // Custom range
       return `${fromDate.toLocaleDateString()} - ${toDate.toLocaleDateString()}`;
@@ -97,9 +104,8 @@ export const RangeControl = React.memo<RangeControlProps>(({
               <button
                 key={preset.value}
                 onClick={() => handlePresetSelect(preset.value)}
-                className={`w-full text-left px-3 py-2 text-sm rounded hover:bg-surface-hover transition-colors ${
-                  value.preset === preset.value ? 'text-brand' : 'text-text'
-                }`}
+                className={`w-full text-left px-3 py-2 text-sm rounded hover:bg-surface-hover transition-colors ${value.preset === preset.value ? 'text-brand' : 'text-text'
+                  }`}
               >
                 {preset.label}
               </button>

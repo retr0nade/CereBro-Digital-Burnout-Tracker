@@ -114,9 +114,10 @@ const getInsightStatus = (suggestions: InsightSuggestion[]): 'ok' | 'warn' | 'da
 // Helper functions to convert backend data to store format
 const convertMetricsToPoints = (usage: any[]): Point[] => {
   return usage.map((item: any) => ({
-    t: item[2] * 1000, // Convert to milliseconds
-    focus: item[3] || 0, // Duration in seconds
-    totalInputs: Math.floor(Math.random() * 100) // Placeholder - would come from backend
+    t: item[1] * 1000, // Start time
+    focus: item[3] || 0, // Duration
+    distract: 0, // TODO: Calculate from category if needed for chart
+    totalInputs: 0 // Inputs not available in usage stream
   }));
 };
 
@@ -182,11 +183,17 @@ export default function Dashboard() {
       let params = '';
 
       if (range.preset === 'week') {
-        endpoint = `${config.API_URL}/api/analytics`;
-        params = '?days=7';
+        endpoint = `${config.API_URL}/api/metrics`;
+        params = '?range=weekly';
       } else if (range.preset === 'month') {
-        endpoint = `${config.API_URL}/api/analytics`;
-        params = '?days=30';
+        endpoint = `${config.API_URL}/api/metrics`;
+        params = '?range=monthly';
+      } else if (range.preset === 'lifetime') {
+        endpoint = `${config.API_URL}/api/metrics`;
+        params = '?range=lifetime';
+      } else {
+        endpoint = `${config.API_URL}/api/metrics`;
+        params = '?range=daily';
       }
 
       const response = await fetch(endpoint + params);

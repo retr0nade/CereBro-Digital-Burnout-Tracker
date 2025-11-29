@@ -127,16 +127,17 @@ class CerebroDB:
             conn.commit()
             return cursor.lastrowid
     
-    def get_app_usage(self, limit: int = 100) -> List[Dict]:
+    def get_app_usage(self, limit: int = 100, start_time: int = 0) -> List[Dict]:
         """Get recent app usage records"""
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT * FROM app_usage 
+                WHERE start_time >= ?
                 ORDER BY start_time DESC 
                 LIMIT ?
-            """, (limit,))
+            """, (start_time, limit))
             return [dict(row) for row in cursor.fetchall()]
     
     # Idle Periods Methods
@@ -151,16 +152,17 @@ class CerebroDB:
             conn.commit()
             return cursor.lastrowid
     
-    def get_idle_periods(self, limit: int = 100) -> List[Dict]:
+    def get_idle_periods(self, limit: int = 100, start_time: int = 0) -> List[Dict]:
         """Get recent idle periods"""
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT * FROM idle_periods 
+                WHERE start_time >= ?
                 ORDER BY start_time DESC 
                 LIMIT ?
-            """, (limit,))
+            """, (start_time, limit))
             return [dict(row) for row in cursor.fetchall()]
     
     # Input Activity Methods
@@ -175,16 +177,17 @@ class CerebroDB:
             conn.commit()
             return cursor.lastrowid
     
-    def get_input_activity(self, limit: int = 100) -> List[Dict]:
+    def get_input_activity(self, limit: int = 100, start_time: int = 0) -> List[Dict]:
         """Get recent input activity"""
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT * FROM input_activity 
+                WHERE timestamp >= ?
                 ORDER BY timestamp DESC 
                 LIMIT ?
-            """, (limit,))
+            """, (start_time, limit))
             return [dict(row) for row in cursor.fetchall()]
     
     # Focus Sessions Methods
@@ -199,16 +202,17 @@ class CerebroDB:
             conn.commit()
             return cursor.lastrowid
     
-    def get_focus_sessions(self, limit: int = 100) -> List[Dict]:
+    def get_focus_sessions(self, limit: int = 100, start_time: int = 0) -> List[Dict]:
         """Get recent focus sessions"""
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT * FROM focus_sessions 
+                WHERE start_time >= ?
                 ORDER BY start_time DESC 
                 LIMIT ?
-            """, (limit,))
+            """, (start_time, limit))
             return [dict(row) for row in cursor.fetchall()]
     
     # Breaks Methods
@@ -223,16 +227,17 @@ class CerebroDB:
             conn.commit()
             return cursor.lastrowid
     
-    def get_breaks(self, limit: int = 100) -> List[Dict]:
+    def get_breaks(self, limit: int = 100, start_time: int = 0) -> List[Dict]:
         """Get recent breaks"""
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT * FROM breaks 
+                WHERE start_time >= ?
                 ORDER BY start_time DESC 
                 LIMIT ?
-            """, (limit,))
+            """, (start_time, limit))
             return [dict(row) for row in cursor.fetchall()]
     
     # Browser Activity Methods

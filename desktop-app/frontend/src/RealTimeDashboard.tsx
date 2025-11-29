@@ -196,7 +196,7 @@ export default function RealTimeDashboard() {
       actions.appendRealtime({
         t: event.timestamp * 1000,
         focus: event.data.duration,
-        totalInputs: Math.floor(Math.random() * 50) + 10 // Placeholder
+        totalInputs: 0 // Inputs handled by input_activity event
       });
       // Bump app switches counter
       actions.bumpCounter("appSwitches");
@@ -234,7 +234,7 @@ export default function RealTimeDashboard() {
       actions.appendRealtime({
         t: event.timestamp * 1000,
         focus: event.data.duration,
-        totalInputs: Math.floor(Math.random() * 20) + 5
+        totalInputs: 0
       });
     });
   }, [rafBatcher, actions]);

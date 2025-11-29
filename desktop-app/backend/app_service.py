@@ -1,5 +1,5 @@
 import threading, time, sqlite3, json, os, platform
-from datetime import datetime
+from datetime import datetime, timedelta
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from flask_socketio import SocketIO
@@ -227,12 +227,66 @@ def collect_idle():
         time.sleep(15)
 
 @app.route('/api/metrics', methods=["GET"])
+@app.route('/api/metrics', methods=["GET"])
 def api_metrics():
     # Return all metrics for dashboard
     try:
-        # Pull from CerebroDB and normalize to the array-based shape the frontend expects
-        raw_usage = unified_db.get_app_usage(limit=200) or []
-        raw_idle = unified_db.get_idle_periods(limit=200) or []
+        # Get time range from request
+        time_range = request.args.get('range', 'daily')
+        
+        # Calculate start time based on range
+        now = datetime.now()
+        if time_range == 'daily':
+            # Start of today (00:00)
+            start_dt = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            start_time = int(start_dt.timestamp())
+        elif time_range == 'weekly':
+            # Start of current week (Monday)
+            start_dt = (now - timedelta(days=now.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
+            start_time = int(start_dt.timestamp())
+        elif time_range == 'monthly':
+            # Start of current month
+            start_dt = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            start_time = int(start_dt.timestamp())
+        elif time_range == 'lifetime':
+            # All time (0)
+            start_time = 0
+        else:
+            # Default to daily
+            start_dt = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            start_time = int(start_dt.timestamp())
+
+        # Pull from CerebroDB with start_time filter
+        # Increase limit for lifetime/monthly views
+        limit = 10000 if time_range in ['monthly', 'lifetime'] else 2000
+        
+        raw_usage = unified_db.get_app_usage(limit=limit, start_time=start_time) or []
+        raw_idle = unified_db.get_idle_periods(limit=limit, start_time=start_time) or []
+        raw_input = unified_db.get_input_activity(limit=limit, start_time=start_time) or []
+
+        # Calculate Focus Score
+        total_duration = 0
+        focus_duration = 0
+        
+        # Helper to categorize app (reusing logic from WindowTracker)
+        def categorize(name):
+            name = name.lower()
+            if any(x in name for x in ['code', 'studio', 'pycharm', 'intellij', 'vim', 'terminal', 'excel', 'word', 'notion']):
+                return 'productive'
+            if any(x in name for x in ['youtube', 'netflix', 'steam', 'game', 'facebook', 'instagram']):
+                return 'distracting'
+            return 'neutral'
+
+        for row in raw_usage:
+            duration = row.get('duration', 0)
+            total_duration += duration
+            cat = categorize(row.get('app_name', ''))
+            if cat == 'productive':
+                focus_duration += duration
+            elif cat == 'neutral':
+                focus_duration += (duration * 0.5) # Neutral counts as half focus
+        
+        focus_score = int((focus_duration / total_duration * 100)) if total_duration > 0 else 0
 
         # Convert dict rows to tuples: [app_name, start_time, end_time, duration, category]
         recent_usage = [
@@ -241,7 +295,7 @@ def api_metrics():
                 row.get('start_time'),
                 row.get('end_time'),
                 row.get('duration', 0),
-                None  # category placeholder (not stored in CerebroDB)
+                categorize(row.get('app_name', ''))
             ]
             for row in raw_usage
         ]
@@ -259,20 +313,24 @@ def api_metrics():
 
         total_app_time = sum([row.get('duration', 0) for row in raw_usage])
         total_idle_time = sum([row.get('duration', 0) for row in raw_idle])
+        
+        # Calculate total inputs
+        total_inputs = sum([row.get('total_inputs', 0) for row in raw_input])
 
         return jsonify({
             "recent_usage": recent_usage,
             "recent_idle": recent_idle,
-            "app_switches": [],
-            "focus_score": 85,
+            "app_switches": [], # TODO: Calculate from usage if needed
+            "focus_score": focus_score,
             "burnout_signals": [],
             "metrics_summary": {
                 "app_switches": len(recent_usage),
                 "recent_usage": len(recent_usage),
                 "idle_events": len(recent_idle),
-                "focus_score": 85,
+                "focus_score": focus_score,
                 "total_app_time": total_app_time,
-                "total_idle_time": total_idle_time
+                "total_idle_time": total_idle_time,
+                "total_inputs": total_inputs
             }
         })
     except Exception as e:
@@ -281,15 +339,16 @@ def api_metrics():
             "recent_usage": [],
             "recent_idle": [],
             "app_switches": [],
-            "focus_score": 85,
+            "focus_score": 0,
             "burnout_signals": [],
             "metrics_summary": {
                 "app_switches": 0,
                 "recent_usage": 0,
                 "idle_events": 0,
-                "focus_score": 85,
+                "focus_score": 0,
                 "total_app_time": 0,
-                "total_idle_time": 0
+                "total_idle_time": 0,
+                "total_inputs": 0
             }
         })
 

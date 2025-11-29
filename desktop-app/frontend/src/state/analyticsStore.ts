@@ -23,7 +23,7 @@ export type Connection = {
 export type DashRange = {
   from: number | null;
   to: number | null;
-  preset: "today" | "week" | "month";
+  preset: "today" | "week" | "month" | "lifetime";
 };
 
 export type Counters = {
