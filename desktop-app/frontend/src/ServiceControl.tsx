@@ -16,13 +16,7 @@ interface ServiceControlProps {
   description: string;
 }
 
-declare global {
-  interface Window {
-    __TAURI__: {
-      invoke: (command: string, args?: any) => Promise<any>;
-    };
-  }
-}
+import { invoke, isTauriAvailable } from './utils/tauri';
 
 const ServiceControl: React.FC<ServiceControlProps> = ({ serviceName, displayName, description }) => {
   const [status, setStatus] = useState<ServiceStatus | null>(null);
@@ -31,8 +25,8 @@ const ServiceControl: React.FC<ServiceControlProps> = ({ serviceName, displayNam
 
   const fetchStatus = async () => {
     try {
-      if (window.__TAURI__) {
-        const services = await window.__TAURI__.invoke('get_service_status');
+      if (isTauriAvailable()) {
+        const services = await invoke('get_service_status');
         const serviceStatus = services[serviceName];
         if (serviceStatus) {
           setStatus(serviceStatus);
@@ -47,9 +41,9 @@ const ServiceControl: React.FC<ServiceControlProps> = ({ serviceName, displayNam
     try {
       setLoading(true);
       setError(null);
-      
-      if (window.__TAURI__) {
-        const result = await window.__TAURI__.invoke('start_service', { name: serviceName });
+
+      if (isTauriAvailable()) {
+        const result = await invoke('start_service', { name: serviceName });
         if (result.success) {
           await fetchStatus();
         } else {
@@ -68,9 +62,9 @@ const ServiceControl: React.FC<ServiceControlProps> = ({ serviceName, displayNam
     try {
       setLoading(true);
       setError(null);
-      
-      if (window.__TAURI__) {
-        const result = await window.__TAURI__.invoke('stop_service', { name: serviceName });
+
+      if (isTauriAvailable()) {
+        const result = await invoke('stop_service', { name: serviceName });
         if (result.success) {
           await fetchStatus();
         } else {
@@ -98,21 +92,20 @@ const ServiceControl: React.FC<ServiceControlProps> = ({ serviceName, displayNam
     <div className="card">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center space-x-3">
-          <div 
-            className={`w-3 h-3 rounded-full ${
-              isRunning 
-                ? 'bg-green-500 animate-pulse' 
+          <div
+            className={`w-3 h-3 rounded-full ${isRunning
+                ? 'bg-green-500 animate-pulse'
                 : isStopped
-                ? 'bg-red-500'
-                : 'bg-yellow-500'
-            }`}
+                  ? 'bg-red-500'
+                  : 'bg-yellow-500'
+              }`}
           />
           <div>
             <h3 className="text-lg font-semibold">{displayName}</h3>
             <p className="text-sm muted">{description}</p>
           </div>
         </div>
-        
+
         <div className="flex space-x-2">
           {isRunning ? (
             <button
@@ -138,14 +131,13 @@ const ServiceControl: React.FC<ServiceControlProps> = ({ serviceName, displayNam
         <div className="grid grid-cols-2 gap-4 text-sm">
           <div>
             <span className="muted">Status:</span>
-            <span className={`ml-2 font-medium ${
-              isRunning ? 'text-green-400' : 
-              isStopped ? 'text-red-400' : 'text-yellow-400'
-            }`}>
+            <span className={`ml-2 font-medium ${isRunning ? 'text-green-400' :
+                isStopped ? 'text-red-400' : 'text-yellow-400'
+              }`}>
               {status.status}
             </span>
           </div>
-          
+
           {status.restart_count > 0 && (
             <div>
               <span className="muted">Restarts:</span>
@@ -154,14 +146,14 @@ const ServiceControl: React.FC<ServiceControlProps> = ({ serviceName, displayNam
               </span>
             </div>
           )}
-          
+
           {status.uptime && (
             <div>
               <span className="muted">Uptime:</span>
               <span className="ml-2">{status.uptime}</span>
             </div>
           )}
-          
+
           {status.last_error && (
             <div className="col-span-2">
               <span className="muted">Last Error:</span>

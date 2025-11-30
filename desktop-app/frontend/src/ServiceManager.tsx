@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Monitor, 
-  Clock, 
-  MousePointer, 
-  BarChart3, 
-  Timer, 
+import {
+  Monitor,
+  Clock,
+  MousePointer,
+  BarChart3,
+  Timer,
   Coffee,
   RefreshCw
 } from 'lucide-react';
@@ -24,13 +24,7 @@ interface ServiceStatus {
   icon?: React.ReactNode;
 }
 
-declare global {
-  interface Window {
-    __TAURI__: {
-      invoke: (command: string, args?: any) => Promise<any>;
-    };
-  }
-}
+import { invoke, isTauriAvailable } from './utils/tauri';
 
 export default function ServiceManager() {
   const [services, setServices] = useState<ServiceStatus[]>([]);
@@ -81,9 +75,9 @@ export default function ServiceManager() {
       setLoading(true);
       setError(null);
 
-      if (window.__TAURI__) {
-        const result = await window.__TAURI__.invoke('get_service_status');
-        
+      if (isTauriAvailable()) {
+        const result = await invoke('get_service_status');
+
         const serviceStatuses: ServiceStatus[] = serviceDefinitions.map(service => {
           const status = result[service.name] || {};
           return {
@@ -113,10 +107,10 @@ export default function ServiceManager() {
       const serviceKey = serviceDefinitions.find(s => s.displayName === serviceName)?.name;
       if (!serviceKey) return;
 
-      if (window.__TAURI__) {
-        await window.__TAURI__.invoke('restart_service', { name: serviceKey });
+      if (isTauriAvailable()) {
+        await invoke('restart_service', { name: serviceKey });
         toast.notify('success', `${serviceName} restart initiated`);
-        
+
         // Refresh status after a short delay
         setTimeout(fetchServiceStatus, 2000);
       }
@@ -161,7 +155,7 @@ export default function ServiceManager() {
           <div className="p-4">
             <h3 className="text-lg font-semibold text-red-400 mb-2">Connection Error</h3>
             <p className="text-red-300 text-sm">{error}</p>
-            <button 
+            <button
               onClick={fetchServiceStatus}
               className="mt-3 px-3 py-1.5 rounded-lg bg-red-500/20 text-red-300 hover:bg-red-500/30 border border-red-500/40 text-sm"
             >

@@ -81,13 +81,7 @@ interface InsightsData {
   generated_at: number;
 }
 
-declare global {
-  interface Window {
-    __TAURI__: {
-      invoke: (command: string, args?: any) => Promise<any>;
-    };
-  }
-}
+import { invoke, isTauriAvailable } from './utils/tauri';
 
 // Helper functions for metric tones
 const getFocusScoreTone = (score: number): 'default' | 'ok' | 'warn' | 'danger' => {
@@ -157,9 +151,9 @@ export default function Dashboard() {
     setError(null);
 
     // Try Tauri command first
-    if (window.__TAURI__) {
+    if (isTauriAvailable()) {
       try {
-        const result = await window.__TAURI__.invoke('get_system_metrics');
+        const result = await invoke('get_system_metrics');
         // Update store with fetched data
         actions.setDashboardSeries(convertMetricsToPoints(result.recent_usage || []));
         actions.setApps(convertUsageToAppSlices(result.recent_usage || []));
@@ -434,10 +428,6 @@ export default function Dashboard() {
             value={dashRange}
             onChange={handleRangeChange}
           />
-          <div className={`px-3 py-1.5 rounded text-dashboard-sm ${backendConnected ? 'bg-green-500/20 text-green-300 border border-green-500/40' : 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/40'
-            }`}>
-            {backendConnected ? 'Connected (Tauri)' : 'Connected via HTTP'}
-          </div>
         </div>
       </div>
 

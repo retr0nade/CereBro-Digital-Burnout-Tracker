@@ -22,6 +22,8 @@ import MetricTile from './ui/MetricTile';
 import { useRAFBatching, useRenderTracker } from './utils/performance';
 import { Clock, MousePointer, Activity, BarChart3 } from 'lucide-react';
 
+import { invoke, isTauriAvailable } from './utils/tauri';
+
 interface RealTimeMetrics {
   appUsage: Array<{
     app_name: string;
@@ -146,9 +148,9 @@ export default function RealTimeDashboard() {
       setError(null);
 
       // Try Tauri command first
-      if (window.__TAURI__) {
+      if (isTauriAvailable()) {
         try {
-          const result = await window.__TAURI__.invoke('get_system_metrics');
+          const result = await invoke('get_system_metrics');
           // Update store with fetched data
           actions.setCounters({
             focusMinutes: Math.round((result.metrics_summary?.total_app_time || 0) / 60),

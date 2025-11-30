@@ -85,18 +85,46 @@ async fn start_backend_command(app: tauri::AppHandle) -> Result<(), String> {
     // Start backend in a separate thread
     let status_arc = Arc::clone(&backend_state.status);
     std::thread::spawn(move || {
-        // Start Python backend
-        let result = Command::new("python")
+        // Try to find the backend directory
+        let possible_paths = vec![
+            "../../backend",
+            "../../../backend",
+            "../../../../backend",
+            "../backend",
+            "./backend",
+            "backend"
+        ];
+
+        let mut backend_dir = "../../backend"; // Default fallback
+        for path in &possible_paths {
+            let full_path = std::path::Path::new(path).join("app_service.py");
+            if full_path.exists() {
+                backend_dir = path;
+                break;
+            }
+        }
+
+        // Try python first, then python3
+        let mut command = "python";
+        let mut result = Command::new(command)
             .arg("app_service.py")
-            .current_dir("../../backend")
+            .current_dir(backend_dir)
             .output();
+
+        if result.is_err() {
+             command = "python3";
+             result = Command::new(command)
+                .arg("app_service.py")
+                .current_dir(backend_dir)
+                .output();
+        }
 
         // Update status based on result
         let mut status = status_arc.lock().unwrap();
         match result {
-            Ok(_) => {
+            Ok(output) => {
                 status.running = false;
-                status.error = Some("Backend stopped".to_string());
+                status.error = Some(format!("Backend stopped. Stderr: {}", String::from_utf8_lossy(&output.stderr)));
             }
             Err(e) => {
                 status.running = false;
@@ -127,7 +155,7 @@ async fn get_backend_status(app: tauri::AppHandle) -> Result<BackendStatus, Stri
         .build()
         .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
     
-    let is_running = match client.get("http://localhost:5005/api/health").send().await {
+    let is_running = match client.get("http://127.0.0.1:5005/api/health").send().await {
         Ok(response) => response.status().is_success(),
         Err(e) => {
             println!("Backend health check failed: {:?}", e);
@@ -154,7 +182,7 @@ async fn get_backend_status(app: tauri::AppHandle) -> Result<BackendStatus, Stri
 #[tauri::command]
 async fn check_backend_health() -> Result<bool, String> {
     let client = reqwest::Client::new();
-    match client.get("http://localhost:5005/api/health").send().await {
+    match client.get("http://127.0.0.1:5005/api/health").send().await {
         Ok(response) => Ok(response.status().is_success()),
         Err(_) => Ok(false),
     }
@@ -167,7 +195,7 @@ async fn get_system_metrics() -> Result<serde_json::Value, String> {
         .build()
         .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
     
-    match client.get("http://localhost:5005/api/metrics").send().await {
+    match client.get("http://127.0.0.1:5005/api/metrics").send().await {
         Ok(response) => {
             if response.status().is_success() {
                 response.json().await.map_err(|e| format!("Failed to parse JSON: {}", e))
@@ -188,7 +216,7 @@ async fn start_service(name: String) -> Result<ServiceControlResponse, String> {
     
     // Call the Python backend API to start the service
     let response = client
-        .post(&format!("http://localhost:5005/api/service/{}/start", name))
+        .post(&format!("http://127.0.0.1:5005/api/service/{}/start", name))
         .send()
         .await
         .map_err(|e| format!("Failed to connect to backend: {}", e))?;
@@ -211,7 +239,7 @@ async fn stop_service(name: String) -> Result<ServiceControlResponse, String> {
     
     // Call the Python backend API to stop the service
     let response = client
-        .post(&format!("http://localhost:5005/api/service/{}/stop", name))
+        .post(&format!("http://127.0.0.1:5005/api/service/{}/stop", name))
         .send()
         .await
         .map_err(|e| format!("Failed to connect to backend: {}", e))?;
@@ -234,7 +262,7 @@ async fn get_service_status() -> Result<HashMap<String, ServiceStatus>, String> 
     
     // Call the Python backend API to get service status
     let response = client
-        .get("http://localhost:5005/api/status")
+        .get("http://127.0.0.1:5005/api/status")
         .send()
         .await
         .map_err(|e| format!("Failed to connect to backend: {}", e))?;

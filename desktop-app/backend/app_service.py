@@ -1160,7 +1160,7 @@ if __name__ == "__main__":
     api_config = config.get_api_config()
     
     # Set up server configuration
-    host = api_config.get('host', 'localhost')
+    host = api_config.get('host', '127.0.0.1')
     port = api_config.get('port', 5000)
     debug = api_config.get('debug', False)
     
