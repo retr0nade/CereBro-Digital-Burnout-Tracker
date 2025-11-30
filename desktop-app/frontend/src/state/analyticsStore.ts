@@ -190,7 +190,8 @@ export const useAnalytics = create<AnalyticsState>()(
       partialize: (state) => ({
         dashRange: state.dashRange,
         timeseries: {
-          dashboard: state.timeseries.dashboard
+          dashboard: state.timeseries.dashboard,
+          realtime: [] // Ensure realtime key exists on rehydration
         },
         apps: state.apps,
         counters: state.counters
