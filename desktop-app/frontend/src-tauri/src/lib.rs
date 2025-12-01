@@ -31,6 +31,7 @@ struct ServiceControlResponse {
 
 struct BackendState {
     status: Arc<Mutex<BackendStatus>>,
+    child_process: Arc<Mutex<Option<std::process::Child>>>,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -41,6 +42,7 @@ pub fn run() {
             port: 5005,
             error: None,
         })),
+        child_process: Arc::new(Mutex::new(None)),
     };
 
     tauri::Builder::default()
@@ -75,70 +77,115 @@ pub fn run() {
 async fn start_backend_command(app: tauri::AppHandle) -> Result<(), String> {
     let backend_state = app.state::<BackendState>();
     
-    // Update status to running
+    // Check if already running
     {
-        let mut status = backend_state.status.lock().unwrap();
-        status.running = true;
-        status.error = None;
+        let child_guard = backend_state.child_process.lock().unwrap();
+        if child_guard.is_some() {
+            return Ok(()); // Already running
+        }
     }
+
+    // Try to find the backend directory
+    let possible_paths = vec![
+        "../../backend",
+        "../../../backend",
+        "../../../../backend",
+        "../backend",
+        "./backend",
+        "backend"
+    ];
+
+    let mut backend_dir = "../../backend"; // Default fallback
+    for path in &possible_paths {
+        let full_path = std::path::Path::new(path).join("app_service.py");
+        if full_path.exists() {
+            backend_dir = path;
+            break;
+        }
+    }
+
+    // Try python first, then python3
+    let mut command = Command::new("python");
+    command.arg("app_service.py").current_dir(backend_dir);
     
-    // Start backend in a separate thread
-    let status_arc = Arc::clone(&backend_state.status);
-    std::thread::spawn(move || {
-        // Try to find the backend directory
-        let possible_paths = vec![
-            "../../backend",
-            "../../../backend",
-            "../../../../backend",
-            "../backend",
-            "./backend",
-            "backend"
-        ];
+    // Configure for Windows to hide console window
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
 
-        let mut backend_dir = "../../backend"; // Default fallback
-        for path in &possible_paths {
-            let full_path = std::path::Path::new(path).join("app_service.py");
-            if full_path.exists() {
-                backend_dir = path;
-                break;
+    let child_result = command.spawn();
+
+    match child_result {
+        Ok(child) => {
+            // Store the child process
+            let mut child_guard = backend_state.child_process.lock().unwrap();
+            *child_guard = Some(child);
+            
+            // Update status
+            let mut status = backend_state.status.lock().unwrap();
+            status.running = true;
+            status.error = None;
+            Ok(())
+        },
+        Err(e) => {
+            // Try python3 fallback
+            let mut command3 = Command::new("python3");
+            command3.arg("app_service.py").current_dir(backend_dir);
+            
+            #[cfg(windows)]
+            {
+                use std::os::windows::process::CommandExt;
+                const CREATE_NO_WINDOW: u32 = 0x08000000;
+                command3.creation_flags(CREATE_NO_WINDOW);
+            }
+
+            match command3.spawn() {
+                Ok(child) => {
+                    let mut child_guard = backend_state.child_process.lock().unwrap();
+                    *child_guard = Some(child);
+                    
+                    let mut status = backend_state.status.lock().unwrap();
+                    status.running = true;
+                    status.error = None;
+                    Ok(())
+                },
+                Err(e2) => {
+                    let mut status = backend_state.status.lock().unwrap();
+                    status.running = false;
+                    status.error = Some(format!("Failed to start backend: {} / {}", e, e2));
+                    Err(format!("Failed to start backend: {} / {}", e, e2))
+                }
             }
         }
-
-        // Try python first, then python3
-        let mut command = "python";
-        let mut result = Command::new(command)
-            .arg("app_service.py")
-            .current_dir(backend_dir)
-            .output();
-
-        if result.is_err() {
-             command = "python3";
-             result = Command::new(command)
-                .arg("app_service.py")
-                .current_dir(backend_dir)
-                .output();
-        }
-
-        // Update status based on result
-        let mut status = status_arc.lock().unwrap();
-        match result {
-            Ok(output) => {
-                status.running = false;
-                status.error = Some(format!("Backend stopped. Stderr: {}", String::from_utf8_lossy(&output.stderr)));
-            }
-            Err(e) => {
-                status.running = false;
-                status.error = Some(format!("Failed to start backend: {}", e));
-            }
-        }
-    });
-    
-    Ok(())
+    }
 }
 
 #[tauri::command]
 async fn stop_backend_command(app: tauri::AppHandle) -> Result<(), String> {
     let backend_state = app.state::<BackendState>();
+    
+    // First try to call the shutdown endpoint gracefully
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(2))
+        .build()
+        .unwrap_or_else(|_| reqwest::Client::new());
+        
+    let _ = client.post("http://127.0.0.1:5005/api/shutdown").send().await;
+
+    // Give it a moment to shut down
+    std::thread::sleep(std::time::Duration::from_millis(1000));
+
+    // Then ensure the process is killed if we have a handle
+    let mut child_guard = backend_state.child_process.lock().unwrap();
+    if let Some(mut child) = child_guard.take() {
+        // Kill the process
+        let _ = child.kill();
+        let _ = child.wait(); // Prevent zombie process
+    }
+
     let mut status = backend_state.status.lock().unwrap();
     status.running = false;
     status.error = Some("Backend stopped by user".to_string());

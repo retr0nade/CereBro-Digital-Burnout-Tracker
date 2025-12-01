@@ -1151,6 +1151,34 @@ def api_stop_service(service_name):
             "service_name": service_name
         }), 500
 
+@app.route('/api/shutdown', methods=["POST"])
+def api_shutdown():
+    """Shutdown the server"""
+    try:
+        # Stop all services first
+        global window_tracker, idle_monitor, input_logger, screen_time_tracker, focus_timer, break_monitor
+        
+        if window_tracker: window_tracker.stop()
+        if idle_monitor: idle_monitor.stop()
+        if input_logger: input_logger.stop()
+        if screen_time_tracker: screen_time_tracker.stop()
+        if break_monitor: break_monitor.stop()
+        
+        # Force exit the process
+        # We use a thread to exit after a short delay to allow the response to be sent
+        def delayed_exit():
+            time.sleep(1)
+            os._exit(0)
+            
+        threading.Thread(target=delayed_exit, daemon=True).start()
+        
+        return jsonify({
+            "success": True,
+            "message": "Server shutting down..."
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == "__main__":
     threading.Thread(target=collect_app_usage, daemon=True).start()
     threading.Thread(target=collect_idle, daemon=True).start()

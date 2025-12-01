@@ -10,6 +10,7 @@ import LoadingState from './ui/LoadingState';
 import { FocusVsDistractionLine, IdleBreakBar, DonutAppUsage } from './charts';
 import { useThrottledValue } from './utils/smoothNumber';
 import ActivityTimeline from './components/ActivityTimeline';
+import SmartInsights from './components/SmartInsights';
 import { useScreenshotMode, useScreenshotData, getScreenshotSeedData } from './utils/screenshotMode';
 import {
   useAnalytics,
@@ -351,7 +352,8 @@ export default function Dashboard() {
     return <LoadingState />;
   }
 
-  if (error) {
+  // Show error only if we have no data to show
+  if (error && (!data || data.length === 0)) {
     return (
       <div className="max-w-7xl mx-auto mt-4 p-4">
         <div className="card border border-red-500/40">
@@ -411,7 +413,14 @@ export default function Dashboard() {
     <div className="dashboard-content max-w-7xl mx-auto mt-4 p-4">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-[22px] md:text-2xl font-semibold tracking-[-0.01em]">Dashboard</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-[22px] md:text-2xl font-semibold tracking-[-0.01em]">Dashboard</h1>
+          {error && (
+            <span className="px-2 py-0.5 rounded text-xs font-medium bg-yellow-500/10 text-yellow-500 border border-yellow-500/20">
+              Offline Mode
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-4">
           <RangeControl
             value={dashRange}
@@ -423,20 +432,15 @@ export default function Dashboard() {
       {/* 12-Column Grid Layout */}
       <div className="grid grid-cols-12 gap-6">
 
-        {/* Row 1: AI Insights Banner - Full Width */}
-        {insights?.suggestions && insights.suggestions.length > 0 && (
-          <div className="col-span-12">
-            <InsightBanner
-              title="AI Insights"
-              insights={insights.suggestions}
-              status={getInsightStatus(insights.suggestions)}
-              defaultExpanded={false}
-            />
-          </div>
-        )}
-
-        {/* Burnout Signals Banner - Full Width */}
-        {/* TODO: Add burnout signals to store when available */}
+        {/* Row 1: Smart Insights - Full Width */}
+        <div className="col-span-12">
+          <SmartInsights
+            focusScore={focusScore(counters.focusMinutes, counters.distractMinutes)}
+            appSwitches={counters.appSwitches}
+            idleEvents={counters.idleEvents}
+            totalMinutes={counters.totalMinutes}
+          />
+        </div>
 
         {/* Row 2: KPI Metrics - Four Cards */}
         <div className="col-span-12 sm:col-span-6 xl:col-span-3">
