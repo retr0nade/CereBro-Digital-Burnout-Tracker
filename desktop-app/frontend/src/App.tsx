@@ -8,6 +8,7 @@ import DataExport from "./DataExport";
 import AppShell from "./layout/AppShell";
 import DebugPanel from "./components/DebugPanel";
 import ParticleEffect from "./components/ParticleEffect";
+import LoadingState from "./ui/LoadingState";
 import { toast } from './services/eventHandlers';
 import { useCursorTracking } from './hooks/useCursorTracking';
 import { useScreenshotMode, ScreenshotModeWrapper } from './utils/screenshotMode';
@@ -28,6 +29,9 @@ export default function App() {
     port: 5005,
     error: undefined
   });
+
+  const [isStarting, setIsStarting] = useState(false);
+  const [isStopping, setIsStopping] = useState(false);
 
   // Initialize cursor tracking for animated background
   useCursorTracking();
@@ -58,12 +62,19 @@ export default function App() {
   const startBackend = async () => {
     try {
       if (isTauriAvailable()) {
+        setIsStarting(true);
         await invoke('start_backend_command');
-        setTimeout(checkBackendStatus, 1000);
+
+        // Artificial delay to show loading state and allow backend to init
+        await new Promise(resolve => setTimeout(resolve, 3000));
+
+        await checkBackendStatus();
+        setIsStarting(false);
         toast.notify('success', 'Backend started');
       }
     } catch (error) {
       console.error('Failed to start backend:', error);
+      setIsStarting(false);
       toast.notify('error', `Failed to start backend: ${error}`);
     }
   };
@@ -71,12 +82,19 @@ export default function App() {
   const stopBackend = async () => {
     try {
       if (isTauriAvailable()) {
+        setIsStopping(true);
         await invoke('stop_backend_command');
-        setTimeout(checkBackendStatus, 1000);
+
+        // Artificial delay to show stopping animation
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
+        await checkBackendStatus();
+        setIsStopping(false);
         toast.notify('success', 'Backend stopped');
       }
     } catch (error) {
       console.error('Failed to stop backend:', error);
+      setIsStopping(false);
       toast.notify('error', 'Failed to stop backend');
     }
   };
@@ -139,9 +157,28 @@ export default function App() {
         theme={theme}
         onThemeToggle={handleThemeToggle}
       >
-        {renderCurrentView()}
+        {isStarting ? (
+          <LoadingState
+            autoAdvance={true}
+            duration={600}
+            onComplete={() => { }}
+          />
+        ) : isStopping ? (
+          <LoadingState
+            autoAdvance={true}
+            duration={500}
+            steps={[
+              "Stopping background services...",
+              "Saving session data...",
+              "Disconnecting...",
+              "Done"
+            ]}
+            onComplete={() => { }}
+          />
+        ) : (
+          renderCurrentView()
+        )}
       </AppShell>
-
       {/* Toast notifications */}
       <ScreenshotModeWrapper hideInScreenshot={screenshotMode.hideToastNotifications}>
         <div className="fixed bottom-4 right-4 space-y-2 z-50 toast-notifications">

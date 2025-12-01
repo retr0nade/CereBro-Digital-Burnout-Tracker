@@ -19,6 +19,7 @@ import { config } from './config';
 import { useScreenshotMode, getScreenshotSeedData } from './utils/screenshotMode';
 import ChartCard from './ui/ChartCard';
 import MetricTile from './ui/MetricTile';
+import LoadingState from './ui/LoadingState';
 import { useRAFBatching, useRenderTracker } from './utils/performance';
 import { Clock, MousePointer, Activity, BarChart3 } from 'lucide-react';
 
@@ -285,28 +286,19 @@ export default function RealTimeDashboard() {
   }, [handleAppUsageUpdate, handleIdleStatus, handleInputActivity, handleFocusSessionUpdate, handleBreakUpdate]);
 
   if (loading) {
-    return (
-      <div className="max-w-6xl mx-auto mt-4 p-4">
-        <div className="card">
-          <div className="animate-pulse">
-            <div className="h-4 bg-neutral-700 rounded w-1/4 mb-4"></div>
-            <div className="h-32 bg-neutral-800 rounded"></div>
-          </div>
-        </div>
-      </div>
-    );
+    return <LoadingState />;
   }
 
   if (error) {
     return (
       <div className="max-w-6xl mx-auto mt-4 p-4">
         <div className="card border border-red-500/40">
-          <h2 className="text-xl font-bold text-red-400 mb-2">Connection Error</h2>
-          <p className="text-red-300">{error}</p>
+          <h2 className="text-xl font-bold text-red-400 mb-2">Trackers not turned on yet</h2>
+          <p className="text-red-300">Please start the backend service to begin tracking.</p>
           <p className="text-sm text-red-400 mt-2">
             {backendConnected
               ? 'Make sure the backend server is running on port 5005'
-              : 'Backend service is not available'
+              : 'Service is not available'
             }
           </p>
           <motion.button

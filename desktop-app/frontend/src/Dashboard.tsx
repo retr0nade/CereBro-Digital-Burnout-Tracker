@@ -6,6 +6,7 @@ import GlassCard from './ui/GlassCard';
 import SectionHeader from './ui/SectionHeader';
 import ChartCard from './ui/ChartCard';
 import { EmptyStateBox } from './ui/InfoBox';
+import LoadingState from './ui/LoadingState';
 import { FocusVsDistractionLine, IdleBreakBar, DonutAppUsage } from './charts';
 import { useThrottledValue } from './utils/smoothNumber';
 import ActivityTimeline from './components/ActivityTimeline';
@@ -347,31 +348,19 @@ export default function Dashboard() {
   };
 
   if (loading) {
-    return (
-      <div className="max-w-7xl mx-auto mt-4 p-4">
-        <div className="card">
-          <div className="animate-pulse">
-            <div className="h-4 bg-neutral-700 rounded w-1/4 mb-4"></div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="h-64 bg-neutral-800 rounded"></div>
-              <div className="h-64 bg-neutral-800 rounded"></div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+    return <LoadingState />;
   }
 
   if (error) {
     return (
       <div className="max-w-7xl mx-auto mt-4 p-4">
         <div className="card border border-red-500/40">
-          <h2 className="text-xl font-bold text-red-400 mb-2">Connection Error</h2>
-          <p className="text-red-300">{error}</p>
+          <h2 className="text-xl font-bold text-red-400 mb-2">Trackers not turned on yet</h2>
+          <p className="text-red-300">Please start the backend service to begin tracking.</p>
           <p className="text-sm text-red-400 mt-2">
             {backendConnected
               ? 'Make sure the backend server is running on port 5005'
-              : 'Backend service is not available'
+              : 'Service is not available'
             }
           </p>
           <button
