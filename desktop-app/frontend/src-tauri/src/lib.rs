@@ -69,8 +69,19 @@ pub fn run() {
             stop_service,
             get_service_status
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app_handle, event| match event {
+            tauri::RunEvent::Exit => {
+                let backend_state = app_handle.state::<BackendState>();
+                let mut child_guard = backend_state.child_process.lock().unwrap();
+                if let Some(mut child) = child_guard.take() {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                }
+            }
+            _ => {}
+        });
 }
 
 #[tauri::command]
@@ -83,6 +94,16 @@ async fn start_backend_command(app: tauri::AppHandle) -> Result<(), String> {
         if child_guard.is_some() {
             return Ok(()); // Already running
         }
+    }
+
+    // Ensure port 5005 is free by killing any process using it
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        let _ = Command::new("cmd")
+            .args(&["/C", "for /f \"tokens=5\" %a in ('netstat -aon ^| findstr :5005') do taskkill /f /pid %a"])
+            .creation_flags(0x08000000) // CREATE_NO_WINDOW
+            .output();
     }
 
     // Try to find the backend directory
