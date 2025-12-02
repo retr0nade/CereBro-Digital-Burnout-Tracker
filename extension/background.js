@@ -7,16 +7,52 @@ const siteCategories = {
   // ...add more as you wish
 };
 
-// == GLOBALS (ONLY IN-MEMORY FOR LIVE TAB TIMING) ==
-let activeTabs = {};    // tabId: { start, domain, total }
-let lastTabId = null;
+// == STATE MANAGEMENT ==
+// In-memory cache of state, populated on startup
+let state = {
+  activeTabs: {},
+  lastTabId: null,
+};
 
 function getDomain(url) {
   try { return new URL(url).hostname; } catch { return "unknown"; }
 }
 function now() { return Date.now(); }
 
-// == SESSION STORAGE RESET ONLY ON EXTENSION INSTALL/RELOAD ==
+// Load state on startup
+async function loadState() {
+  try {
+    const data = await chrome.storage.local.get(['activeTabs', 'lastTabId']);
+    if (data.activeTabs) state.activeTabs = data.activeTabs;
+    if (data.lastTabId) state.lastTabId = data.lastTabId;
+    console.log("State loaded:", state);
+  } catch (e) {
+    console.error("Failed to load state:", e);
+  }
+}
+
+// Save state helper
+function saveState() {
+  chrome.storage.local.set({
+    activeTabs: state.activeTabs,
+    lastTabId: state.lastTabId
+  });
+}
+
+// Initialize
+loadState();
+
+// == ALARMS (KEEP ALIVE & SYNC) ==
+// Create alarm for periodic sync (approx every 5 seconds)
+chrome.alarms.create("syncLoop", { periodInMinutes: 0.083 });
+
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === "syncLoop") {
+    syncData();
+  }
+});
+
+// == SESSION STORAGE RESET ONLY ON EXTENSION INSTALL ==
 chrome.runtime.onInstalled.addListener(() => {
   chrome.storage.local.set({
     tabSwitches: 0,
@@ -25,39 +61,63 @@ chrome.runtime.onInstalled.addListener(() => {
     tabOpenTimes: [],
     navHistory: {},
     siteVisitHistory: {},
-    siteCategoryStats: { focus: 0, distraction: 0, other: 0 }
+    siteCategoryStats: { focus: 0, distraction: 0, other: 0 },
+    activeTabs: {},
+    lastTabId: null
   });
+  state.activeTabs = {};
+  state.lastTabId = null;
 });
 
 // == CORE TAB TIME & CATEGORY LOGIC ==
-chrome.tabs.onActivated.addListener((activeInfo) => {
+chrome.tabs.onActivated.addListener(async (activeInfo) => {
+  // Ensure state is loaded
+  if (!state.activeTabs) await loadState();
+
   const t = now();
-  if (lastTabId !== null && activeTabs[lastTabId]) {
-    const dt = t - activeTabs[lastTabId].start;
-    activeTabs[lastTabId].total += dt;
-    categorize(activeTabs[lastTabId].domain, dt);
+  if (state.lastTabId !== null && state.activeTabs[state.lastTabId]) {
+    const dt = t - state.activeTabs[state.lastTabId].start;
+    state.activeTabs[state.lastTabId].total += dt;
+    categorize(state.activeTabs[state.lastTabId].domain, dt);
   }
-  chrome.tabs.get(activeInfo.tabId, (tab) => {
+
+  try {
+    const tab = await chrome.tabs.get(activeInfo.tabId);
     const url = tab.url || "about:blank";
     const domain = getDomain(url);
-    if (!activeTabs[activeInfo.tabId]) {
-      activeTabs[activeInfo.tabId] = { start: t, domain, total: 0 };
-    }
-    activeTabs[activeInfo.tabId].start = t;
-    lastTabId = activeInfo.tabId;
 
-    // Increment tab switches in persistent storage
+    if (!state.activeTabs[activeInfo.tabId]) {
+      state.activeTabs[activeInfo.tabId] = { start: t, domain, total: 0 };
+    }
+    state.activeTabs[activeInfo.tabId].start = t;
+    state.lastTabId = activeInfo.tabId;
+
+    saveState();
+
+    // Increment tab switches
     chrome.storage.local.get({ tabSwitches: 0 }, data => {
       chrome.storage.local.set({ tabSwitches: data.tabSwitches + 1 });
     });
-  });
+  } catch (e) {
+    // Tab might be closed or inaccessible
+    console.log("Tab access error:", e);
+  }
 });
 
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   if (changeInfo.status === "complete") {
+    if (!state.activeTabs) await loadState();
+
     const url = tab.url || "about:blank";
     const domain = getDomain(url);
-    activeTabs[tabId] = { start: now(), domain, total: 0 };
+
+    // Update active tab info
+    state.activeTabs[tabId] = {
+      start: now(),
+      domain,
+      total: state.activeTabs[tabId]?.total || 0
+    };
+    saveState();
 
     // --- Repeated visits ---
     chrome.storage.local.get({ siteVisitHistory: {} }, data => {
@@ -72,19 +132,25 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
           type: "repeatSite",
           domain,
           count: visitHistory[domain].length
-        });
+        }).catch(() => { });
       }
     });
   }
 });
 
-chrome.tabs.onRemoved.addListener((tabId) => {
-  if (activeTabs[tabId]) {
+chrome.tabs.onRemoved.addListener(async (tabId) => {
+  if (!state.activeTabs) await loadState();
+
+  if (state.activeTabs[tabId]) {
     const t = now();
-    const dt = t - activeTabs[tabId].start;
-    activeTabs[tabId].total += dt;
-    categorize(activeTabs[tabId].domain, dt);
-    delete activeTabs[tabId];
+    const dt = t - state.activeTabs[tabId].start;
+    state.activeTabs[tabId].total += dt;
+    categorize(state.activeTabs[tabId].domain, dt);
+
+    delete state.activeTabs[tabId];
+    if (state.lastTabId === tabId) state.lastTabId = null;
+
+    saveState();
   }
 });
 
@@ -121,7 +187,7 @@ chrome.webNavigation.onCommitted.addListener(details => {
         type: "rapidNav",
         tabId: details.tabId,
         urls: nh[details.tabId].map(h => h.url)
-      });
+      }).catch(() => { });
     }
   });
 });
@@ -157,10 +223,33 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       chrome.storage.local.set({ idleEvents: data.idleEvents + 1 });
     });
   }
+
+  // == UI DATA PROVIDER: ALL-STATS SNAPSHOT ==
+  if (msg.type === "getStats") {
+    chrome.storage.local.get([
+      'tabSwitches', 'erraticClicks', 'ytLoops', 'tabOpenTimes', 'navHistory',
+      'siteVisitHistory', 'siteCategoryStats', 'scrollBursts',
+      'typingBursts', 'idleEvents'
+    ], stats => {
+      // Add latest tab timing data
+      const t = now();
+      let usage = {};
+      for (let tabId in state.activeTabs) {
+        const rec = state.activeTabs[tabId];
+        usage[tabId] = {
+          domain: rec.domain,
+          total: rec.total + (state.lastTabId == tabId ? (t - rec.start) : 0),
+          start: rec.start
+        };
+      }
+      sendResponse(Object.assign({}, stats, { usage }));
+    });
+    return true; // For async sendResponse
+  }
 });
 
-// == PERIODIC SYNC: PUSH ALL (NEVER RESET ANY STATS!) ==
-setInterval(() => {
+// == SYNC FUNCTION ==
+function syncData() {
   chrome.storage.local.get([
     'tabSwitches', 'erraticClicks', 'ytLoops', 'tabOpenTimes', 'navHistory',
     'siteVisitHistory', 'siteCategoryStats', 'scrollBursts',
@@ -169,17 +258,18 @@ setInterval(() => {
     // Compile live usage (active tabs)
     const t = now();
     let usage = {};
-    for (let tabId in activeTabs) {
-      const rec = activeTabs[tabId];
+
+    for (let tabId in state.activeTabs) {
+      const rec = state.activeTabs[tabId];
       usage[tabId] = {
         domain: rec.domain,
-        total: rec.total + (lastTabId == tabId ? (t - rec.start) : 0),
+        total: rec.total + (state.lastTabId == tabId ? (t - rec.start) : 0),
         start: rec.start
       };
     }
 
     const payload = {
-      usage, // now a dict, not array
+      usage,
       tabSwitches: stats.tabSwitches || 0,
       erraticClicks: stats.erraticClicks || [],
       ytLoops: stats.ytLoops || [],
@@ -195,35 +285,10 @@ setInterval(() => {
 
     fetch("http://localhost:5005/api/extension_data", {
       method: "POST",
-      headers: {"Content-Type": "application/json"},
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
     }).catch((error) => {
-      console.log("Desktop app not running or connection failed:", error.message);
+      // console.log("Desktop app not running or connection failed:", error.message);
     });
   });
-}, 5000);
-
-// == UI DATA PROVIDER: ALL-STATS SNAPSHOT ==
-chrome.runtime.onMessage.addListener((req, sender, sendResponse) => {
-  if (req.type === "getStats") {
-    chrome.storage.local.get([
-      'tabSwitches', 'erraticClicks', 'ytLoops', 'tabOpenTimes', 'navHistory',
-      'siteVisitHistory', 'siteCategoryStats', 'scrollBursts',
-      'typingBursts', 'idleEvents'
-    ], stats => {
-      // Add latest tab timing data
-      const t = now();
-      let usage = {};
-      for (let tabId in activeTabs) {
-        const rec = activeTabs[tabId];
-        usage[tabId] = {
-          domain: rec.domain,
-          total: rec.total + (lastTabId == tabId ? (t - rec.start) : 0),
-          start: rec.start
-        };
-      }
-      sendResponse(Object.assign({}, stats, { usage }));
-    });
-    return true; // For async sendResponse
-  }
-});
+}
