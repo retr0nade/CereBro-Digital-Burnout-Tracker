@@ -7,6 +7,9 @@ declare global {
             core?: {
                 invoke: (command: string, args?: any) => Promise<any>;
             };
+            event?: {
+                listen: <T>(event: string, handler: (event: { payload: T }) => void) => Promise<() => void>;
+            };
         };
     }
 }
@@ -33,6 +36,31 @@ export const invoke = async <T = any>(command: string, args?: any): Promise<T> =
     }
 
     throw new Error('Tauri API is not available. Make sure you are running in a Tauri environment.');
+};
+
+/**
+ * Safely listens to a Tauri event.
+ * @param event The event name to listen to
+ * @param handler The event handler callback
+ * @returns Promise resolving to an unlisten function
+ */
+export const listen = async <T = any>(event: string, handler: (event: { payload: T }) => void): Promise<() => void> => {
+    if (typeof window === 'undefined') {
+        console.warn('Window object is not available, cannot listen to event:', event);
+        return () => { };
+    }
+
+    // Check for Tauri event API
+    if (window.__TAURI__?.event?.listen) {
+        return window.__TAURI__.event.listen(event, handler);
+    }
+
+    // Fallback or error if not found (Tauri v1 might have it directly on __TAURI__ or different path, 
+    // but v2 usually has it under event)
+    // For v1 it was window.__TAURI__.event.listen too usually if allowed.
+
+    console.warn('Tauri Event API is not available.');
+    return () => { };
 };
 
 /**

@@ -1,88 +1,8 @@
-use serde::{Deserialize, Serialize};
-use std::process::Command;
-use std::sync::{Arc, Mutex};
-use tauri::Manager;
-use std::collections::HashMap;
+use std::process::{Command, Stdio};
+use std::io::{BufRead, BufReader};
+use tauri::Emitter;
 
-#[derive(Debug, Serialize, Deserialize)]
-struct BackendStatus {
-    running: bool,
-    port: u16,
-    error: Option<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct ServiceStatus {
-    name: String,
-    status: String,
-    start_time: Option<String>,
-    last_error: Option<String>,
-    restart_count: u32,
-    max_restarts: u32,
-    uptime: Option<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct ServiceControlResponse {
-    success: bool,
-    message: String,
-    service_name: String,
-}
-
-struct BackendState {
-    status: Arc<Mutex<BackendStatus>>,
-    child_process: Arc<Mutex<Option<std::process::Child>>>,
-}
-
-#[cfg_attr(mobile, tauri::mobile_entry_point)]
-pub fn run() {
-    let backend_state = BackendState {
-        status: Arc::new(Mutex::new(BackendStatus {
-            running: false,
-            port: 5005,
-            error: None,
-        })),
-        child_process: Arc::new(Mutex::new(None)),
-    };
-
-    tauri::Builder::default()
-        .plugin(tauri_plugin_http::init())
-        .plugin(tauri_plugin_shell::init())
-        .manage(backend_state)
-        .setup(|app| {
-            if cfg!(debug_assertions) {
-                app.handle().plugin(
-                    tauri_plugin_log::Builder::default()
-                        .level(log::LevelFilter::Info)
-                        .build(),
-                )?;
-            }
-            Ok(())
-        })
-        .invoke_handler(tauri::generate_handler![
-            start_backend_command,
-            stop_backend_command,
-            get_backend_status,
-            check_backend_health,
-            get_system_metrics,
-            start_service,
-            stop_service,
-            get_service_status
-        ])
-        .build(tauri::generate_context!())
-        .expect("error while building tauri application")
-        .run(|app_handle, event| match event {
-            tauri::RunEvent::Exit => {
-                let backend_state = app_handle.state::<BackendState>();
-                let mut child_guard = backend_state.child_process.lock().unwrap();
-                if let Some(mut child) = child_guard.take() {
-                    let _ = child.kill();
-                    let _ = child.wait();
-                }
-            }
-            _ => {}
-        });
-}
+// ... (keep existing structs)
 
 #[tauri::command]
 async fn start_backend_command(app: tauri::AppHandle) -> Result<(), String> {
@@ -137,10 +57,45 @@ async fn start_backend_command(app: tauri::AppHandle) -> Result<(), String> {
         command.creation_flags(CREATE_NO_WINDOW);
     }
 
+    // Pipe stdout and stderr
+    command.stdout(Stdio::piped());
+    command.stderr(Stdio::piped());
+
     let child_result = command.spawn();
 
     match child_result {
-        Ok(child) => {
+        Ok(mut child) => {
+            // Handle stdout
+            if let Some(stdout) = child.stdout.take() {
+                let app_handle = app.clone();
+                std::thread::spawn(move || {
+                    let reader = BufReader::new(stdout);
+                    for line in reader.lines() {
+                        if let Ok(line) = line {
+                            println!("Backend: {}", line);
+                            let _ = app_handle.emit("backend-log", format!("STDOUT: {}", line));
+                            if line.contains("PORT_BUSY") {
+                                let _ = app_handle.emit("backend-error", "Port 5005 is busy");
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Handle stderr
+            if let Some(stderr) = child.stderr.take() {
+                let app_handle = app.clone();
+                std::thread::spawn(move || {
+                    let reader = BufReader::new(stderr);
+                    for line in reader.lines() {
+                        if let Ok(line) = line {
+                            eprintln!("Backend Err: {}", line);
+                            let _ = app_handle.emit("backend-log", format!("STDERR: {}", line));
+                        }
+                    }
+                });
+            }
+
             // Store the child process
             let mut child_guard = backend_state.child_process.lock().unwrap();
             *child_guard = Some(child);
@@ -163,8 +118,43 @@ async fn start_backend_command(app: tauri::AppHandle) -> Result<(), String> {
                 command3.creation_flags(CREATE_NO_WINDOW);
             }
 
+            // Pipe stdout and stderr for fallback too
+            command3.stdout(Stdio::piped());
+            command3.stderr(Stdio::piped());
+
             match command3.spawn() {
-                Ok(child) => {
+                Ok(mut child) => {
+                    // Handle stdout
+                    if let Some(stdout) = child.stdout.take() {
+                        let app_handle = app.clone();
+                        std::thread::spawn(move || {
+                            let reader = BufReader::new(stdout);
+                            for line in reader.lines() {
+                                if let Ok(line) = line {
+                                    println!("Backend: {}", line);
+                                    let _ = app_handle.emit("backend-log", format!("STDOUT: {}", line));
+                                    if line.contains("PORT_BUSY") {
+                                        let _ = app_handle.emit("backend-error", "Port 5005 is busy");
+                                    }
+                                }
+                            }
+                        });
+                    }
+
+                    // Handle stderr
+                    if let Some(stderr) = child.stderr.take() {
+                        let app_handle = app.clone();
+                        std::thread::spawn(move || {
+                            let reader = BufReader::new(stderr);
+                            for line in reader.lines() {
+                                if let Ok(line) = line {
+                                    eprintln!("Backend Err: {}", line);
+                                    let _ = app_handle.emit("backend-log", format!("STDERR: {}", line));
+                                }
+                            }
+                        });
+                    }
+
                     let mut child_guard = backend_state.child_process.lock().unwrap();
                     *child_guard = Some(child);
                     

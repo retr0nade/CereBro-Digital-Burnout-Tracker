@@ -1193,4 +1193,18 @@ if __name__ == "__main__":
     debug = api_config.get('debug', False)
     
     print(f"Starting server on {host}:{port}...")
-    socketio.run(app, host=host, port=port, debug=debug, allow_unsafe_werkzeug=True)
+    try:
+        socketio.run(app, host=host, port=port, debug=debug, allow_unsafe_werkzeug=True)
+    except OSError as e:
+        if "Address already in use" in str(e) or "WinError 10048" in str(e):
+            print(f"PORT_BUSY: {port}")
+            # Try to kill the process on this port? 
+            # No, let the frontend handle it or the user decide.
+            # But we can try to be helpful.
+            print(f"Error: Port {port} is already in use. Please stop the existing process or change the port in config.json.")
+        else:
+            print(f"Failed to start server: {e}")
+        os._exit(1)
+    except Exception as e:
+        print(f"Critical error starting server: {e}")
+        os._exit(1)
