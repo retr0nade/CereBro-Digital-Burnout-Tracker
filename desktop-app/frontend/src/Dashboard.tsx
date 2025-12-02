@@ -11,7 +11,7 @@ import { FocusVsDistractionLine, IdleBreakBar, DonutAppUsage } from './charts';
 import { useThrottledValue } from './utils/smoothNumber';
 import ActivityTimeline from './components/ActivityTimeline';
 import SmartInsights from './components/SmartInsights';
-import { useScreenshotMode, useScreenshotData, getScreenshotSeedData } from './utils/screenshotMode';
+
 import {
   useAnalytics,
   selectDashboardSeries,
@@ -145,8 +145,7 @@ export default function Dashboard() {
   const [insights, setInsights] = useState<InsightsData | null>(null);
 
   // Screenshot mode
-  const screenshotMode = useScreenshotMode();
-  const seedData = getScreenshotSeedData();
+
 
   const loadAggregatedHistory = async (range: typeof dashRange) => {
     setLoading(true);
@@ -272,25 +271,7 @@ export default function Dashboard() {
   const throttledDashboardData = useThrottledValue(data || [], 250);
   const throttledApps = useThrottledValue(apps || [], 250);
 
-  // Convert store data to ActivityTimeline format
-  const timelineEvents = useMemo(() => {
-    const events: any[] = [];
 
-    // Add app usage events from store data
-    throttledApps.forEach((app: AppSlice, index: number) => {
-      events.push({
-        id: `usage-${index}`,
-        appName: app.name,
-        action: 'Used application',
-        timestamp: Date.now() - (index * 60000), // Simulate timestamps
-        duration: app.minutes * 60,
-        type: 'app_usage' as const
-      });
-    });
-
-    // Sort by timestamp (newest first)
-    return events.sort((a, b) => b.timestamp - a.timestamp);
-  }, [throttledApps]);
 
   // Prepare chart data from store
   const prepareScreenTimeData = () => {
@@ -344,7 +325,7 @@ export default function Dashboard() {
     return throttledDashboardData.map(point => ({
       t: point.t,
       idle: point.idle || 0,
-      focus: Math.floor(Math.random() * 15) + 2 // Simulated break minutes
+      focus: 0 // No break data available yet
     }));
   };
 
@@ -404,10 +385,10 @@ export default function Dashboard() {
     );
   }
 
-  const screenTimeData = screenshotMode.useSeedData ? seedData.screenTimeData : prepareScreenTimeData();
-  const appUsageData = screenshotMode.useSeedData ? seedData.appUsageData : prepareAppUsageData();
-  const focusDistractionData = screenshotMode.useSeedData ? seedData.focusDistractionData : prepareFocusDistractionData();
-  const idleBreakData = screenshotMode.useSeedData ? seedData.idleBreakData : prepareIdleBreakData();
+  const screenTimeData = prepareScreenTimeData();
+  const appUsageData = prepareAppUsageData();
+  const focusDistractionData = prepareFocusDistractionData();
+  const idleBreakData = prepareIdleBreakData();
 
   return (
     <div className="dashboard-content max-w-7xl mx-auto mt-4 p-4">

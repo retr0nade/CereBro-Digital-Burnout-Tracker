@@ -11,7 +11,7 @@ import ParticleEffect from "./components/ParticleEffect";
 import LoadingState from "./ui/LoadingState";
 import { toast } from './services/eventHandlers';
 import { useCursorTracking } from './hooks/useCursorTracking';
-import { useScreenshotMode, ScreenshotModeWrapper } from './utils/screenshotMode';
+
 import { invoke, isTauriAvailable } from './utils/tauri';
 
 interface BackendStatusType {
@@ -37,7 +37,7 @@ export default function App() {
   useCursorTracking();
 
   // Initialize screenshot mode
-  const screenshotMode = useScreenshotMode();
+
 
   useEffect(() => {
     // Check backend status on mount
@@ -227,36 +227,31 @@ export default function App() {
         )}
       </AppShell>
       {/* Toast notifications */}
-      <ScreenshotModeWrapper hideInScreenshot={screenshotMode.hideToastNotifications}>
-        <div className="fixed bottom-4 right-4 space-y-2 z-50 toast-notifications">
-          {toasts.map(t => (
-            <div
-              key={t.id}
-              className={`px-4 py-3 rounded-xl shadow-pop text-sm font-medium border backdrop-blur-sm ${t.type === 'error'
-                ? 'bg-danger/90 border-danger text-white'
-                : t.type === 'success'
-                  ? 'bg-ok/90 border-ok text-white'
-                  : 'bg-surface/90 border-border text-text'
-                }`}
-            >
-              {t.message}
-            </div>
-          ))}
-        </div>
-      </ScreenshotModeWrapper>
+      {/* Toast notifications */}
+      <div className="fixed bottom-4 right-4 space-y-2 z-50 toast-notifications">
+        {toasts.map(t => (
+          <div
+            key={t.id}
+            className={`px-4 py-3 rounded-xl shadow-pop text-sm font-medium border backdrop-blur-sm ${t.type === 'error'
+              ? 'bg-danger/90 border-danger text-white'
+              : t.type === 'success'
+                ? 'bg-ok/90 border-ok text-white'
+                : 'bg-surface/90 border-border text-text'
+              }`}
+          >
+            {t.message}
+          </div>
+        ))}
+      </div>
 
       {/* Debug Panel - Development Only */}
-      <ScreenshotModeWrapper hideInScreenshot={screenshotMode.hideDebugPanel}>
-        <DebugPanel />
-      </ScreenshotModeWrapper>
+      <DebugPanel />
 
       {/* Particle Effect for Theme Switch */}
-      <ScreenshotModeWrapper hideInScreenshot={screenshotMode.hideFloatingElements}>
-        <ParticleEffect
-          trigger={particleTrigger}
-          onComplete={() => setParticleTrigger(false)}
-        />
-      </ScreenshotModeWrapper>
+      <ParticleEffect
+        trigger={particleTrigger}
+        onComplete={() => setParticleTrigger(false)}
+      />
     </>
   );
 }

@@ -112,7 +112,7 @@ export default function ScreenTime() {
         id: app,
         label: app,
         value: count as number,
-        color: `hsl(${Math.random() * 360}, 70%, 50%)`
+        color: `hsl(${Math.abs(app.split('').reduce((acc, char) => char.charCodeAt(0) + ((acc << 5) - acc), 0)) % 360}, 70%, 50%)`
       }))
       .sort((a, b) => (b.value as number) - (a.value as number))
       .slice(0, 10) // Top 10 apps

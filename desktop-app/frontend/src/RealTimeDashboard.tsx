@@ -16,7 +16,7 @@ import {
 import { focusScore, formatMinutes } from './utils/derive';
 import WindowSelect from './components/WindowSelect';
 import { config } from './config';
-import { useScreenshotMode, getScreenshotSeedData } from './utils/screenshotMode';
+
 import ChartCard from './ui/ChartCard';
 import MetricTile from './ui/MetricTile';
 import LoadingState from './ui/LoadingState';
@@ -105,8 +105,7 @@ export default function RealTimeDashboard() {
   const renderCount = useRenderTracker('RealTimeDashboard');
 
   // Screenshot mode
-  const screenshotMode = useScreenshotMode();
-  const seedData = getScreenshotSeedData();
+
 
   // Create rolling window functions for different data types
   const rollingWindow72 = createRollingWindow(72); // 72 points for 6 hours at 5-min intervals
@@ -122,10 +121,6 @@ export default function RealTimeDashboard() {
 
   // Convert real-time data to ActivityTimeline format
   const timelineEvents = useMemo(() => {
-    if (screenshotMode.useSeedData) {
-      return seedData.activityTimelineEvents;
-    }
-
     const events: any[] = [];
 
     // Add real-time data points as events
@@ -141,7 +136,7 @@ export default function RealTimeDashboard() {
     });
 
     return events;
-  }, [throttledRealtimeData, screenshotMode.useSeedData, seedData]);
+  }, [throttledRealtimeData]);
 
   const fetchData = async () => {
     try {
@@ -343,7 +338,7 @@ export default function RealTimeDashboard() {
   }
 
   // Prepare real-time chart data from store
-  const inputActivityData = screenshotMode.useSeedData ? seedData.inputActivityData : [
+  const inputActivityData = [
     {
       id: 'Total Inputs',
       data: throttledRealtimeData.map((point: Point, i) => ({
@@ -367,7 +362,7 @@ export default function RealTimeDashboard() {
     }
   ];
 
-  const appUsageData = screenshotMode.useSeedData ? seedData.realtimeAppUsageData : throttledRealtimeData.map((point: Point, index) => ({
+  const appUsageData = throttledRealtimeData.map((point: Point, index) => ({
     id: `Activity-${index}`,
     label: `Activity ${index + 1}`,
     value: point.totalInputs || 0

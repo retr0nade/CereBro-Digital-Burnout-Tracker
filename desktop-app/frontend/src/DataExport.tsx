@@ -138,24 +138,13 @@ const DataExport: React.FC = () => {
         }
       } catch (error) {
         // console.error('Failed to calculate summary:', error);
-        // Fallback to mock data if API fails
-        const preset = presets.find(p => p.id === selectedPreset);
-        if (preset && selectedPreset !== 'custom') {
-          const formatDate = (date: Date) => date.toLocaleDateString('en-US', {
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric'
-          });
-
-          const dateRange = `${formatDate(preset.startDate)} - ${formatDate(preset.endDate)}`;
-
-          setSummary({
-            rows: Math.floor(Math.random() * 10000) + 100,
-            dateRange,
-            estimatedSize: `${Math.floor(Math.random() * 500) + 50} KB`,
-            tables: ['app_usage', 'focus_sessions', 'breaks', 'browser_activity']
-          });
-        }
+        // Fallback removed to ensure only real data is shown
+        setSummary({
+          rows: 0,
+          dateRange: 'Data unavailable',
+          estimatedSize: '0 KB',
+          tables: []
+        });
       }
     };
 
