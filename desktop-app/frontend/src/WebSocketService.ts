@@ -20,9 +20,12 @@ class WebSocketService {
   private status: WebSocketStatus = { connected: false, connecting: false };
   private reconnectAttempts = 0;
 
-  private setupSocket() {
+  private currentUrl: string = SOCKET_URL;
+
+  private setupSocket(url: string) {
+    this.currentUrl = url;
     try {
-      this.socket = io(SOCKET_URL, {
+      this.socket = io(url, {
         transports: ['websocket'],
         autoConnect: true,
         reconnection: true,
@@ -66,10 +69,17 @@ class WebSocketService {
     }
   }
 
-  public connect(): Promise<void> {
+  public connect(url?: string): Promise<void> {
     return new Promise((resolve, reject) => {
+      if (url && url !== this.currentUrl) {
+        if (this.socket) {
+          this.socket.disconnect();
+          this.socket = null;
+        }
+      }
+
       if (!this.socket) {
-        this.setupSocket();
+        this.setupSocket(url || this.currentUrl);
       }
 
       if (this.socket?.connected) {

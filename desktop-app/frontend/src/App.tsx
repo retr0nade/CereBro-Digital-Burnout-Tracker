@@ -13,6 +13,7 @@ import { toast } from './services/eventHandlers';
 import { useCursorTracking } from './hooks/useCursorTracking';
 
 import { invoke, isTauriAvailable } from './utils/tauri';
+import webSocketService from './WebSocketService';
 
 interface BackendStatusType {
   running: boolean;
@@ -53,6 +54,10 @@ export default function App() {
       if (isTauriAvailable()) {
         const status = await invoke('get_backend_status');
         setBackendStatus(status);
+
+        if (status.running) {
+          webSocketService.connect(`http://localhost:${status.port}`);
+        }
       } else {
         // Fallback for browser mode: Check via HTTP
         try {
@@ -70,6 +75,10 @@ export default function App() {
               port: 5005,
               error: undefined
             });
+
+            if (isRunning) {
+              webSocketService.connect('http://localhost:5005');
+            }
           } else {
             setBackendStatus(prev => ({ ...prev, running: false }));
           }

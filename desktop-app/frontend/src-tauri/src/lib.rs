@@ -2,7 +2,34 @@ use std::process::{Command, Stdio};
 use std::io::{BufRead, BufReader};
 use tauri::Emitter;
 
+use std::fs;
+use std::path::Path;
+
 // ... (keep existing structs)
+
+fn get_backend_port() -> u16 {
+    let possible_paths = vec![
+        "../../backend/backend_port.json",
+        "../../../backend/backend_port.json",
+        "../../../../backend/backend_port.json",
+        "../backend/backend_port.json",
+        "./backend/backend_port.json",
+        "backend/backend_port.json"
+    ];
+
+    for path in &possible_paths {
+        if Path::new(path).exists() {
+            if let Ok(content) = fs::read_to_string(path) {
+                if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
+                    if let Some(port) = json.get("port").and_then(|p| p.as_u64()) {
+                        return port as u16;
+                    }
+                }
+            }
+        }
+    }
+    5005 // Default fallback
+}
 
 #[tauri::command]
 async fn start_backend_command(app: tauri::AppHandle) -> Result<(), String> {
@@ -184,7 +211,8 @@ async fn stop_backend_command(app: tauri::AppHandle) -> Result<(), String> {
         .build()
         .unwrap_or_else(|_| reqwest::Client::new());
         
-    let _ = client.post("http://127.0.0.1:5005/api/shutdown").send().await;
+    let port = get_backend_port();
+    let _ = client.post(&format!("http://127.0.0.1:{}/api/shutdown", port)).send().await;
 
     // Give it a moment to shut down
     std::thread::sleep(std::time::Duration::from_millis(1000));
@@ -213,7 +241,8 @@ async fn get_backend_status(app: tauri::AppHandle) -> Result<BackendStatus, Stri
         .build()
         .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
     
-    let is_running = match client.get("http://127.0.0.1:5005/api/health").send().await {
+    let port = get_backend_port();
+    let is_running = match client.get(&format!("http://127.0.0.1:{}/api/health", port)).send().await {
         Ok(response) => response.status().is_success(),
         Err(e) => {
             println!("Backend health check failed: {:?}", e);
@@ -232,7 +261,7 @@ async fn get_backend_status(app: tauri::AppHandle) -> Result<BackendStatus, Stri
     
     Ok(BackendStatus {
         running: status.running,
-        port: status.port,
+        port: port,
         error: status.error.clone(),
     })
 }
@@ -240,7 +269,8 @@ async fn get_backend_status(app: tauri::AppHandle) -> Result<BackendStatus, Stri
 #[tauri::command]
 async fn check_backend_health() -> Result<bool, String> {
     let client = reqwest::Client::new();
-    match client.get("http://127.0.0.1:5005/api/health").send().await {
+    let port = get_backend_port();
+    match client.get(&format!("http://127.0.0.1:{}/api/health", port)).send().await {
         Ok(response) => Ok(response.status().is_success()),
         Err(_) => Ok(false),
     }
@@ -253,7 +283,8 @@ async fn get_system_metrics() -> Result<serde_json::Value, String> {
         .build()
         .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
     
-    match client.get("http://127.0.0.1:5005/api/metrics").send().await {
+    let port = get_backend_port();
+    match client.get(&format!("http://127.0.0.1:{}/api/metrics", port)).send().await {
         Ok(response) => {
             if response.status().is_success() {
                 response.json().await.map_err(|e| format!("Failed to parse JSON: {}", e))
@@ -273,8 +304,9 @@ async fn start_service(name: String) -> Result<ServiceControlResponse, String> {
     let client = reqwest::Client::new();
     
     // Call the Python backend API to start the service
+    let port = get_backend_port();
     let response = client
-        .post(&format!("http://127.0.0.1:5005/api/service/{}/start", name))
+        .post(&format!("http://127.0.0.1:{}/api/service/{}/start", port, name))
         .send()
         .await
         .map_err(|e| format!("Failed to connect to backend: {}", e))?;
@@ -296,8 +328,9 @@ async fn stop_service(name: String) -> Result<ServiceControlResponse, String> {
     let client = reqwest::Client::new();
     
     // Call the Python backend API to stop the service
+    let port = get_backend_port();
     let response = client
-        .post(&format!("http://127.0.0.1:5005/api/service/{}/stop", name))
+        .post(&format!("http://127.0.0.1:{}/api/service/{}/stop", port, name))
         .send()
         .await
         .map_err(|e| format!("Failed to connect to backend: {}", e))?;
@@ -319,8 +352,9 @@ async fn get_service_status() -> Result<HashMap<String, ServiceStatus>, String> 
     let client = reqwest::Client::new();
     
     // Call the Python backend API to get service status
+    let port = get_backend_port();
     let response = client
-        .get("http://127.0.0.1:5005/api/status")
+        .get(&format!("http://127.0.0.1:{}/api/status", port))
         .send()
         .await
         .map_err(|e| format!("Failed to connect to backend: {}", e))?;
