@@ -1,11 +1,36 @@
-use std::process::{Command, Stdio};
+use std::process::{Command, Stdio, Child};
 use std::io::{BufRead, BufReader};
-use tauri::Emitter;
-
+use tauri::{Emitter, Manager};
+use std::sync::Mutex;
+use std::collections::HashMap;
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
 
-// ... (keep existing structs)
+#[derive(Default)]
+struct BackendState {
+    child_process: Mutex<Option<Child>>,
+    status: Mutex<BackendStatus>,
+}
+
+#[derive(Clone, Serialize, Deserialize, Default)]
+struct BackendStatus {
+    running: bool,
+    port: u16,
+    error: Option<String>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct ServiceControlResponse {
+    status: String,
+    message: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct ServiceStatus {
+    status: String,
+    // Add other fields if needed, e.g., last_active
+}
 
 fn get_backend_port() -> u16 {
     let possible_paths = vec![
@@ -379,3 +404,23 @@ async fn get_service_status() -> Result<HashMap<String, ServiceStatus>, String> 
     }
 }
 
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    tauri::Builder::default()
+        .setup(|app| {
+            app.manage(BackendState::default());
+            Ok(())
+        })
+        .invoke_handler(tauri::generate_handler![
+            start_backend_command,
+            stop_backend_command,
+            get_backend_status,
+            check_backend_health,
+            get_system_metrics,
+            start_service,
+            stop_service,
+            get_service_status
+        ])
+        .run(tauri::generate_context!())
+        .expect("error while running tauri application");
+}
