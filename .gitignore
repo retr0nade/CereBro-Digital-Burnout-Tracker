@@ -22,14 +22,17 @@ backend/settings.json
 # ==============================
 node_modules/
 dist/
+dist-ssr/
 build/
 *.log
+*.local
 
 # TailwindCSS generated output (if any):
 *.css.map
 
 # Lock files (optional: include or exclude)
-package-lock.json
+# Un-ignoring package-lock.json so dependencies are deterministic
+# package-lock.json
 yarn.lock
 
 # ==============================
